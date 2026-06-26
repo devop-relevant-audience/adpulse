@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Platform, CampaignPerformanceRow, ClientRow, AlertRuleRow, AlertHistoryRow, AlertRuleInsert, ReportScheduleRow, ReportScheduleInsert, ReportRow, AdCreativeRow, CreativeStatus } from "@/lib/types/database";
+import type { Platform, CampaignPerformanceRow, ClientRow, AlertRuleRow, AlertHistoryRow, AlertRuleInsert, ReportScheduleRow, ReportScheduleInsert, ReportRow, AdCreativeRow, CreativeStatus, ChartAnnotationRow } from "@/lib/types/database";
 import type { ComparisonResult, AnomalyPoint, FunnelData, PacingData, FatigueAnalysisItem } from "@/lib/data/queries";
 import type { ChannelMixAnalysis } from "@/lib/data/optimizer";
 import type { HealthScoreResult } from "@/lib/data/health-score";
@@ -525,5 +525,63 @@ export function useCampaignComparison(params: {
       return res.json();
     },
     enabled: !!params.clientId && params.campaignIds.length >= 2,
+  });
+}
+
+// --- Chart Annotations ---
+
+export function useAnnotations(params: {
+  clientId: string | null;
+  startDate: string;
+  endDate: string;
+}) {
+  return useQuery<ChartAnnotationRow[]>({
+    queryKey: ["annotations", params],
+    queryFn: async () => {
+      const sp = new URLSearchParams({
+        clientId: params.clientId!,
+        startDate: params.startDate,
+        endDate: params.endDate,
+      });
+      const res = await fetch(`/api/annotations?${sp}`);
+      if (!res.ok) throw new Error("Failed to fetch annotations");
+      return res.json();
+    },
+    enabled: !!params.clientId,
+  });
+}
+
+export function useCreateAnnotation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (annotation: { client_id: string; date: string; content: string }) => {
+      const res = await fetch("/api/annotations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(annotation),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create annotation");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["annotations"] });
+    },
+  });
+}
+
+export function useDeleteAnnotation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/annotations?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete annotation");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["annotations"] });
+    },
   });
 }

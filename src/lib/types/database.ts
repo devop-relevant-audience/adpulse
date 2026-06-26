@@ -309,6 +309,24 @@ export interface ReportScheduleInsert {
   enabled?: boolean;
 }
 
+// --- Chart Annotations ---
+
+export interface ChartAnnotationRow {
+  id: string;
+  client_id: string;
+  date: string;
+  content: string;
+  created_at: string;
+}
+
+export interface ChartAnnotationInsert {
+  id?: string;
+  client_id: string;
+  date: string;
+  content: string;
+  created_at?: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -341,6 +359,11 @@ export interface Database {
         Row: AdCreativeRow;
         Insert: AdCreativeInsert;
         Update: Partial<AdCreativeInsert>;
+      };
+      chart_annotations: {
+        Row: ChartAnnotationRow;
+        Insert: ChartAnnotationInsert;
+        Update: Partial<ChartAnnotationInsert>;
       };
     };
     Views: Record<string, never>;
