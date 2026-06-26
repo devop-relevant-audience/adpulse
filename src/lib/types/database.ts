@@ -12,7 +12,7 @@ export interface ClientInsert {
   created_at?: string;
 }
 
-export const PLATFORMS = ["google", "meta", "tiktok"] as const;
+export const PLATFORMS = ['google', 'meta', 'tiktok'] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
 export interface CampaignPerformanceRow {
@@ -98,7 +98,7 @@ export interface ChatSessionInsert {
 export interface ChatMessageRow {
   id: string;
   session_id: string;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   reference_context: Record<string, unknown> | null;
   created_at: string;
@@ -107,7 +107,7 @@ export interface ChatMessageRow {
 export interface ChatMessageInsert {
   id?: string;
   session_id: string;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   reference_context?: Record<string, unknown> | null;
   created_at?: string;
@@ -115,10 +115,10 @@ export interface ChatMessageInsert {
 
 // --- Ad Creatives ---
 
-export const CREATIVE_TYPES = ["image", "video", "carousel"] as const;
+export const CREATIVE_TYPES = ['image', 'video', 'carousel'] as const;
 export type CreativeType = (typeof CREATIVE_TYPES)[number];
 
-export const CREATIVE_STATUSES = ["active", "fatigued", "paused"] as const;
+export const CREATIVE_STATUSES = ['active', 'fatigued', 'paused'] as const;
 export type CreativeStatus = (typeof CREATIVE_STATUSES)[number];
 
 export interface AdCreativeRow {
@@ -173,22 +173,22 @@ export interface AdCreativeInsert {
 
 // --- Alerts & Notifications ---
 
-export const ALERT_METRICS = ["spend", "cpa", "ctr", "cpc", "conversions", "impressions"] as const;
+export const ALERT_METRICS = ['spend', 'cpa', 'ctr', 'cpc', 'conversions', 'impressions'] as const;
 export type AlertMetric = (typeof ALERT_METRICS)[number];
 
-export const ALERT_CONDITIONS = ["above", "below", "increases_by_pct", "decreases_by_pct"] as const;
+export const ALERT_CONDITIONS = ['above', 'below', 'increases_by_pct', 'decreases_by_pct'] as const;
 export type AlertCondition = (typeof ALERT_CONDITIONS)[number];
 
-export const EVALUATION_WINDOWS = ["daily", "weekly"] as const;
+export const EVALUATION_WINDOWS = ['daily', 'weekly'] as const;
 export type EvaluationWindow = (typeof EVALUATION_WINDOWS)[number];
 
-export const ALERT_FREQUENCIES = ["realtime", "hourly_digest", "daily_digest"] as const;
+export const ALERT_FREQUENCIES = ['realtime', 'hourly_digest', 'daily_digest'] as const;
 export type AlertFrequency = (typeof ALERT_FREQUENCIES)[number];
 
-export const ALERT_SEVERITIES = ["critical", "warning", "info"] as const;
+export const ALERT_SEVERITIES = ['critical', 'warning', 'info'] as const;
 export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
 
-export const ALERT_STATUSES = ["triggered", "acknowledged", "resolved"] as const;
+export const ALERT_STATUSES = ['triggered', 'acknowledged', 'resolved'] as const;
 export type AlertStatus = (typeof ALERT_STATUSES)[number];
 
 export interface AlertRuleRow {
@@ -263,10 +263,10 @@ export interface AlertHistoryInsert {
 
 // --- Scheduled Report Delivery ---
 
-export const SCHEDULE_FREQUENCIES = ["daily", "weekly", "biweekly", "monthly", "quarterly"] as const;
+export const SCHEDULE_FREQUENCIES = ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly'] as const;
 export type ScheduleFrequency = (typeof SCHEDULE_FREQUENCIES)[number];
 
-export const DATE_RANGE_TYPES = ["last_7", "last_14", "last_30", "last_month", "last_quarter", "month_to_date", "custom"] as const;
+export const DATE_RANGE_TYPES = ['last_7', 'last_14', 'last_30', 'last_month', 'last_quarter', 'month_to_date', 'custom'] as const;
 export type DateRangeType = (typeof DATE_RANGE_TYPES)[number];
 
 export interface ReportScheduleRow {
@@ -309,24 +309,6 @@ export interface ReportScheduleInsert {
   enabled?: boolean;
 }
 
-// --- Chart Annotations ---
-
-export interface ChartAnnotationRow {
-  id: string;
-  client_id: string;
-  date: string;
-  content: string;
-  created_at: string;
-}
-
-export interface ChartAnnotationInsert {
-  id?: string;
-  client_id: string;
-  date: string;
-  content: string;
-  created_at?: string;
-}
-
 export interface Database {
   public: {
     Tables: {
@@ -359,11 +341,6 @@ export interface Database {
         Row: AdCreativeRow;
         Insert: AdCreativeInsert;
         Update: Partial<AdCreativeInsert>;
-      };
-      chart_annotations: {
-        Row: ChartAnnotationRow;
-        Insert: ChartAnnotationInsert;
-        Update: Partial<ChartAnnotationInsert>;
       };
     };
     Views: Record<string, never>;
