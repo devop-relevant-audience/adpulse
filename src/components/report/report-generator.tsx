@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,6 +25,16 @@ export function ReportGenerator() {
   const [generatingFormat, setGeneratingFormat] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
+
+  const lastParamsRef = useRef<string>("");
+
+  useEffect(() => {
+    const key = `${clientId}|${dateRange.start}|${dateRange.end}`;
+    if (lastParamsRef.current && lastParamsRef.current !== key) {
+      setReportData(null);
+    }
+    lastParamsRef.current = key;
+  }, [clientId, dateRange.start, dateRange.end]);
 
   const selectedClient = clients?.find((c) => c.id === clientId);
 

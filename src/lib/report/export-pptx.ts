@@ -459,23 +459,161 @@ export async function exportPptx(data: ReportData): Promise<void> {
   });
   addFooter(s8);
 
-  // ── Slide 9: Recommendations ──
-  const s9 = pptx.addSlide();
-  s9.background = { color: C.white };
-  addSlideTitle(s9, "Recommendations", C.amber);
+  // ── Slide 9: Creative Performance ──
+  if (data.creatives && data.creatives.totalCreatives > 0) {
+    const s9 = pptx.addSlide();
+    s9.background = { color: C.white };
+    addSlideTitle(s9, "Creative Performance", "D946EF");
 
-  s9.addShape("roundRect" as PptxGenJS.ShapeType, {
+    const crKpis = [
+      { label: "Total Creatives", value: `${data.creatives.totalCreatives}` },
+      { label: "Avg CTR", value: `${data.creatives.avgCtr}%` },
+      { label: "Avg CPA", value: `$${data.creatives.avgCpa}` },
+      { label: "Fatigued", value: `${data.creatives.fatiguedCount}` },
+    ];
+
+    crKpis.forEach((kpi, i) => {
+      const kx = 0.4 + i * 3.2;
+      s9.addShape("roundRect" as PptxGenJS.ShapeType, {
+        x: kx, y: 1.0, w: 3.0, h: 0.9,
+        fill: { color: C.bg }, rectRadius: 0.06,
+      });
+      s9.addText(kpi.label, {
+        x: kx + 0.15, y: 1.06, w: 2.7, h: 0.2,
+        fontSize: 8, bold: true, color: C.faint, fontFace: FONT,
+      });
+      s9.addText(kpi.value, {
+        x: kx + 0.15, y: 1.3, w: 2.7, h: 0.45,
+        fontSize: 20, bold: true, color: i === 3 && data.creatives.fatiguedCount > 0 ? C.amber : C.dark, fontFace: FONT,
+      });
+    });
+
+    s9.addText(truncate(data.narratives.creatives || "", 350), {
+      x: 0.4, y: 2.1, w: 12.5, h: 1.0,
+      fontSize: 10, color: C.muted, fontFace: FONT, valign: "top", lineSpacingMultiple: 1.5,
+      shrinkText: true,
+    });
+
+    if (data.creatives.topPerformers.length > 0) {
+      s9.addText("Top Creatives", {
+        x: 0.4, y: 3.2, w: 3, h: 0.25,
+        fontSize: 8, bold: true, color: C.faint, fontFace: FONT,
+      });
+      data.creatives.topPerformers.slice(0, 5).forEach((cr, i) => {
+        const cy = 3.5 + i * 0.42;
+        s9.addShape("roundRect" as PptxGenJS.ShapeType, {
+          x: 0.4, y: cy, w: 12.5, h: 0.38,
+          fill: { color: i % 2 === 0 ? C.bg : C.white }, rectRadius: 0.03,
+        });
+        s9.addText(`${i + 1}. ${truncate(cr.headline, 30)}`, {
+          x: 0.6, y: cy, w: 5.5, h: 0.38,
+          fontSize: 9, color: C.dark, fontFace: FONT, valign: "middle",
+        });
+        s9.addText(`${cr.platform} / ${cr.type}`, {
+          x: 6.2, y: cy, w: 2.0, h: 0.38,
+          fontSize: 8, color: C.muted, fontFace: FONT, valign: "middle",
+        });
+        s9.addText(`${cr.conversions} conv.`, {
+          x: 8.4, y: cy, w: 1.5, h: 0.38,
+          fontSize: 9, bold: true, color: C.dark, fontFace: FONT, align: "right", valign: "middle",
+        });
+        s9.addText(`$${cr.cpa} CPA`, {
+          x: 10.0, y: cy, w: 1.5, h: 0.38,
+          fontSize: 9, color: C.dark, fontFace: FONT, align: "right", valign: "middle",
+        });
+        s9.addText(`${cr.ctr}% CTR`, {
+          x: 11.5, y: cy, w: 1.4, h: 0.38,
+          fontSize: 9, color: C.dark, fontFace: FONT, align: "right", valign: "middle",
+        });
+      });
+    }
+    addFooter(s9);
+  }
+
+  // ── Slide 10: Budget Optimization ──
+  if (data.optimizer && data.optimizer.platforms.length > 0) {
+    const s10 = pptx.addSlide();
+    s10.background = { color: C.white };
+    addSlideTitle(s10, "Budget Optimization", C.teal);
+
+    s10.addText(truncate(data.narratives.optimizer || "", 350), {
+      x: 0.4, y: 1.0, w: 12.5, h: 1.0,
+      fontSize: 10, color: C.muted, fontFace: FONT, valign: "top", lineSpacingMultiple: 1.5,
+      shrinkText: true,
+    });
+
+    s10.addText("Channel Efficiency", {
+      x: 0.4, y: 2.2, w: 4, h: 0.25,
+      fontSize: 8, bold: true, color: C.faint, fontFace: FONT,
+    });
+
+    data.optimizer.platforms.forEach((p, i) => {
+      const py = 2.5 + i * 0.7;
+      const sc = scoreColor(p.efficiencyScore);
+      s10.addShape("roundRect" as PptxGenJS.ShapeType, {
+        x: 0.4, y: py, w: 6.0, h: 0.6,
+        fill: { color: C.bg }, rectRadius: 0.04,
+      });
+      s10.addText(`${i + 1}. ${p.platform.charAt(0).toUpperCase() + p.platform.slice(1)}`, {
+        x: 0.6, y: py + 0.05, w: 2.5, h: 0.25,
+        fontSize: 10, bold: true, color: C.dark, fontFace: FONT,
+      });
+      s10.addText(`Efficiency: ${p.efficiencyScore}/100`, {
+        x: 3.2, y: py + 0.05, w: 3.0, h: 0.25,
+        fontSize: 9, bold: true, color: sc, fontFace: FONT, align: "right",
+      });
+      s10.addShape("roundRect" as PptxGenJS.ShapeType, {
+        x: 0.6, y: py + 0.38, w: 5.6, h: 0.08,
+        fill: { color: C.border }, rectRadius: 0.02,
+      });
+      s10.addShape("roundRect" as PptxGenJS.ShapeType, {
+        x: 0.6, y: py + 0.38, w: Math.max(0.1, 5.6 * p.efficiencyScore / 100), h: 0.08,
+        fill: { color: sc }, rectRadius: 0.02,
+      });
+    });
+
+    if (data.optimizer.projectedImpact.additionalConversions > 0 || data.optimizer.projectedImpact.cpaReduction > 0) {
+      s10.addShape("roundRect" as PptxGenJS.ShapeType, {
+        x: 7.0, y: 2.5, w: 5.9, h: 1.5,
+        fill: { color: "ECFEFF" }, rectRadius: 0.06,
+        line: { color: "A5F3FC", width: 1 },
+      });
+      s10.addText("Projected Impact", {
+        x: 7.2, y: 2.6, w: 5.5, h: 0.3,
+        fontSize: 8, bold: true, color: "0E7490", fontFace: FONT,
+      });
+      let impactText = "";
+      if (data.optimizer.projectedImpact.additionalConversions > 0) {
+        impactText += `+${data.optimizer.projectedImpact.additionalConversions} additional conversions\n`;
+      }
+      if (data.optimizer.projectedImpact.cpaReduction > 0) {
+        impactText += `-${data.optimizer.projectedImpact.cpaReduction}% CPA reduction`;
+      }
+      s10.addText(impactText, {
+        x: 7.2, y: 2.95, w: 5.5, h: 0.9,
+        fontSize: 14, bold: true, color: "0E7490", fontFace: FONT, valign: "top", lineSpacingMultiple: 1.6,
+      });
+    }
+    addFooter(s10);
+  }
+
+  // ── Slide: Recommendations ──
+  const sRec = pptx.addSlide();
+  sRec.background = { color: C.white };
+  addSlideTitle(sRec, "Recommendations", C.amber);
+
+  sRec.addShape("roundRect" as PptxGenJS.ShapeType, {
     x: 0.4, y: 1.0, w: 12.5, h: 3.6,
     fill: { color: C.amberBg }, rectRadius: 0.08,
   });
-  s9.addText(truncate(data.narratives.recommendations, 800), {
+  sRec.addText(truncate(data.narratives.recommendations, 800), {
     x: 0.7, y: 1.2, w: 12, h: 3.2,
     fontSize: 12, color: "92400E", fontFace: FONT,
     valign: "top", lineSpacingMultiple: 1.7, paraSpaceAfter: 6,
     shrinkText: true,
   });
 
-  s9.addText("Generated by AdPulse", {
+  sRec.addText("Generated by AdPulse", {
     x: 0.4, y: 4.8, w: 12.5, h: 0.3,
     fontSize: 9, color: C.faint, fontFace: FONT, align: "center",
   });

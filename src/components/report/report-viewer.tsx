@@ -13,6 +13,11 @@ import {
   ChevronRight,
   Lightbulb,
   MessageCircle,
+  Image,
+  Layers,
+  Video,
+  AlertTriangle,
+  PieChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
@@ -665,6 +670,299 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
           </div>
         </div>
       </section>
+
+      {/* Creative Performance */}
+      {data.creatives && data.creatives.totalCreatives > 0 && (
+        <section>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-fuchsia-500 to-pink-400 flex items-center justify-center text-white shrink-0">
+              <Image className="w-4 h-4" />
+            </div>
+            <h3 className="text-[15px] font-semibold text-ink">Creative Performance</h3>
+          </div>
+          <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.creatives}</p>
+
+          {/* Creative KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="bg-white rounded-xl border border-hairline p-4">
+              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Total Creatives</p>
+              <p className="text-xl font-bold text-ink tabular-nums mt-1">{data.creatives.totalCreatives}</p>
+              <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-ink-muted">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />{data.creatives.activeCount} active
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 ml-1" />{data.creatives.fatiguedCount} fatigued
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-hairline p-4">
+              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Avg CTR</p>
+              <p className="text-xl font-bold text-ink tabular-nums mt-1">{data.creatives.avgCtr}%</p>
+            </div>
+            <div className="bg-white rounded-xl border border-hairline p-4">
+              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Avg CPA</p>
+              <p className="text-xl font-bold text-ink tabular-nums mt-1">${data.creatives.avgCpa}</p>
+            </div>
+            <div className={cn("bg-white rounded-xl border p-4", data.creatives.fatiguedCount > 0 ? "border-amber-200" : "border-hairline")}>
+              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Fatigued</p>
+              <p className={cn("text-xl font-bold tabular-nums mt-1", data.creatives.fatiguedCount > 0 ? "text-amber-600" : "text-ink")}>{data.creatives.fatiguedCount}</p>
+              {data.creatives.fatiguedCount > 0 && <p className="text-[10px] text-amber-500 mt-0.5">needs refresh</p>}
+            </div>
+          </div>
+
+          {/* By Creative Type */}
+          {data.creatives.byType.length > 0 && (
+            <div className="bg-white rounded-xl border border-hairline p-4 mb-4">
+              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Performance by Creative Type</p>
+              <div className="grid gap-2">
+                {data.creatives.byType.sort((a, b) => b.totalConversions - a.totalConversions).map((t) => {
+                  const TypeIcon = t.type === "video" ? Video : t.type === "carousel" ? Layers : Image;
+                  return (
+                    <div key={t.type} className="flex items-center gap-3 bg-canvas-soft/60 rounded-lg px-3 py-2.5">
+                      <div className="w-7 h-7 rounded-md bg-white border border-hairline flex items-center justify-center shrink-0">
+                        <TypeIcon className="w-3.5 h-3.5 text-ink-muted" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-ink capitalize">{t.type}</p>
+                        <p className="text-[10px] text-ink-muted">{t.count} creatives</p>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0 text-right">
+                        <div>
+                          <p className="text-[9px] text-ink-muted uppercase">CTR</p>
+                          <p className="text-[12px] font-semibold text-ink tabular-nums">{t.avgCtr}%</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-ink-muted uppercase">CPA</p>
+                          <p className="text-[12px] font-semibold text-ink tabular-nums">${t.avgCpa}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-ink-muted uppercase">Conv.</p>
+                          <p className="text-[12px] font-semibold text-ink tabular-nums">{formatNum(t.totalConversions)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-ink-muted uppercase">Spend</p>
+                          <p className="text-[12px] font-semibold text-ink tabular-nums">{formatCurrency(t.totalSpend)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Top Creative Performers */}
+          {data.creatives.topPerformers.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Top Creatives
+              </p>
+              <div className="space-y-2">
+                {data.creatives.topPerformers.map((cr, i) => (
+                  <div key={cr.headline + i} className="bg-white rounded-xl border border-hairline p-3 flex items-center gap-3">
+                    <div className={cn(
+                      "w-7 h-7 rounded-lg flex items-center justify-center text-[12px] font-bold text-white shrink-0",
+                      i === 0 ? "bg-fuchsia-500" : i === 1 ? "bg-fuchsia-400" : "bg-fuchsia-300"
+                    )}>
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-ink truncate">{cr.headline}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Badge variant="secondary" className="text-[9px] capitalize">{cr.platform}</Badge>
+                        <Badge variant="secondary" className="text-[9px] capitalize">{cr.type}</Badge>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0">
+                      <div className="text-right">
+                        <p className="text-[10px] text-ink-muted">Conv.</p>
+                        <p className="text-[13px] font-bold text-ink tabular-nums">{cr.conversions}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-ink-muted">CPA</p>
+                        <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(cr.cpa)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-ink-muted">CTR</p>
+                        <p className="text-[13px] font-semibold text-ink tabular-nums">{cr.ctr}%</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Fatigued Creatives */}
+          {data.creatives.fatiguedCreatives.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Creative Fatigue Alert
+              </p>
+              <div className="space-y-2">
+                {data.creatives.fatiguedCreatives.map((f, i) => (
+                  <div key={f.headline + i} className="bg-amber-50/50 rounded-xl border border-amber-100 p-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-ink truncate">{f.headline}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Badge variant="secondary" className="text-[9px] capitalize">{f.platform}</Badge>
+                        <span className="text-[10px] text-amber-600 font-medium">{f.daysRunning} days running</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0">
+                      <div className="text-right">
+                        <p className="text-[10px] text-ink-muted">Fatigue</p>
+                        <p className="text-[13px] font-bold text-amber-600 tabular-nums">{f.fatigueScore.toFixed(0)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-ink-muted">CTR</p>
+                        <p className="text-[13px] font-semibold text-ink tabular-nums">{f.ctr}%</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-ink-muted">CPA</p>
+                        <p className="text-[13px] font-semibold text-ink tabular-nums">${f.cpa}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Budget Optimizer */}
+      {data.optimizer && data.optimizer.platforms.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-cyan-500 to-blue-400 flex items-center justify-center text-white shrink-0">
+              <PieChart className="w-4 h-4" />
+            </div>
+            <h3 className="text-[15px] font-semibold text-ink">Budget Optimization</h3>
+          </div>
+          <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.optimizer}</p>
+
+          {/* Allocation comparison */}
+          <div className="bg-white rounded-xl border border-hairline p-5 mb-4">
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Current Allocation</p>
+                <div className="space-y-2">
+                  {data.optimizer.platforms.map((p) => (
+                    <div key={`cur-${p.platform}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] || "#888" }} />
+                          <span className="text-[12px] font-medium text-ink capitalize">{p.platform}</span>
+                        </div>
+                        <span className="text-[12px] font-semibold text-ink tabular-nums">{p.currentAllocation}%</span>
+                      </div>
+                      <div className="h-2 bg-canvas-soft rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${p.currentAllocation}%`, backgroundColor: PLATFORM_COLORS[p.platform] || "#888", opacity: 0.7 }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Recommended Allocation</p>
+                <div className="space-y-2">
+                  {data.optimizer.platforms.map((p) => {
+                    const recommended = data.optimizer.recommendedAllocation[p.platform] ?? p.currentAllocation;
+                    const diff = recommended - p.currentAllocation;
+                    return (
+                      <div key={`rec-${p.platform}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] || "#888" }} />
+                            <span className="text-[12px] font-medium text-ink capitalize">{p.platform}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[12px] font-semibold text-ink tabular-nums">{recommended.toFixed(1)}%</span>
+                            {diff !== 0 && (
+                              <span className={cn("text-[10px] font-medium", diff > 0 ? "text-emerald-600" : "text-red-500")}>
+                                {diff > 0 ? "+" : ""}{diff.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="h-2 bg-canvas-soft rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${recommended}%`, backgroundColor: PLATFORM_COLORS[p.platform] || "#888" }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Platform Efficiency Scores */}
+          <div className="bg-white rounded-xl border border-hairline p-4 mb-4">
+            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Channel Efficiency Ranking</p>
+            <div className="space-y-2.5">
+              {data.optimizer.platforms.map((p, i) => {
+                const color = getScoreColor(p.efficiencyScore);
+                return (
+                  <div key={p.platform} className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold text-white shrink-0",
+                      i === 0 ? "bg-cyan-500" : i === 1 ? "bg-cyan-400" : "bg-cyan-300"
+                    )}>
+                      {i + 1}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[12px] font-medium text-ink capitalize">{p.platform}</span>
+                        <span className="text-[12px] font-bold tabular-nums" style={{ color }}>{p.efficiencyScore}/100</span>
+                      </div>
+                      <div className="h-2 bg-canvas-soft rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${p.efficiencyScore}%`, backgroundColor: color }} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 text-right">
+                      <div>
+                        <p className="text-[9px] text-ink-muted uppercase">CPA</p>
+                        <p className="text-[12px] font-semibold text-ink tabular-nums">{formatCurrency(p.cpa)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-ink-muted uppercase">Trend</p>
+                        <p className={cn("text-[12px] font-semibold tabular-nums", p.recentCpaTrend <= 0 ? "text-emerald-600" : "text-red-500")}>
+                          {p.recentCpaTrend > 0 ? "+" : ""}{p.recentCpaTrend}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Projected Impact */}
+          {(data.optimizer.projectedImpact.additionalConversions > 0 || data.optimizer.projectedImpact.cpaReduction > 0) && (
+            <div className="bg-linear-to-r from-cyan-50 to-blue-50/50 rounded-xl p-4 border border-cyan-100">
+              <p className="text-[11px] font-semibold text-cyan-700 uppercase tracking-wider mb-2">Projected Impact of Reallocation</p>
+              <div className="flex items-center gap-6">
+                {data.optimizer.projectedImpact.additionalConversions > 0 && (
+                  <div>
+                    <p className="text-lg font-bold text-cyan-700">+{data.optimizer.projectedImpact.additionalConversions}</p>
+                    <p className="text-[10px] text-cyan-600">additional conversions</p>
+                  </div>
+                )}
+                {data.optimizer.projectedImpact.cpaReduction > 0 && (
+                  <div>
+                    <p className="text-lg font-bold text-cyan-700">-{data.optimizer.projectedImpact.cpaReduction}%</p>
+                    <p className="text-[10px] text-cyan-600">CPA reduction</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Recommendations */}
       <section>

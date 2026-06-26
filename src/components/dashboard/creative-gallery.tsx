@@ -13,7 +13,9 @@ import {
   MessageCircle,
   ArrowUpDown,
   TrendingDown,
+  Sparkles,
 } from "lucide-react";
+import { CreativeGenerator } from "@/components/dashboard/creative-generator";
 import type { AdCreativeRow, Platform, CreativeStatus } from "@/lib/types/database";
 
 const PLATFORM_DOTS: Record<Platform, string> = {
@@ -221,6 +223,7 @@ export function CreativeGallery() {
   const [statusFilter, setStatusFilter] = useState<CreativeStatus | "">("");
   const [sortBy, setSortBy] = useState<SortKey>("spend");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [generatorOpen, setGeneratorOpen] = useState(false);
 
   const { data: creatives, isLoading } = useCreatives({
     clientId,
@@ -281,6 +284,13 @@ export function CreativeGallery() {
           <span className="text-[11px] text-ink-muted bg-canvas-soft px-2 py-0.5 rounded-md font-medium">
             {allCreatives.length}
           </span>
+          <button
+            onClick={() => setGeneratorOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Generate Variants
+          </button>
         </div>
 
         {/* Filters */}
@@ -376,6 +386,8 @@ export function CreativeGallery() {
           ))}
         </div>
       )}
+
+      <CreativeGenerator open={generatorOpen} onOpenChange={setGeneratorOpen} />
     </div>
   );
 }

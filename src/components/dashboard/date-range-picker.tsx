@@ -16,6 +16,7 @@ const PRESETS = [
   { label: "Last 7 days", id: "last-7", getRange: (today: Date) => ({ start: format(subDays(today, 7), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }) },
   { label: "Last 14 days", id: "last-14", getRange: (today: Date) => ({ start: format(subDays(today, 14), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }) },
   { label: "Last 30 days", id: "last-30", getRange: (today: Date) => ({ start: format(subDays(today, 30), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }) },
+  { label: "Last 60 days", id: "last-60", getRange: (today: Date) => ({ start: format(subDays(today, 60), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }) },
   { label: "Last 90 days", id: "last-90", getRange: (today: Date) => ({ start: format(subDays(today, 90), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }) },
   { label: "Month to date", id: "mtd", getRange: (today: Date) => ({ start: format(startOfMonth(today), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }) },
   { label: "Last month", id: "last-month", getRange: (today: Date) => {

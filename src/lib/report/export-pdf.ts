@@ -428,6 +428,89 @@ export function generatePdfHtml(data: ReportData): string {
       </div>
     </div>
 
+    <!-- Creative Performance -->
+    ${data.creatives && data.creatives.totalCreatives > 0 ? `<div class="section">
+      <div class="section-title">
+        <div class="icon" style="background:linear-gradient(135deg,#d946ef,#f472b6)">&#127912;</div>
+        <h2>Creative Performance</h2>
+      </div>
+      <p class="narrative">${esc(narratives.creatives || "")}</p>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="label">Total Creatives</div><div class="value">${data.creatives.totalCreatives}</div><div style="font-size:10px;color:#615d59;margin-top:4px">${data.creatives.activeCount} active, ${data.creatives.fatiguedCount} fatigued</div></div>
+        <div class="kpi-card"><div class="label">Avg CTR</div><div class="value">${data.creatives.avgCtr}%</div></div>
+        <div class="kpi-card"><div class="label">Avg CPA</div><div class="value">$${data.creatives.avgCpa}</div></div>
+        <div class="kpi-card" ${data.creatives.fatiguedCount > 0 ? 'style="border-color:#fde68a"' : ""}><div class="label">Fatigued</div><div class="value" ${data.creatives.fatiguedCount > 0 ? 'style="color:#d97706"' : ""}>${data.creatives.fatiguedCount}</div>${data.creatives.fatiguedCount > 0 ? '<div style="font-size:10px;color:#d97706;margin-top:4px">needs refresh</div>' : ""}</div>
+      </div>
+      ${data.creatives.byType.length > 0 ? `<div class="sub-label" style="margin-top:16px">Performance by Creative Type</div>
+      ${data.creatives.byType.sort((a, b) => b.totalConversions - a.totalConversions).map((t) => `<div style="display:flex;align-items:center;gap:10px;background:#f8f7f6;border-radius:10px;padding:10px 14px;margin-bottom:6px">
+        <div style="flex:1"><div style="font-size:12px;font-weight:600;color:#1a1a1a;text-transform:capitalize">${esc(t.type)}</div><div style="font-size:10px;color:#615d59">${t.count} creatives</div></div>
+        <div style="display:flex;gap:16px;flex-shrink:0">
+          <div style="text-align:right"><div style="font-size:8px;text-transform:uppercase;color:#a39e98">CTR</div><div style="font-size:12px;font-weight:600">${t.avgCtr}%</div></div>
+          <div style="text-align:right"><div style="font-size:8px;text-transform:uppercase;color:#a39e98">CPA</div><div style="font-size:12px;font-weight:600">$${t.avgCpa}</div></div>
+          <div style="text-align:right"><div style="font-size:8px;text-transform:uppercase;color:#a39e98">Conv.</div><div style="font-size:12px;font-weight:600">${formatNum(t.totalConversions)}</div></div>
+        </div>
+      </div>`).join("")}` : ""}
+      ${data.creatives.topPerformers.length > 0 ? `<div class="sub-label" style="margin-top:16px"><span style="color:#16a34a">&#9650;</span> Top Creatives</div>
+      <div class="camp-list">${data.creatives.topPerformers.map((cr, i) => `<div class="camp-row top">
+        <div class="camp-rank" style="background:${i < 2 ? "#d946ef" : "#f0abfc"}">${i + 1}</div>
+        <div class="camp-info"><div class="camp-name">${esc(cr.headline)}</div><span class="camp-platform">${esc(cr.platform)} / ${esc(cr.type)}</span></div>
+        <div class="camp-stats">
+          <div class="camp-stat"><div class="camp-stat-label">Conv.</div><div class="camp-stat-value">${cr.conversions}</div></div>
+          <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">${formatCurrency(cr.cpa)}</div></div>
+          <div class="camp-stat"><div class="camp-stat-label">CTR</div><div class="camp-stat-value">${cr.ctr}%</div></div>
+        </div>
+      </div>`).join("")}</div>` : ""}
+      ${data.creatives.fatiguedCreatives.length > 0 ? `<div class="sub-label" style="margin-top:16px"><span style="color:#d97706">&#9888;</span> Creative Fatigue Alert</div>
+      <div class="camp-list">${data.creatives.fatiguedCreatives.map((f) => `<div class="camp-row warn">
+        <div class="camp-info"><div class="camp-name">${esc(f.headline)}</div><span class="camp-platform">${esc(f.platform)} &middot; ${f.daysRunning} days</span></div>
+        <div class="camp-stats">
+          <div class="camp-stat"><div class="camp-stat-label">Fatigue</div><div class="camp-stat-value" style="color:#d97706">${f.fatigueScore.toFixed(0)}</div></div>
+          <div class="camp-stat"><div class="camp-stat-label">CTR</div><div class="camp-stat-value">${f.ctr}%</div></div>
+          <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">$${f.cpa}</div></div>
+        </div>
+      </div>`).join("")}</div>` : ""}
+    </div>` : ""}
+
+    <!-- Budget Optimization -->
+    ${data.optimizer && data.optimizer.platforms.length > 0 ? `<div class="section">
+      <div class="section-title">
+        <div class="icon" style="background:linear-gradient(135deg,#06b6d4,#38bdf8)">&#9878;</div>
+        <h2>Budget Optimization</h2>
+      </div>
+      <p class="narrative">${esc(narratives.optimizer || "")}</p>
+      <div class="platform-grid">
+        <div style="background:#f8f7f6;border-radius:12px;padding:16px">
+          <div class="sub-label">Current Allocation</div>
+          ${data.optimizer.platforms.map((p) => `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${PLATFORM_COLORS[p.platform] || "#888"}"></span><span style="font-size:11px;font-weight:500;text-transform:capitalize">${esc(p.platform)}</span></div><span style="font-size:11px;font-weight:600">${p.currentAllocation}%</span></div><div style="height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden"><div style="height:100%;width:${p.currentAllocation}%;background:${PLATFORM_COLORS[p.platform] || "#888"};opacity:0.7;border-radius:3px"></div></div></div>`).join("")}
+        </div>
+        <div style="background:#f8f7f6;border-radius:12px;padding:16px">
+          <div class="sub-label">Recommended Allocation</div>
+          ${data.optimizer.platforms.map((p) => {
+            const rec = data.optimizer.recommendedAllocation[p.platform] ?? p.currentAllocation;
+            const diff = rec - p.currentAllocation;
+            return `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${PLATFORM_COLORS[p.platform] || "#888"}"></span><span style="font-size:11px;font-weight:500;text-transform:capitalize">${esc(p.platform)}</span></div><span style="font-size:11px;font-weight:600">${rec.toFixed(1)}% ${diff !== 0 ? `<span style="color:${diff > 0 ? "#16a34a" : "#dc2626"};font-size:10px">(${diff > 0 ? "+" : ""}${diff.toFixed(1)}%)</span>` : ""}</span></div><div style="height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden"><div style="height:100%;width:${rec}%;background:${PLATFORM_COLORS[p.platform] || "#888"};border-radius:3px"></div></div></div>`;
+          }).join("")}
+        </div>
+      </div>
+      <div class="sub-label" style="margin-top:12px">Channel Efficiency Ranking</div>
+      ${data.optimizer.platforms.map((p, i) => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="width:22px;height:22px;border-radius:6px;background:${i === 0 ? "#06b6d4" : i === 1 ? "#67e8f9" : "#a5f3fc"};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">${i + 1}</div>
+        <div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:11px;font-weight:500;text-transform:capitalize">${esc(p.platform)}</span><span style="font-size:11px;font-weight:700;color:${scoreColor(p.efficiencyScore)}">${p.efficiencyScore}/100</span></div><div style="height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden"><div style="height:100%;width:${p.efficiencyScore}%;background:${scoreColor(p.efficiencyScore)};border-radius:3px"></div></div></div>
+        <div style="display:flex;gap:12px;flex-shrink:0;text-align:right">
+          <div><div style="font-size:8px;text-transform:uppercase;color:#a39e98">CPA</div><div style="font-size:11px;font-weight:600">${formatCurrency(p.cpa)}</div></div>
+          <div><div style="font-size:8px;text-transform:uppercase;color:#a39e98">Trend</div><div style="font-size:11px;font-weight:600;color:${p.recentCpaTrend <= 0 ? "#16a34a" : "#dc2626"}">${p.recentCpaTrend > 0 ? "+" : ""}${p.recentCpaTrend}%</div></div>
+        </div>
+      </div>`).join("")}
+      ${data.optimizer.projectedImpact.additionalConversions > 0 || data.optimizer.projectedImpact.cpaReduction > 0 ? `
+      <div style="background:linear-gradient(135deg,#ecfeff,#cffafe);border:1px solid #a5f3fc;border-radius:12px;padding:16px;margin-top:14px">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#0e7490;margin-bottom:8px">Projected Impact of Reallocation</div>
+        <div style="display:flex;gap:24px">
+          ${data.optimizer.projectedImpact.additionalConversions > 0 ? `<div><div style="font-size:18px;font-weight:700;color:#0e7490">+${data.optimizer.projectedImpact.additionalConversions}</div><div style="font-size:10px;color:#0891b2">additional conversions</div></div>` : ""}
+          ${data.optimizer.projectedImpact.cpaReduction > 0 ? `<div><div style="font-size:18px;font-weight:700;color:#0e7490">-${data.optimizer.projectedImpact.cpaReduction}%</div><div style="font-size:10px;color:#0891b2">CPA reduction</div></div>` : ""}
+        </div>
+      </div>` : ""}
+    </div>` : ""}
+
     <!-- Recommendations -->
     <div class="section">
       <div class="section-title">

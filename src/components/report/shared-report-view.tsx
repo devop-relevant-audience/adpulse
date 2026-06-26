@@ -88,6 +88,8 @@ function parseReportResponse(raw: Record<string, unknown>): ParsedReport {
     funnel: safeStr(rawNarratives.funnel, ""),
     campaigns: safeStr(rawNarratives.campaigns, ""),
     health: safeStr(rawNarratives.health, ""),
+    creatives: safeStr(rawNarratives.creatives, ""),
+    optimizer: safeStr(rawNarratives.optimizer, ""),
     recommendations: safeStr(rawNarratives.recommendations, ""),
   };
 
@@ -110,6 +112,16 @@ function parseReportResponse(raw: Record<string, unknown>): ParsedReport {
     recommendations: safeArr(healthRaw.recommendations, []),
   };
 
+  const emptyCreatives = {
+    totalCreatives: 0, activeCount: 0, fatiguedCount: 0, pausedCount: 0,
+    avgCtr: 0, avgCpa: 0, totalCreativeSpend: 0,
+    byType: [], topPerformers: [], fatiguedCreatives: [],
+  };
+  const emptyOptimizer = {
+    currentAllocation: {}, recommendedAllocation: {},
+    platforms: [], suggestions: [], projectedImpact: { additionalConversions: 0, cpaReduction: 0 },
+  };
+
   const data: ReportData = {
     id: safeStr(raw.id, undefined as unknown as string),
     clientName: safeStr(raw.title, "Client").replace(" — Performance Report", ""),
@@ -122,6 +134,8 @@ function parseReportResponse(raw: Record<string, unknown>): ParsedReport {
     funnel: safeObj(ms.funnel, { overall: [], byPlatform: {} }) as ReportData["funnel"],
     campaignBreakdown: safeArr(ms.campaignBreakdown, []) as ReportData["campaignBreakdown"],
     healthScore: healthScore as unknown as ReportData["healthScore"],
+    creatives: safeObj(ms.creatives, emptyCreatives) as ReportData["creatives"],
+    optimizer: safeObj(ms.optimizer, emptyOptimizer) as ReportData["optimizer"],
     narratives,
   };
 
