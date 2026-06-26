@@ -9,10 +9,25 @@ export const VIEWS = {
   funnel: "funnel",
   optimizer: "optimizer",
   health: "health",
+  creatives: "creatives",
+  alerts: "alerts",
+  compare: "compare",
   reports: "reports",
 } as const;
 
 export type ViewId = (typeof VIEWS)[keyof typeof VIEWS];
+
+export interface ComparisonCampaignSummary {
+  name: string;
+  platform: string;
+  spend: number;
+  conversions: number;
+  cpa: number;
+  ctr: number;
+  cpc: number;
+  impressions: number;
+  clicks: number;
+}
 
 export interface ReferenceContext {
   campaignId?: string;
@@ -21,6 +36,13 @@ export interface ReferenceContext {
   metric?: string;
   dateRange?: { start: string; end: string };
   value?: number;
+  comparisonType?: "campaigns" | "periods";
+  comparisonCampaigns?: ComparisonCampaignSummary[];
+  comparisonPeriods?: {
+    periodA: { start: string; end: string; label: string };
+    periodB: { start: string; end: string; label: string };
+    metrics: Record<string, { a: number; b: number; delta: number }>;
+  };
 }
 
 interface AppState {

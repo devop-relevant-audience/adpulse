@@ -28,16 +28,16 @@ function MetricCard({ label, value, delta, previousValue, invertDeltaColor = fal
   return (
     <button
       onClick={onAskAi}
-      className="bg-white rounded-xl border border-hairline p-4 text-left hover:border-primary/30 hover:shadow-sm transition-all group cursor-pointer"
+      className="bg-white rounded-xl border border-hairline p-5 text-left hover:border-primary/30 hover:shadow-sm transition-all group cursor-pointer"
     >
-      <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">{label}</p>
-      <div className="flex items-baseline gap-2 mt-1.5">
-        <p className="text-[22px] font-semibold tracking-tight text-ink leading-none">{value}</p>
+      <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider mb-2">{label}</p>
+      <p className="text-xl font-semibold tracking-tight text-ink leading-none truncate">{value}</p>
+      <div className="flex items-center gap-2 mt-2.5">
         {!isNeutral && (
           <span
             className={cn(
-              "inline-flex items-center gap-0.5 text-[11px] font-medium",
-              isGood ? "text-emerald-600" : "text-red-500"
+              "inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded",
+              isGood ? "text-emerald-700 bg-emerald-50" : "text-red-600 bg-red-50"
             )}
           >
             {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -45,7 +45,7 @@ function MetricCard({ label, value, delta, previousValue, invertDeltaColor = fal
           </span>
         )}
       </div>
-      <p className="text-[11px] text-ink-faint mt-1">vs prev. {previousValue}</p>
+      <p className="text-[11px] text-ink-muted mt-1.5 truncate">vs prev. {previousValue}</p>
     </button>
   );
 }
@@ -88,9 +88,9 @@ export function MetricCards() {
 
   if (!clientId || isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border border-hairline p-4 space-y-2">
+          <div key={i} className="bg-white rounded-xl border border-hairline p-5 space-y-2">
             <Skeleton className="h-3 w-14" />
             <Skeleton className="h-6 w-20" />
             <Skeleton className="h-3 w-16" />
@@ -165,7 +165,7 @@ export function MetricCards() {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
       {cards.map((card) => (
         <MetricCard
           key={card.label}

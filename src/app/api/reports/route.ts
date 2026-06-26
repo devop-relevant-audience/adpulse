@@ -32,11 +32,6 @@ export async function POST(request: NextRequest) {
     const reportData = await buildReport(parsed.data);
 
     const supabase = getSupabase();
-    const daysDiff = Math.round(
-      (new Date(parsed.data.endDate).getTime() -
-        new Date(parsed.data.startDate).getTime()) /
-        (1000 * 60 * 60 * 24)
-    );
 
     const { data: savedReport, error } = await supabase
       .from("reports")
@@ -47,10 +42,15 @@ export async function POST(request: NextRequest) {
         date_range_end: parsed.data.endDate,
         comparison_start: reportData.comparisonRange.start,
         comparison_end: reportData.comparisonRange.end,
-        narrative: reportData.narrative,
+        narrative: reportData.narratives.executive,
         metrics_summary: {
           comparison: reportData.comparison,
           campaignBreakdown: reportData.campaignBreakdown,
+          platformBreakdown: reportData.platformBreakdown,
+          trendSummary: reportData.trendSummary,
+          funnel: reportData.funnel,
+          healthScore: reportData.healthScore,
+          narratives: reportData.narratives,
         },
       })
       .select()

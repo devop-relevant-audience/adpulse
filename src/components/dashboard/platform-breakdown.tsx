@@ -3,13 +3,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-} from "recharts";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
 
 const PLATFORM_META: Record<Platform, { label: string; color: string }> = {
@@ -68,7 +61,7 @@ export function PlatformBreakdown() {
   if (!clientId || isLoading) {
     return (
       <div className="bg-white rounded-xl border border-hairline p-5">
-        <Skeleton className="h-[320px] w-full" />
+        <Skeleton className="h-[200px] w-full" />
       </div>
     );
   }
@@ -76,87 +69,65 @@ export function PlatformBreakdown() {
   const platformData = aggregateByPlatform(metrics || []);
   const totalSpend = platformData.reduce((s, p) => s + p.spend, 0);
 
-  const pieData = platformData.map((p) => ({
-    name: PLATFORM_META[p.platform].label,
-    value: p.spend,
-    color: PLATFORM_META[p.platform].color,
-  }));
-
   return (
     <div className="bg-white rounded-xl border border-hairline">
-      <div className="px-5 pt-4 pb-2">
+      <div className="px-5 py-4">
         <h3 className="text-sm font-semibold text-ink">Spend by Platform</h3>
+        <p className="text-xs text-ink-muted mt-0.5">Total: {formatCurrency(totalSpend)}</p>
       </div>
 
-      {/* Donut Chart */}
-      <div className="px-5">
-        <ResponsiveContainer width="100%" height={180}>
-          <PieChart>
-            <Pie
-              data={pieData}
-              cx="50%"
-              cy="50%"
-              innerRadius={52}
-              outerRadius={78}
-              paddingAngle={3}
-              dataKey="value"
-              strokeWidth={0}
-            >
-              {pieData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "white",
-                border: "1px solid #e6e6e6",
-                borderRadius: "10px",
-                fontSize: "12px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                padding: "8px 12px",
+      {/* Consolidated mini-table */}
+      <div className="px-5 pb-4">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-hairline">
+              <th className="text-left text-[10px] font-medium text-ink-muted uppercase tracking-wider pb-2">Platform</th>
+              <th className="text-right text-[10px] font-medium text-ink-muted uppercase tracking-wider pb-2">Spend</th>
+              <th className="text-right text-[10px] font-medium text-ink-muted uppercase tracking-wider pb-2">% Total</th>
+              <th className="text-right text-[10px] font-medium text-ink-muted uppercase tracking-wider pb-2">CTR</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-hairline/60">
+            {platformData.map((p) => (
+              <tr key={p.platform} className="group">
+                <td className="py-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: PLATFORM_META[p.platform].color }}
+                    />
+                    <span className="text-[13px] font-medium text-ink">{PLATFORM_META[p.platform].label}</span>
+                  </div>
+                </td>
+                <td className="py-3 text-right">
+                  <span className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(p.spend)}</span>
+                </td>
+                <td className="py-3 text-right">
+                  <span className="text-[12px] text-ink-muted tabular-nums">{p.pct}%</span>
+                </td>
+                <td className="py-3 text-right">
+                  <span className="text-[12px] font-semibold text-ink tabular-nums">{p.ctr}%</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Stacked bar visualization */}
+      <div className="px-5 pb-4">
+        <div className="h-3 rounded-full overflow-hidden flex">
+          {platformData.map((p) => (
+            <div
+              key={p.platform}
+              className="h-full first:rounded-l-full last:rounded-r-full transition-all"
+              style={{
+                width: `${p.pct}%`,
+                backgroundColor: PLATFORM_META[p.platform].color,
               }}
-              formatter={(value) => [`$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "Spend"]}
             />
-            <text x="50%" y="47%" textAnchor="middle" className="fill-ink text-lg font-semibold">
-              {formatCurrency(totalSpend)}
-            </text>
-            <text x="50%" y="58%" textAnchor="middle" className="fill-ink-muted text-[11px]">
-              Total Spend
-            </text>
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Platform Stats Table */}
-      <div className="px-5 pb-4 space-y-2">
-        {platformData.map((p) => (
-          <div key={p.platform} className="flex items-center gap-3 py-2 border-t border-hairline/60 first:border-t-0">
-            <span
-              className="w-2.5 h-2.5 rounded-full shrink-0"
-              style={{ backgroundColor: PLATFORM_META[p.platform].color }}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-ink">{PLATFORM_META[p.platform].label}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[13px] font-medium text-ink tabular-nums">{formatCurrency(p.spend)}</p>
-              <p className="text-[11px] text-ink-muted tabular-nums">{p.pct}% of total</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-3 border-t border-hairline">
-        {platformData.map((p) => (
-          <div key={`stats-${p.platform}`} className="px-3 py-3 text-center border-r border-hairline last:border-r-0">
-            <p className="text-[10px] text-ink-muted uppercase tracking-wider font-medium">
-              {PLATFORM_META[p.platform].label.split(" ")[0]}
-            </p>
-            <p className="text-[13px] font-semibold text-ink mt-0.5 tabular-nums">{p.ctr}%</p>
-            <p className="text-[10px] text-ink-faint">CTR</p>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

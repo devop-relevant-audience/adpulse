@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Platform } from "@/lib/types/database";
+import type { Platform, AdCreativeRow, CreativeStatus } from "@/lib/types/database";
 
 function getSupabase() {
   return createClient(
@@ -492,4 +492,98 @@ export async function getCampaignPacing(params: {
     overallStatus,
     campaigns: campaigns.sort((a, b) => b.monthlyBudget - a.monthlyBudget),
   };
+}
+
+export async function getCreatives(params: {
+  clientId: string;
+  platform?: Platform;
+  status?: CreativeStatus;
+  campaignId?: string;
+  sort?: string;
+  order?: "asc" | "desc";
+}): Promise<AdCreativeRow[]> {
+  const supabase = getSupabase();
+  let query = supabase
+    .from("ad_creatives")
+    .select("*")
+    .eq("client_id", params.clientId);
+
+  if (params.platform) {
+    query = query.eq("platform", params.platform);
+  }
+  if (params.status) {
+    query = query.eq("status", params.status);
+  }
+  if (params.campaignId) {
+    query = query.eq("campaign_id", params.campaignId);
+  }
+
+  const sortCol = params.sort || "spend";
+  const ascending = params.order === "asc";
+  query = query.order(sortCol, { ascending });
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data as AdCreativeRow[];
+}
+
+export interface FatigueAnalysisItem {
+  ad_id: string;
+  ad_name: string;
+  headline: string;
+  platform: Platform;
+  campaign_id: string;
+  creative_type: string;
+  thumbnail_url: string;
+  days_running: number;
+  ctr: number;
+  cpa: number;
+  spend: number;
+  impressions: number;
+  status: string;
+  fatigue_score: number;
+}
+
+export async function getCreativeFatigueAnalysis(
+  clientId: string,
+): Promise<FatigueAnalysisItem[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("ad_creatives")
+    .select("*")
+    .eq("client_id", clientId)
+    .gte("days_running", 14);
+
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) return [];
+
+  const rows = data as AdCreativeRow[];
+  const avgCtr = rows.reduce((s, r) => s + Number(r.ctr), 0) / rows.length;
+  const avgCpa = rows.reduce((s, r) => s + Number(r.cpa), 0) / rows.length;
+
+  return rows
+    .map((r) => {
+      const ctrRatio = avgCtr > 0 ? Number(r.ctr) / avgCtr : 1;
+      const cpaRatio = avgCpa > 0 ? Number(r.cpa) / avgCpa : 1;
+      const ageFactor = Math.min(Number(r.days_running) / 90, 2);
+      const fatigue_score = Number(((1 - ctrRatio) * 40 + (cpaRatio - 1) * 30 + ageFactor * 30).toFixed(1));
+
+      return {
+        ad_id: r.ad_id,
+        ad_name: r.ad_name,
+        headline: r.headline,
+        platform: r.platform,
+        campaign_id: r.campaign_id,
+        creative_type: r.creative_type,
+        thumbnail_url: r.thumbnail_url,
+        days_running: r.days_running,
+        ctr: Number(r.ctr),
+        cpa: Number(r.cpa),
+        spend: Number(r.spend),
+        impressions: Number(r.impressions),
+        status: r.status,
+        fatigue_score,
+      };
+    })
+    .sort((a, b) => b.fatigue_score - a.fatigue_score);
 }

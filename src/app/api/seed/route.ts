@@ -6,7 +6,8 @@ import { generateTikTokAdsData } from "@/lib/mock-data/tiktok-ads";
 import { normalizeGoogleAds } from "@/lib/adapters/google-adapter";
 import { normalizeMetaAds } from "@/lib/adapters/meta-adapter";
 import { normalizeTikTokAds } from "@/lib/adapters/tiktok-adapter";
-import type { CampaignPerformanceInsert } from "@/lib/types/database";
+import { generateCreatives } from "@/lib/mock-data/creatives";
+import type { CampaignPerformanceInsert, Platform } from "@/lib/types/database";
 
 const CLIENTS = [
   { name: "Zenith Apparel", industry: "Fashion & Retail" },
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (forceReseed) {
+      await supabase.from("ad_creatives").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       await supabase.from("campaign_budgets").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       await supabase.from("campaign_performance").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       await supabase.from("chat_messages").delete().neq("id", "00000000-0000-0000-0000-000000000000");
@@ -130,6 +132,34 @@ export async function POST(request: NextRequest) {
       for (let i = 0; i < budgetRecords.length; i += BUDGET_BATCH) {
         const batch = budgetRecords.slice(i, i + BUDGET_BATCH);
         await supabase.from("campaign_budgets").insert(batch);
+      }
+
+      const uniqueCampaigns = new Map<string, { campaign_id: string; campaign_name: string; platform: Platform }>();
+      for (const row of normalized) {
+        if (!uniqueCampaigns.has(row.campaign_id)) {
+          uniqueCampaigns.set(row.campaign_id, {
+            campaign_id: row.campaign_id,
+            campaign_name: row.campaign_name,
+            platform: row.platform,
+          });
+        }
+      }
+
+      const clientIndustry = CLIENTS.find(c => c.name === client.name)?.industry || "SaaS & Technology";
+      const creativeRecords = generateCreatives(
+        Array.from(uniqueCampaigns.values()),
+        client.id,
+        clientIndustry,
+        endDate,
+      );
+
+      const CREATIVE_BATCH = 500;
+      for (let i = 0; i < creativeRecords.length; i += CREATIVE_BATCH) {
+        const batch = creativeRecords.slice(i, i + CREATIVE_BATCH);
+        const { error } = await supabase.from("ad_creatives").insert(batch);
+        if (error) {
+          throw new Error(`Failed to insert creatives for ${client.name}: ${error.message}`);
+        }
       }
     }
 

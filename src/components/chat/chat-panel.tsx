@@ -24,6 +24,13 @@ interface ChatMessage {
 }
 
 function formatRefContext(ctx: ReferenceContext): string {
+  if (ctx.comparisonType === "campaigns" && ctx.comparisonCampaigns) {
+    const names = ctx.comparisonCampaigns.map((c) => c.name);
+    return `Comparing: ${names.join(" vs ")}`;
+  }
+  if (ctx.comparisonType === "periods" && ctx.comparisonPeriods) {
+    return `Comparing: ${ctx.comparisonPeriods.periodA.label} vs ${ctx.comparisonPeriods.periodB.label}`;
+  }
   const parts: string[] = [];
   if (ctx.campaignName) parts.push(ctx.campaignName);
   if (ctx.platform) parts.push(ctx.platform);
@@ -85,13 +92,14 @@ export function ChatPanel() {
     }
   }
 
-  async function handleSend() {
-    if (!input.trim() || isLoading || !clientId) return;
+  async function handleSend(directMessage?: string) {
+    const text = directMessage ?? input.trim();
+    if (!text || isLoading || !clientId) return;
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      content: input.trim(),
+      content: text,
       referenceContext,
     };
 
@@ -257,9 +265,26 @@ export function ChatPanel() {
             <p className="text-sm font-medium text-ink mb-1">
               Ask anything about your ad data
             </p>
-            <p className="text-[12px] text-ink-muted max-w-[240px] leading-relaxed">
+            <p className="text-[12px] text-ink-muted max-w-[240px] leading-relaxed mb-5">
               Click any metric, chart point, or campaign row to pre-load context, then ask.
             </p>
+            <div className="flex flex-col gap-2 w-full max-w-[320px]">
+              {[
+                "Which campaigns are underperforming this month?",
+                "How can I improve my ROAS across platforms?",
+                "Summarize my ad spend and conversions this week",
+                "Are there any budget pacing issues I should fix?",
+              ].map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => handleSend(prompt)}
+                  disabled={!clientId}
+                  className="text-left px-3.5 py-2.5 rounded-lg border border-hairline bg-white hover:bg-primary/5 hover:border-primary/30 text-[12px] text-ink-muted hover:text-ink transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -376,7 +401,7 @@ export function ChatPanel() {
           ) : (
             <Button
               size="icon"
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={!input.trim() || !clientId}
               className="rounded-lg h-10 w-10 bg-primary hover:bg-primary/90 shrink-0 transition-colors"
               aria-label="Send message"

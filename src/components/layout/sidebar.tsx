@@ -22,6 +22,9 @@ import {
   Funnel,
   Sliders,
   HeartPulse,
+  Bell,
+  ArrowLeftRight,
+  Image,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { VIEWS, type ViewId } from "@/store/app-store";
@@ -218,6 +221,27 @@ export function Sidebar() {
       icon: <HeartPulse className="w-4 h-4" />,
       active: activeView === VIEWS.health,
       onClick: () => setActiveView(VIEWS.health),
+    },
+    {
+      id: VIEWS.creatives,
+      label: "Creatives",
+      icon: <Image className="w-4 h-4" />,
+      active: activeView === VIEWS.creatives,
+      onClick: () => setActiveView(VIEWS.creatives),
+    },
+    {
+      id: VIEWS.compare,
+      label: "Compare",
+      icon: <ArrowLeftRight className="w-4 h-4" />,
+      active: activeView === VIEWS.compare,
+      onClick: () => setActiveView(VIEWS.compare),
+    },
+    {
+      id: VIEWS.alerts,
+      label: "Alerts",
+      icon: <Bell className="w-4 h-4" />,
+      active: activeView === VIEWS.alerts,
+      onClick: () => setActiveView(VIEWS.alerts),
     },
     {
       id: VIEWS.reports,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getMetrics, compareMetrics, listCampaigns, getDailyTrend, detectAnomalies, getFunnelData } from '@/lib/data/queries';
+import { getMetrics, compareMetrics, listCampaigns, getDailyTrend, detectAnomalies, getFunnelData, getCreatives, getCreativeFatigueAnalysis } from '@/lib/data/queries';
 import { getChannelMixAnalysis } from '@/lib/data/optimizer';
 import { calculateHealthScore } from '@/lib/data/health-score';
 import type { Platform } from '@/lib/types/database';
@@ -157,7 +157,41 @@ const TOOL_DEFINITIONS = [
 					endDate: { type: 'string' },
 					platform: { type: 'string' },
 				},
-				required: ['clientId', 'startDate', 'endDate'],
+			required: ['clientId', 'startDate', 'endDate'],
+		},
+	},
+},
+	{
+		type: 'function' as const,
+		function: {
+			name: 'getCreatives',
+			description:
+				'Get ad creative performance data for a client. Returns creative-level metrics including headline, body copy, thumbnail URL, CTR, CPA, spend, conversions, days running, status (active/fatigued/paused), and creative type (image/video/carousel). Useful for answering questions about which ads are performing best or worst.',
+			parameters: {
+				type: 'object',
+				properties: {
+					clientId: { type: 'string', description: 'The client UUID' },
+					platform: { type: 'string', description: 'Optional: google, meta, or tiktok' },
+					status: { type: 'string', description: 'Optional: active, fatigued, or paused' },
+					sort: { type: 'string', description: 'Optional: spend, ctr, cpa, impressions, conversions' },
+					order: { type: 'string', description: 'Optional: asc or desc' },
+				},
+				required: ['clientId'],
+			},
+		},
+	},
+	{
+		type: 'function' as const,
+		function: {
+			name: 'getCreativeFatigueAnalysis',
+			description:
+				'Analyze creative fatigue across all ads for a client. Returns ads that have been running 14+ days, ranked by a fatigue score that considers CTR degradation, CPA inflation, and age. Higher fatigue_score means worse fatigue. Use this to answer questions like "which creatives are fatiguing?" or "which ads should I refresh?"',
+			parameters: {
+				type: 'object',
+				properties: {
+					clientId: { type: 'string', description: 'The client UUID' },
+				},
+				required: ['clientId'],
 			},
 		},
 	},
@@ -233,6 +267,20 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
 				platform: args.platform as Platform | undefined,
 			});
 			return JSON.stringify(data);
+		}
+		case 'getCreatives': {
+			const data = await getCreatives({
+				clientId: args.clientId,
+				platform: args.platform as Platform | undefined,
+				status: args.status as 'active' | 'fatigued' | 'paused' | undefined,
+				sort: args.sort,
+				order: args.order as 'asc' | 'desc' | undefined,
+			});
+			return JSON.stringify(data.slice(0, 30));
+		}
+		case 'getCreativeFatigueAnalysis': {
+			const data = await getCreativeFatigueAnalysis(args.clientId);
+			return JSON.stringify(data.slice(0, 20));
 		}
 		default:
 			return JSON.stringify({ error: `Unknown tool: ${name}` });
@@ -338,6 +386,7 @@ IMPORTANT RULES:
 - Keep answers concise but insightful
 - Format currency values with $ and use K/M abbreviations for large numbers
 - If data shows anomalies (sudden drops or spikes), highlight them and suggest causes
+- You have access to creative-level analytics. Use getCreatives to see individual ad performance and getCreativeFatigueAnalysis to identify ads suffering from creative fatigue (declining CTR, rising CPA over time). When asked about fatiguing creatives, always use the fatigue analysis tool.
 - The client ID for this conversation is: ${clientId}`;
 
 		if (referenceContext) {
