@@ -20,6 +20,7 @@ export function normalizeGoogleAds(
       clicks: Number(row.metrics.clicks),
       spend,
       conversions: Math.round(Number(row.metrics.conversions)),
+      revenue: round(Number(row.metrics.conversionsValue), 2),
       ctr: round(Number(row.metrics.ctr) * 100, 2),
       cpc: round(Number(row.metrics.averageCpc), 4),
       cpm: round(Number(row.metrics.averageCpm), 4),

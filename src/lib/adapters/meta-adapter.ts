@@ -11,6 +11,10 @@ export function normalizeMetaAds(
       (a) => a.action_type === "purchase"
     );
     const conversions = purchaseAction ? Number(purchaseAction.value) : 0;
+    const purchaseValueAction = row.action_values.find(
+      (a) => a.action_type === "purchase"
+    );
+    const revenue = purchaseValueAction ? Number(purchaseValueAction.value) : 0;
 
     return {
       client_id: clientId,
@@ -22,6 +26,7 @@ export function normalizeMetaAds(
       clicks: Number(row.clicks),
       spend: round(Number(row.spend), 2),
       conversions,
+      revenue: round(revenue, 2),
       ctr: round(Number(row.ctr) * 100, 2),
       cpc: round(Number(row.cpc), 4),
       cpm: round(Number(row.cpm), 4),

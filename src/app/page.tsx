@@ -17,6 +17,7 @@ import { HealthWidget, ConversionWidget } from "@/components/dashboard/dashboard
 import { AlertsManager } from "@/components/dashboard/alerts-manager";
 import { ReportsView } from "@/components/dashboard/reports-view";
 import { ComparisonView } from "@/components/dashboard/comparison-view";
+import { AttributionView } from "@/components/dashboard/attribution-view";
 import { CreativeGallery } from "@/components/dashboard/creative-gallery";
 import { SharedReportView } from "@/components/report/shared-report-view";
 import { useAppStore } from "@/store/app-store";
@@ -88,6 +89,8 @@ function ActiveView() {
       return <FunnelChart />;
     case VIEWS.optimizer:
       return <ChannelOptimizer />;
+    case VIEWS.attribution:
+      return <AttributionView />;
     case VIEWS.health:
       return <HealthScore />;
     case VIEWS.creatives:

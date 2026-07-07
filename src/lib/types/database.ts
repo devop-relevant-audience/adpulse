@@ -26,6 +26,7 @@ export interface CampaignPerformanceRow {
   clicks: number;
   spend: number;
   conversions: number;
+  revenue: number;
   ctr: number;
   cpc: number;
   cpm: number;
@@ -44,6 +45,7 @@ export interface CampaignPerformanceInsert {
   clicks: number;
   spend: number;
   conversions: number;
+  revenue: number;
   ctr: number;
   cpc: number;
   cpm: number;
@@ -309,9 +311,80 @@ export interface ReportScheduleInsert {
   enabled?: boolean;
 }
 
+// --- Attribution & Revenue ---
+
+export type AttributionModel =
+  | 'first_touch'
+  | 'last_touch'
+  | 'linear'
+  | 'time_decay'
+  | 'position_based';
+
+export interface AttributionJourneyRow {
+  id: string;
+  client_id: string;
+  conversion_date: string;
+  revenue: number;
+  path: Platform[];
+  converting_platform: Platform;
+  touch_count: number;
+  created_at: string;
+}
+
+export interface AttributionJourneyInsert {
+  id?: string;
+  client_id: string;
+  conversion_date: string;
+  revenue: number;
+  path: Platform[];
+  converting_platform: Platform;
+  touch_count: number;
+  created_at?: string;
+}
+
+// Nested JSON value on customer_cohorts.retention — passed through the
+// snake/camel converter untouched, so its keys stay camelCase everywhere.
+export interface CohortRetentionPoint {
+  monthOffset: number;
+  revenue: number;
+  activeCustomers: number;
+}
+
+export interface CustomerCohortRow {
+  id: string;
+  client_id: string;
+  acquisition_platform: Platform;
+  cohort_month: string;
+  customers: number;
+  acquisition_spend: number;
+  retention: CohortRetentionPoint[];
+  created_at: string;
+}
+
+export interface CustomerCohortInsert {
+  id?: string;
+  client_id: string;
+  acquisition_platform: Platform;
+  cohort_month: string;
+  customers: number;
+  acquisition_spend: number;
+  retention: CohortRetentionPoint[];
+  created_at?: string;
+}
+
 export interface Database {
   public: {
     Tables: {
+      attribution_journeys: {
+        Row: AttributionJourneyRow;
+        Insert: AttributionJourneyInsert;
+        Update: Partial<AttributionJourneyInsert>;
+      };
+      customer_cohorts: {
+        Row: CustomerCohortRow;
+        Insert: CustomerCohortInsert;
+        Update: Partial<CustomerCohortInsert>;
+      };
       campaign_performance: {
         Row: CampaignPerformanceRow;
         Insert: CampaignPerformanceInsert;

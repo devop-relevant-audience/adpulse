@@ -27,6 +27,7 @@ export interface MetaAdsRow {
   cpc: string;
   cpm: string;
   actions: MetaAdsAction[];
+  action_values: MetaAdsAction[];
 }
 
 interface CampaignSeed {
@@ -73,6 +74,8 @@ const META_CAMPAIGNS: CampaignSeed[] = [
   },
 ];
 
+const META_AOV = 62;
+
 export function generateMetaAdsData(
   startDate: Date,
   endDate: Date
@@ -109,6 +112,7 @@ export function generateMetaAdsData(
       const cpm = round((spend / impressions) * 1000, 2);
       const linkClicks = Math.round(clicks * randomBetween(0.7, 0.9));
       const purchases = conversions;
+      const purchaseValue = round(purchases * META_AOV * randomBetween(0.9, 1.1), 2);
 
       rows.push({
         campaign_id: campaign.id,
@@ -126,6 +130,9 @@ export function generateMetaAdsData(
           { action_type: "purchase", value: String(purchases) },
           { action_type: "add_to_cart", value: String(Math.round(purchases * randomBetween(2, 4))) },
           { action_type: "page_view", value: String(Math.round(linkClicks * randomBetween(1.5, 3))) },
+        ],
+        action_values: [
+          { action_type: "purchase", value: String(purchaseValue) },
         ],
       });
     }

@@ -8,6 +8,7 @@ export const VIEWS = {
   pacing: "pacing",
   funnel: "funnel",
   optimizer: "optimizer",
+  attribution: "attribution",
   health: "health",
   creatives: "creatives",
   alerts: "alerts",

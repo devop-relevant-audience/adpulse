@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
   adCreatives,
+  attributionJourneys,
   campaignBudgets,
   campaignPerformance,
   chatMessages,
   chatSessions,
   clients,
+  customerCohorts,
   reports,
 } from "@/lib/db/schema";
 import { keysToCamel } from "@/lib/db/case";
@@ -17,6 +19,7 @@ import { normalizeGoogleAds } from "@/lib/adapters/google-adapter";
 import { normalizeMetaAds } from "@/lib/adapters/meta-adapter";
 import { normalizeTikTokAds } from "@/lib/adapters/tiktok-adapter";
 import { generateCreatives } from "@/lib/mock-data/creatives";
+import { generateAttributionJourneys, generateCustomerCohorts } from "@/lib/mock-data/attribution";
 import type { CampaignPerformanceInsert, Platform } from "@/lib/types/database";
 
 const CLIENTS = [
@@ -41,6 +44,8 @@ export async function POST(request: NextRequest) {
 
     if (forceReseed) {
       await db.delete(adCreatives);
+      await db.delete(attributionJourneys);
+      await db.delete(customerCohorts);
       await db.delete(campaignBudgets);
       await db.delete(campaignPerformance);
       await db.delete(chatMessages);
@@ -79,6 +84,24 @@ export async function POST(request: NextRequest) {
       }
 
       totalRows += normalized.length;
+
+      const journeyRecords = generateAttributionJourneys(normalized, client.id);
+      const JOURNEY_BATCH = 500;
+      for (let i = 0; i < journeyRecords.length; i += JOURNEY_BATCH) {
+        const batch = journeyRecords.slice(i, i + JOURNEY_BATCH);
+        await db
+          .insert(attributionJourneys)
+          .values(batch.map((r) => keysToCamel(r) as typeof attributionJourneys.$inferInsert));
+      }
+
+      const cohortRecords = generateCustomerCohorts(normalized, client.id);
+      const COHORT_BATCH = 500;
+      for (let i = 0; i < cohortRecords.length; i += COHORT_BATCH) {
+        const batch = cohortRecords.slice(i, i + COHORT_BATCH);
+        await db
+          .insert(customerCohorts)
+          .values(batch.map((r) => keysToCamel(r) as typeof customerCohorts.$inferInsert));
+      }
 
       const campaignSpendMap = new Map<string, number[]>();
       for (const row of normalized) {

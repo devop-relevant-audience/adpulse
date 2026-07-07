@@ -25,6 +25,7 @@ import {
   Bell,
   ArrowLeftRight,
   Image,
+  Coins,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { VIEWS, type ViewId } from "@/store/app-store";
@@ -214,6 +215,13 @@ export function Sidebar() {
       icon: <Sliders className="w-4 h-4" />,
       active: activeView === VIEWS.optimizer,
       onClick: () => setActiveView(VIEWS.optimizer),
+    },
+    {
+      id: VIEWS.attribution,
+      label: "Attribution",
+      icon: <Coins className="w-4 h-4" />,
+      active: activeView === VIEWS.attribution,
+      onClick: () => setActiveView(VIEWS.attribution),
     },
     {
       id: VIEWS.health,

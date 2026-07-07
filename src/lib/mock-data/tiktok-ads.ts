@@ -21,6 +21,7 @@ export interface TikTokAdsRow {
     clicks: string;
     spend: string;
     conversion: string;
+    total_purchase_value: string;
     ctr: string;
     cpc: string;
     cpm: string;
@@ -84,6 +85,8 @@ const TIKTOK_CAMPAIGNS: CampaignSeed[] = [
   },
 ];
 
+const TIKTOK_AOV = 41;
+
 export function generateTikTokAdsData(
   startDate: Date,
   endDate: Date
@@ -118,6 +121,7 @@ export function generateTikTokAdsData(
       const spend = round(clicks * cpc, 2);
       const conversions = Math.round(clicks * conversionRate);
       const cpm = round((spend / impressions) * 1000, 2);
+      const totalPurchaseValue = round(conversions * TIKTOK_AOV * randomBetween(0.9, 1.1), 2);
 
       list.push({
         dimensions: {
@@ -130,6 +134,7 @@ export function generateTikTokAdsData(
           clicks: String(clicks),
           spend: String(spend),
           conversion: String(conversions),
+          total_purchase_value: String(totalPurchaseValue),
           ctr: String(round(ctr, 4)),
           cpc: String(round(cpc, 2)),
           cpm: String(cpm),

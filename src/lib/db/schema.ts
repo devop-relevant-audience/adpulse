@@ -37,6 +37,7 @@ export const campaignPerformance = pgTable(
     clicks: integer("clicks").notNull().default(0),
     spend: numeric("spend", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
     conversions: integer("conversions").notNull().default(0),
+    revenue: numeric("revenue", { precision: 14, scale: 2, mode: "number" }).notNull().default(0),
     ctr: numeric("ctr", { precision: 8, scale: 4, mode: "number" }).notNull().default(0),
     cpc: numeric("cpc", { precision: 10, scale: 4, mode: "number" }).notNull().default(0),
     cpm: numeric("cpm", { precision: 10, scale: 4, mode: "number" }).notNull().default(0),
@@ -210,5 +211,51 @@ export const reportSchedules = pgTable(
     check("report_schedules_day_of_week_check", sql`((${table.dayOfWeek} >= 0) AND (${table.dayOfWeek} <= 6))`),
     check("report_schedules_day_of_month_check", sql`((${table.dayOfMonth} >= 1) AND (${table.dayOfMonth} <= 31))`),
     check("report_schedules_date_range_type_check", sql`(${table.dateRangeType} = ANY (ARRAY['last_7'::text, 'last_14'::text, 'last_30'::text, 'last_month'::text, 'last_quarter'::text, 'month_to_date'::text, 'custom'::text]))`),
+  ]
+);
+
+// --- Attribution & Revenue ---
+// Cross-platform conversion journeys: each row is ONE deduplicated (real)
+// conversion with the ordered list of platform touchpoints that led to it.
+// Used to compute multi-touch attribution models and the blended-vs-reported
+// ROAS contrast (platforms each self-claim conversions, so summing
+// campaign_performance across platforms over-counts vs these real journeys).
+export const attributionJourneys = pgTable(
+  "attribution_journeys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    conversionDate: date("conversion_date").notNull(),
+    revenue: numeric("revenue", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    path: text("path").array().notNull().default([]),
+    convertingPlatform: text("converting_platform").notNull(),
+    touchCount: integer("touch_count").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("attribution_journeys_converting_platform_check", sql`(${table.convertingPlatform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),
+  ]
+);
+
+// Customer cohorts by acquisition channel + acquisition month, with a retention
+// curve (per-customer cumulative revenue over month offsets) for LTV / LTV:CAC.
+export const customerCohorts = pgTable(
+  "customer_cohorts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    acquisitionPlatform: text("acquisition_platform").notNull(),
+    cohortMonth: text("cohort_month").notNull(),
+    customers: integer("customers").notNull().default(0),
+    acquisitionSpend: numeric("acquisition_spend", { precision: 14, scale: 2, mode: "number" }).notNull().default(0),
+    // Nested JSON — passed through the case converter untouched, so keys stay camelCase.
+    retention: jsonb("retention")
+      .$type<Array<{ monthOffset: number; revenue: number; activeCustomers: number }>>()
+      .notNull()
+      .default([]),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("customer_cohorts_acquisition_platform_check", sql`(${table.acquisitionPlatform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),
   ]
 );

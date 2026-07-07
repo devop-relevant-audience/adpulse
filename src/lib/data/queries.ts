@@ -88,6 +88,7 @@ export async function getMetrics(params: {
       clicks: campaignPerformance.clicks,
       spend: campaignPerformance.spend,
       conversions: campaignPerformance.conversions,
+      revenue: campaignPerformance.revenue,
       ctr: campaignPerformance.ctr,
       cpc: campaignPerformance.cpc,
       cpm: campaignPerformance.cpm,

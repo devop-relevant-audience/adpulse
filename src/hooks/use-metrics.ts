@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Platform, CampaignPerformanceRow, ClientRow, AlertRuleRow, AlertHistoryRow, AlertRuleInsert, ReportScheduleRow, ReportScheduleInsert, ReportRow, AdCreativeRow, CreativeStatus } from "@/lib/types/database";
+import type { Platform, AttributionModel, CampaignPerformanceRow, ClientRow, AlertRuleRow, AlertHistoryRow, AlertRuleInsert, ReportScheduleRow, ReportScheduleInsert, ReportRow, AdCreativeRow, CreativeStatus } from "@/lib/types/database";
 import type { ComparisonResult, AnomalyPoint, FunnelData, PacingData, FatigueAnalysisItem } from "@/lib/data/queries";
 import type { ChannelMixAnalysis } from "@/lib/data/optimizer";
 import type { HealthScoreResult } from "@/lib/data/health-score";
@@ -482,6 +482,136 @@ export function useGeneratedReports(clientId: string | null) {
       return res.json();
     },
     enabled: !!clientId,
+  });
+}
+
+// --- Attribution & Revenue ---
+
+export interface RevenueOverview {
+  totalSpend: number;
+  blended: { conversions: number; revenue: number; roas: number; cpa: number; aov: number };
+  platformReported: { conversions: number; revenue: number; roas: number };
+  overAttribution: { conversionsClaimed: number; conversionsActual: number; inflationPct: number };
+  platforms: Array<{
+    platform: Platform;
+    spend: number;
+    reportedConversions: number;
+    reportedRevenue: number;
+    reportedRoas: number;
+    blendedConversions: number;
+    blendedRevenue: number;
+    blendedRoas: number;
+    roasGap: number;
+  }>;
+  insight: string;
+}
+
+export interface AttributionComparison {
+  totalRevenue: number;
+  totalConversions: number;
+  models: Array<{
+    model: AttributionModel;
+    label: string;
+    credit: Array<{ platform: Platform; revenue: number; conversions: number; roas: number; sharePct: number }>;
+  }>;
+  platformReported: Array<{ platform: Platform; revenue: number; roas: number; sharePct: number }>;
+  insight: string;
+}
+
+export interface CohortAnalysis {
+  cohorts: Array<{
+    platform: Platform;
+    customers: number;
+    acquisitionSpend: number;
+    cac: number;
+    ltv: number;
+    ltvCacRatio: number;
+    paybackMonths: number | null;
+    day0Roas: number;
+    curve: Array<{ monthOffset: number; cumulativeRevenuePerCustomer: number; retentionPct: number }>;
+  }>;
+  byMonth: Array<{
+    platform: Platform;
+    cohortMonth: string;
+    customers: number;
+    cac: number;
+    retention: Array<{ monthOffset: number; revenue: number; activeCustomers: number }>;
+  }>;
+  insight: string;
+}
+
+export function useRevenueOverview(params: {
+  clientId: string | null;
+  startDate: string;
+  endDate: string;
+  platform?: Platform;
+}) {
+  return useQuery<RevenueOverview>({
+    queryKey: ["attribution-overview", params],
+    queryFn: async () => {
+      const sp = new URLSearchParams({
+        action: "overview",
+        clientId: params.clientId!,
+        startDate: params.startDate,
+        endDate: params.endDate,
+      });
+      if (params.platform) sp.set("platform", params.platform);
+
+      const res = await fetch(`/api/attribution?${sp}`);
+      if (!res.ok) throw new Error("Failed to fetch revenue overview");
+      return res.json();
+    },
+    enabled: !!params.clientId,
+  });
+}
+
+export function useAttributionComparison(params: {
+  clientId: string | null;
+  startDate: string;
+  endDate: string;
+  platform?: Platform;
+}) {
+  return useQuery<AttributionComparison>({
+    queryKey: ["attribution-comparison", params],
+    queryFn: async () => {
+      const sp = new URLSearchParams({
+        action: "attribution",
+        clientId: params.clientId!,
+        startDate: params.startDate,
+        endDate: params.endDate,
+      });
+      if (params.platform) sp.set("platform", params.platform);
+
+      const res = await fetch(`/api/attribution?${sp}`);
+      if (!res.ok) throw new Error("Failed to fetch attribution comparison");
+      return res.json();
+    },
+    enabled: !!params.clientId,
+  });
+}
+
+export function useCohortAnalysis(params: {
+  clientId: string | null;
+  startDate: string;
+  endDate: string;
+  platform?: Platform;
+}) {
+  return useQuery<CohortAnalysis>({
+    queryKey: ["attribution-cohorts", params],
+    queryFn: async () => {
+      const sp = new URLSearchParams({
+        action: "cohorts",
+        clientId: params.clientId!,
+        startDate: params.startDate,
+        endDate: params.endDate,
+      });
+      if (params.platform) sp.set("platform", params.platform);
+
+      const res = await fetch(`/api/attribution?${sp}`);
+      if (!res.ok) throw new Error("Failed to fetch cohort analysis");
+      return res.json();
+    },
+    enabled: !!params.clientId,
   });
 }
 

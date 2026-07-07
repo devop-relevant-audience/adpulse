@@ -21,6 +21,7 @@ export interface GoogleAdsRow {
     clicks: string;
     costMicros: string;
     conversions: string;
+    conversionsValue: string;
     ctr: string;
     averageCpc: string;
     averageCpm: string;
@@ -82,6 +83,8 @@ const GOOGLE_CAMPAIGNS: CampaignSeed[] = [
   },
 ];
 
+const GOOGLE_AOV = 95;
+
 export function generateGoogleAdsData(
   startDate: Date,
   endDate: Date
@@ -117,6 +120,7 @@ export function generateGoogleAdsData(
       const costMicros = Math.round(clicks * cpc * 1_000_000);
       const conversions = Math.round(clicks * conversionRate);
       const cpm = (costMicros / 1_000_000 / impressions) * 1000;
+      const conversionsValue = round(conversions * GOOGLE_AOV * randomBetween(0.9, 1.1), 2);
 
       rows.push({
         campaign: { id: campaign.id, name: campaign.name, status: "ENABLED" },
@@ -125,6 +129,7 @@ export function generateGoogleAdsData(
           clicks: String(clicks),
           costMicros: String(costMicros),
           conversions: String(round(conversions, 1)),
+          conversionsValue: String(conversionsValue),
           ctr: String(round(ctr, 4)),
           averageCpc: String(round(cpc, 2)),
           averageCpm: String(round(cpm, 2)),

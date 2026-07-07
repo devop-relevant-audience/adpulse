@@ -19,6 +19,7 @@ export function normalizeTikTokAds(
       clicks: Number(row.metrics.clicks),
       spend: round(Number(row.metrics.spend), 2),
       conversions: Number(row.metrics.conversion),
+      revenue: round(Number(row.metrics.total_purchase_value), 2),
       ctr: round(Number(row.metrics.ctr) * 100, 2),
       cpc: round(Number(row.metrics.cpc), 4),
       cpm: round(Number(row.metrics.cpm), 4),
