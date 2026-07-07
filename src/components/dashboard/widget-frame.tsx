@@ -88,7 +88,7 @@ export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: Widge
           </div>
         )}
       </div>
-      <div className="flex-1 min-h-0 p-3">
+      <div className={cn("flex-1 min-h-0 p-3", editMode && "pointer-events-none select-none")}>
         <WidgetErrorBoundary>
           <Render config={instance.config} instanceId={instance.i} />
         </WidgetErrorBoundary>
