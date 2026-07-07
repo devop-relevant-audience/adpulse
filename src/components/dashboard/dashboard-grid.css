@@ -1,0 +1,35 @@
+/* react-grid-layout tuning for AdPulse. Base RGL/resizable CSS is imported in
+   the host component before this file. */
+.react-grid-item.react-grid-placeholder {
+  background: var(--color-primary);
+  opacity: 0.1;
+  border-radius: 12px;
+  transition-duration: 100ms;
+}
+
+.react-grid-item {
+  transition: transform 180ms ease, width 180ms ease, height 180ms ease;
+}
+
+/* Disable transitions while actively dragging/resizing for snappiness. */
+.react-grid-item.react-draggable-dragging,
+.react-grid-item.resizing {
+  transition: none;
+  z-index: 20;
+}
+
+.react-grid-item.react-draggable-dragging {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Only show the resize handle in edit mode (host adds .dash-editing). */
+.dash-editing .react-grid-item > .react-resizable-handle {
+  opacity: 0.5;
+}
+.react-grid-item > .react-resizable-handle {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.dash-editing .react-grid-item:hover > .react-resizable-handle {
+  opacity: 1;
+}
