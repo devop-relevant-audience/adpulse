@@ -372,9 +372,42 @@ export interface CustomerCohortInsert {
   created_at?: string;
 }
 
+// --- Customizable dashboards ---
+// `layouts`/`widgets` are nested JSON blobs (react-grid-layout layout + widget
+// instances). Typed as unknown at the DB boundary to avoid a types↔dashboard
+// import cycle; the data layer maps them to the DashboardConfig app type.
+export interface DashboardRow {
+  id: string;
+  client_id: string;
+  name: string;
+  is_default: boolean;
+  layouts: unknown;
+  widgets: unknown;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DashboardInsert {
+  id?: string;
+  client_id: string;
+  name?: string;
+  is_default?: boolean;
+  layouts: unknown;
+  widgets: unknown;
+  version?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Database {
   public: {
     Tables: {
+      dashboards: {
+        Row: DashboardRow;
+        Insert: DashboardInsert;
+        Update: Partial<DashboardInsert>;
+      };
       attribution_journeys: {
         Row: AttributionJourneyRow;
         Insert: AttributionJourneyInsert;

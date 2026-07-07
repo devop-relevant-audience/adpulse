@@ -16,6 +16,7 @@ import {
   timestamp,
   check,
 } from "drizzle-orm/pg-core";
+import type { DashboardLayouts, WidgetInstance } from "@/lib/dashboard/types";
 
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -259,3 +260,18 @@ export const customerCohorts = pgTable(
     check("customer_cohorts_acquisition_platform_check", sql`(${table.acquisitionPlatform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),
   ]
 );
+
+// --- Customizable dashboards ---
+// Per-client saved dashboard layouts. `layouts`/`widgets` are nested JSON that
+// crosses the case boundary untouched (their inner keys stay camelCase).
+export const dashboards = pgTable("dashboards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  name: text("name").notNull().default("Default"),
+  isDefault: boolean("is_default").notNull().default(true),
+  layouts: jsonb("layouts").$type<DashboardLayouts>().notNull().default({ lg: [], md: [], sm: [] }),
+  widgets: jsonb("widgets").$type<WidgetInstance[]>().notNull().default([]),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+});
