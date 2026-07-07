@@ -1,7 +1,18 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { Hash, LineChart, PieChart, StickyNote } from "lucide-react";
+import {
+  Hash,
+  LineChart,
+  PieChart,
+  StickyNote,
+  Table2,
+  HeartPulse,
+  Filter,
+  DollarSign,
+  GitBranch,
+  Users,
+} from "lucide-react";
 import type {
   WidgetType,
   WidgetRenderProps,
@@ -11,6 +22,15 @@ import { KpiWidget, KpiConfigForm } from "@/components/dashboard/widgets/kpi-wid
 import { TrendWidget, TrendConfigForm } from "@/components/dashboard/widgets/trend-widget";
 import { PlatformBreakdownWidget } from "@/components/dashboard/widgets/platform-breakdown-widget";
 import { NoteWidget, NoteConfigForm } from "@/components/dashboard/widgets/note-widget";
+import {
+  CampaignTableWidget,
+  CampaignTableConfigForm,
+} from "@/components/dashboard/widgets/campaign-table-widget";
+import { HealthGaugeWidget } from "@/components/dashboard/widgets/health-gauge-widget";
+import { FunnelWidget } from "@/components/dashboard/widgets/funnel-widget";
+import { RevenueRoasWidget } from "@/components/dashboard/widgets/revenue-roas-widget";
+import { AttributionMiniWidget } from "@/components/dashboard/widgets/attribution-mini-widget";
+import { LtvCacWidget } from "@/components/dashboard/widgets/ltv-cac-widget";
 
 export type WidgetCategory = "metrics" | "charts" | "attribution" | "other";
 
@@ -81,6 +101,67 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     defaultConfig: { text: "" },
     Render: NoteWidget,
     ConfigForm: NoteConfigForm,
+  },
+  {
+    type: "campaign-table",
+    title: "Campaign Table",
+    description: "Top campaigns by spend/conversions with CTR and CPA.",
+    icon: Table2,
+    category: "metrics",
+    defaultSize: { w: 6, h: 8, minW: 4, minH: 5 },
+    defaultConfig: { limit: 8, sortBy: "spend" },
+    Render: CampaignTableWidget,
+    ConfigForm: CampaignTableConfigForm,
+  },
+  {
+    type: "health-gauge",
+    title: "Health Score",
+    description: "Overall account health gauge, grade and top fixes.",
+    icon: HeartPulse,
+    category: "metrics",
+    defaultSize: { w: 4, h: 8, minW: 3, minH: 6 },
+    defaultConfig: {},
+    Render: HealthGaugeWidget,
+  },
+  {
+    type: "funnel",
+    title: "Conversion Funnel",
+    description: "Impressions → clicks → conversions with step rates.",
+    icon: Filter,
+    category: "charts",
+    defaultSize: { w: 6, h: 7, minW: 4, minH: 5 },
+    defaultConfig: {},
+    Render: FunnelWidget,
+  },
+  {
+    type: "revenue-roas",
+    title: "Revenue & ROAS",
+    description: "Blended ROAS, real revenue and AOV (deduplicated).",
+    icon: DollarSign,
+    category: "attribution",
+    defaultSize: { w: 3, h: 3, minW: 3, minH: 3 },
+    defaultConfig: {},
+    Render: RevenueRoasWidget,
+  },
+  {
+    type: "attribution-mini",
+    title: "Attribution Models",
+    description: "First-touch vs last-touch credit across platforms.",
+    icon: GitBranch,
+    category: "attribution",
+    defaultSize: { w: 6, h: 8, minW: 4, minH: 6 },
+    defaultConfig: { modelA: "first_touch", modelB: "last_touch" },
+    Render: AttributionMiniWidget,
+  },
+  {
+    type: "ltv-cac",
+    title: "LTV : CAC",
+    description: "Lifetime value vs acquisition cost by channel.",
+    icon: Users,
+    category: "attribution",
+    defaultSize: { w: 6, h: 7, minW: 4, minH: 5 },
+    defaultConfig: {},
+    Render: LtvCacWidget,
   },
 ];
 

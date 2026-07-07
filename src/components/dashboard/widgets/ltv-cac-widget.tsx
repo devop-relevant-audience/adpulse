@@ -1,0 +1,82 @@
+"use client";
+
+import { AlertTriangle } from "lucide-react";
+import { useCohortAnalysis } from "@/hooks/use-metrics";
+import { useAppStore } from "@/store/app-store";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/dashboard/metrics";
+import type { Platform } from "@/lib/types/database";
+
+const PLATFORM_COLORS: Record<Platform, string> = {
+  google: "#4285f4",
+  meta: "#0866ff",
+  tiktok: "#121212",
+};
+
+const PLATFORM_LABELS: Record<Platform, string> = {
+  google: "Google",
+  meta: "Meta",
+  tiktok: "TikTok",
+};
+
+export function LtvCacWidget() {
+  const clientId = useAppStore((s) => s.selectedClientId);
+  const dateRange = useAppStore((s) => s.dateRange);
+  const platform = useAppStore((s) => s.selectedPlatform);
+
+  const { data, isLoading } = useCohortAnalysis({
+    clientId,
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    platform,
+  });
+
+  if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
+  if (!data || data.cohorts.length === 0)
+    return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
+
+  const byLtvCac = [...data.cohorts].sort((a, b) => b.ltvCacRatio - a.ltvCacRatio);
+  const byDay0Roas = [...data.cohorts].sort((a, b) => b.day0Roas - a.day0Roas);
+  const maxRatio = Math.max(...byLtvCac.map((c) => c.ltvCacRatio), 1);
+  const leadersDiffer = byLtvCac[0]?.platform !== byDay0Roas[0]?.platform;
+
+  return (
+    <div className="h-full w-full flex flex-col justify-center gap-2 px-1">
+      {byLtvCac.map((c) => (
+        <div key={c.platform}>
+          <div className="flex items-center justify-between text-[11px] mb-1">
+            <span className="flex items-center gap-1.5 text-ink font-medium">
+              <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: PLATFORM_COLORS[c.platform] }} />
+              {PLATFORM_LABELS[c.platform]}
+            </span>
+            <span className="flex items-center gap-2 text-ink-muted tabular-nums">
+              <span>CAC {formatCurrency(c.cac)}</span>
+              <span>Day-0 {c.day0Roas.toFixed(2)}x</span>
+              <span
+                className={cn(
+                  "font-semibold",
+                  c.ltvCacRatio >= 3 ? "text-emerald-600" : c.ltvCacRatio >= 2 ? "text-amber-600" : "text-red-500"
+                )}
+              >
+                {c.ltvCacRatio.toFixed(2)}x
+              </span>
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-canvas-soft overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{ width: `${(c.ltvCacRatio / maxRatio) * 100}%`, background: PLATFORM_COLORS[c.platform] }}
+            />
+          </div>
+        </div>
+      ))}
+      {leadersDiffer && (
+        <p className="flex items-start gap-1 text-[10px] text-amber-600 mt-1 leading-snug">
+          <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
+          {PLATFORM_LABELS[byDay0Roas[0].platform]} leads Day-0 ROAS, but {PLATFORM_LABELS[byLtvCac[0].platform]} wins LTV:CAC.
+        </p>
+      )}
+    </div>
+  );
+}

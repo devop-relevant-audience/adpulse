@@ -1,10 +1,9 @@
 import type { DashboardConfig, GridItem, WidgetInstance } from "./types";
 import { DASHBOARD_CONFIG_VERSION } from "./types";
 
-// The default dashboard — mirrors the classic fixed layout (KPI row → trend →
-// platform breakdown) so a client with no saved dashboard sees a sensible page
-// and nothing regresses. Stage 2 enriches this with the campaign table / health
-// gauge once those widgets are registered.
+// The default dashboard — mirrors the classic fixed layout (KPI row → trend +
+// platform split → health + campaign table) so a client with no saved dashboard
+// sees a sensible page and nothing regresses.
 interface PresetEntry {
   widget: WidgetInstance;
   lg: Omit<GridItem, "i">;
@@ -46,8 +45,20 @@ const PRESET: PresetEntry[] = [
   {
     widget: { i: "platform-split", type: "platform-breakdown", config: { metric: "spend" } },
     lg: { x: 8, y: 3, w: 4, h: 9 },
-    md: { x: 0, y: 14, w: 8, h: 7 },
+    md: { x: 0, y: 14, w: 8, h: 6 },
     sm: { x: 0, y: 13, w: 4, h: 7 },
+  },
+  {
+    widget: { i: "health", type: "health-gauge", config: {} },
+    lg: { x: 0, y: 12, w: 4, h: 8 },
+    md: { x: 0, y: 20, w: 4, h: 8 },
+    sm: { x: 0, y: 20, w: 4, h: 8 },
+  },
+  {
+    widget: { i: "campaigns", type: "campaign-table", config: { limit: 8, sortBy: "spend" } },
+    lg: { x: 4, y: 12, w: 8, h: 8 },
+    md: { x: 4, y: 20, w: 4, h: 8 },
+    sm: { x: 0, y: 28, w: 4, h: 8 },
   },
 ];
 
