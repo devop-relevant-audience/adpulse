@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { db } from "@/lib/db";
+import {
+  adCreatives,
+  campaignBudgets,
+  campaignPerformance,
+  chatMessages,
+  chatSessions,
+  clients,
+  reports,
+} from "@/lib/db/schema";
+import { keysToCamel } from "@/lib/db/case";
 import { generateGoogleAdsData } from "@/lib/mock-data/google-ads";
 import { generateMetaAdsData } from "@/lib/mock-data/meta-ads";
 import { generateTikTokAdsData } from "@/lib/mock-data/tiktok-ads";
@@ -15,26 +25,14 @@ const CLIENTS = [
   { name: "GreenLeaf Wellness", industry: "Health & Wellness" },
 ];
 
-function createAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createAdminClient();
-
     const body = await request.json().catch(() => ({}));
     const forceReseed = (body as { force?: boolean }).force === true;
 
-    const { data: existingClients } = await supabase
-      .from("clients")
-      .select("id")
-      .limit(1);
+    const existingClients = await db.select({ id: clients.id }).from(clients).limit(1);
 
-    if (existingClients && existingClients.length > 0 && !forceReseed) {
+    if (existingClients.length > 0 && !forceReseed) {
       return NextResponse.json(
         { message: "Database already seeded", seeded: false },
         { status: 200 }
@@ -42,27 +40,20 @@ export async function POST(request: NextRequest) {
     }
 
     if (forceReseed) {
-      await supabase.from("ad_creatives").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await supabase.from("campaign_budgets").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await supabase.from("campaign_performance").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await supabase.from("chat_messages").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await supabase.from("chat_sessions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await supabase.from("reports").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await supabase.from("clients").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await db.delete(adCreatives);
+      await db.delete(campaignBudgets);
+      await db.delete(campaignPerformance);
+      await db.delete(chatMessages);
+      await db.delete(chatSessions);
+      await db.delete(reports);
+      await db.delete(clients);
     }
 
     const endDate = new Date();
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 6);
 
-    const { data: insertedClients, error: clientError } = await supabase
-      .from("clients")
-      .insert(CLIENTS)
-      .select();
-
-    if (clientError) {
-      throw new Error(`Failed to insert clients: ${clientError.message}`);
-    }
+    const insertedClients = await db.insert(clients).values(CLIENTS).returning();
 
     let totalRows = 0;
 
@@ -80,15 +71,11 @@ export async function POST(request: NextRequest) {
       const BATCH_SIZE = 500;
       for (let i = 0; i < normalized.length; i += BATCH_SIZE) {
         const batch = normalized.slice(i, i + BATCH_SIZE);
-        const { error } = await supabase
-          .from("campaign_performance")
-          .insert(batch);
-
-        if (error) {
-          throw new Error(
-            `Failed to insert batch for ${client.name}: ${error.message}`
+        await db
+          .insert(campaignPerformance)
+          .values(
+            batch.map((r) => keysToCamel(r) as typeof campaignPerformance.$inferInsert)
           );
-        }
       }
 
       totalRows += normalized.length;
@@ -131,7 +118,9 @@ export async function POST(request: NextRequest) {
       const BUDGET_BATCH = 500;
       for (let i = 0; i < budgetRecords.length; i += BUDGET_BATCH) {
         const batch = budgetRecords.slice(i, i + BUDGET_BATCH);
-        await supabase.from("campaign_budgets").insert(batch);
+        await db
+          .insert(campaignBudgets)
+          .values(batch.map((r) => keysToCamel(r) as typeof campaignBudgets.$inferInsert));
       }
 
       const uniqueCampaigns = new Map<string, { campaign_id: string; campaign_name: string; platform: Platform }>();
@@ -156,10 +145,9 @@ export async function POST(request: NextRequest) {
       const CREATIVE_BATCH = 500;
       for (let i = 0; i < creativeRecords.length; i += CREATIVE_BATCH) {
         const batch = creativeRecords.slice(i, i + CREATIVE_BATCH);
-        const { error } = await supabase.from("ad_creatives").insert(batch);
-        if (error) {
-          throw new Error(`Failed to insert creatives for ${client.name}: ${error.message}`);
-        }
+        await db
+          .insert(adCreatives)
+          .values(batch.map((r) => keysToCamel(r) as typeof adCreatives.$inferInsert));
       }
     }
 

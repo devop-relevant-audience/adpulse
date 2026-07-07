@@ -1,22 +1,60 @@
-import { createClient } from "@supabase/supabase-js";
-import type { Platform, AdCreativeRow, CreativeStatus } from "@/lib/types/database";
+import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { db } from "@/lib/db";
+import {
+  adCreatives,
+  campaignBudgets,
+  campaignPerformance,
+  clients,
+} from "@/lib/db/schema";
+import type {
+  Platform,
+  AdCreativeRow,
+  CampaignPerformanceRow,
+  ClientRow,
+  CreativeStatus,
+} from "@/lib/types/database";
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+type AdCreativeSelect = typeof adCreatives.$inferSelect;
+
+// Map a Drizzle (camelCase) ad_creatives row onto the snake_case `AdCreativeRow`
+// shape that the rest of the app and the chat tools consume.
+function toAdCreativeRow(row: AdCreativeSelect): AdCreativeRow {
+  return {
+    id: row.id,
+    client_id: row.clientId,
+    campaign_id: row.campaignId,
+    platform: row.platform as AdCreativeRow["platform"],
+    ad_id: row.adId,
+    ad_name: row.adName,
+    creative_type: row.creativeType as AdCreativeRow["creative_type"],
+    headline: row.headline,
+    body_copy: row.bodyCopy,
+    thumbnail_url: row.thumbnailUrl,
+    impressions: row.impressions,
+    clicks: row.clicks,
+    spend: row.spend,
+    conversions: row.conversions,
+    ctr: row.ctr,
+    cpc: row.cpc,
+    cpa: row.cpa,
+    first_served: row.firstServed,
+    last_served: row.lastServed,
+    days_running: row.daysRunning,
+    status: row.status as AdCreativeRow["status"],
+    created_at: row.createdAt,
+  };
 }
 
-export async function getClients() {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("clients")
-    .select("*")
-    .order("name");
-
-  if (error) throw new Error(error.message);
-  return data;
+export async function getClients(): Promise<ClientRow[]> {
+  return db
+    .select({
+      id: clients.id,
+      name: clients.name,
+      industry: clients.industry,
+      created_at: clients.createdAt,
+    })
+    .from(clients)
+    .orderBy(asc(clients.name));
 }
 
 export async function getMetrics(params: {
@@ -25,47 +63,64 @@ export async function getMetrics(params: {
   endDate: string;
   platform?: Platform;
   campaignId?: string;
-}) {
-  const supabase = getSupabase();
-  let query = supabase
-    .from("campaign_performance")
-    .select("*")
-    .eq("client_id", params.clientId)
-    .gte("date", params.startDate)
-    .lte("date", params.endDate)
-    .order("date", { ascending: true });
-
+}): Promise<CampaignPerformanceRow[]> {
+  const conditions = [
+    eq(campaignPerformance.clientId, params.clientId),
+    gte(campaignPerformance.date, params.startDate),
+    lte(campaignPerformance.date, params.endDate),
+  ];
   if (params.platform) {
-    query = query.eq("platform", params.platform);
+    conditions.push(eq(campaignPerformance.platform, params.platform));
   }
   if (params.campaignId) {
-    query = query.eq("campaign_id", params.campaignId);
+    conditions.push(eq(campaignPerformance.campaignId, params.campaignId));
   }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data;
+  const rows = await db
+    .select({
+      id: campaignPerformance.id,
+      client_id: campaignPerformance.clientId,
+      platform: campaignPerformance.platform,
+      campaign_id: campaignPerformance.campaignId,
+      campaign_name: campaignPerformance.campaignName,
+      date: campaignPerformance.date,
+      impressions: campaignPerformance.impressions,
+      clicks: campaignPerformance.clicks,
+      spend: campaignPerformance.spend,
+      conversions: campaignPerformance.conversions,
+      ctr: campaignPerformance.ctr,
+      cpc: campaignPerformance.cpc,
+      cpm: campaignPerformance.cpm,
+      raw_payload: campaignPerformance.rawPayload,
+      created_at: campaignPerformance.createdAt,
+    })
+    .from(campaignPerformance)
+    .where(and(...conditions))
+    .orderBy(asc(campaignPerformance.date));
+
+  return rows as CampaignPerformanceRow[];
 }
 
 export async function listCampaigns(clientId: string, platform?: Platform) {
-  const supabase = getSupabase();
-  let query = supabase
-    .from("campaign_performance")
-    .select("campaign_id, campaign_name, platform")
-    .eq("client_id", clientId);
-
+  const conditions = [eq(campaignPerformance.clientId, clientId)];
   if (platform) {
-    query = query.eq("platform", platform);
+    conditions.push(eq(campaignPerformance.platform, platform));
   }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const rows = await db
+    .select({
+      campaign_id: campaignPerformance.campaignId,
+      campaign_name: campaignPerformance.campaignName,
+      platform: campaignPerformance.platform,
+    })
+    .from(campaignPerformance)
+    .where(and(...conditions));
 
   const uniqueMap = new Map<
     string,
     { campaign_id: string; campaign_name: string; platform: string }
   >();
-  for (const row of data) {
+  for (const row of rows) {
     uniqueMap.set(row.campaign_id, row);
   }
   return Array.from(uniqueMap.values());
@@ -404,15 +459,18 @@ export async function getCampaignPacing(params: {
   clientId: string;
   month: string;
 }): Promise<PacingData> {
-  const supabase = getSupabase();
-
-  const { data: budgets, error: budgetError } = await supabase
-    .from("campaign_budgets")
-    .select("*")
-    .eq("client_id", params.clientId)
-    .eq("month", params.month);
-
-  if (budgetError) throw new Error(budgetError.message);
+  const budgets = await db
+    .select({
+      campaign_id: campaignBudgets.campaignId,
+      monthly_budget: campaignBudgets.monthlyBudget,
+    })
+    .from(campaignBudgets)
+    .where(
+      and(
+        eq(campaignBudgets.clientId, params.clientId),
+        eq(campaignBudgets.month, params.month)
+      )
+    );
 
   const monthStart = `${params.month}-01`;
   const monthDate = new Date(monthStart);
@@ -426,14 +484,21 @@ export async function getCampaignPacing(params: {
 
   const endDateStr = endOfRange.toISOString().split("T")[0];
 
-  const { data: performanceData, error: perfError } = await supabase
-    .from("campaign_performance")
-    .select("campaign_id, campaign_name, platform, spend")
-    .eq("client_id", params.clientId)
-    .gte("date", monthStart)
-    .lte("date", endDateStr);
-
-  if (perfError) throw new Error(perfError.message);
+  const performanceData = await db
+    .select({
+      campaign_id: campaignPerformance.campaignId,
+      campaign_name: campaignPerformance.campaignName,
+      platform: campaignPerformance.platform,
+      spend: campaignPerformance.spend,
+    })
+    .from(campaignPerformance)
+    .where(
+      and(
+        eq(campaignPerformance.clientId, params.clientId),
+        gte(campaignPerformance.date, monthStart),
+        lte(campaignPerformance.date, endDateStr)
+      )
+    );
 
   const spendByCampaign = new Map<string, { total: number; name: string; platform: Platform }>();
   for (const row of performanceData || []) {
@@ -502,29 +567,40 @@ export async function getCreatives(params: {
   sort?: string;
   order?: "asc" | "desc";
 }): Promise<AdCreativeRow[]> {
-  const supabase = getSupabase();
-  let query = supabase
-    .from("ad_creatives")
-    .select("*")
-    .eq("client_id", params.clientId);
-
+  const conditions = [eq(adCreatives.clientId, params.clientId)];
   if (params.platform) {
-    query = query.eq("platform", params.platform);
+    conditions.push(eq(adCreatives.platform, params.platform));
   }
   if (params.status) {
-    query = query.eq("status", params.status);
+    conditions.push(eq(adCreatives.status, params.status));
   }
   if (params.campaignId) {
-    query = query.eq("campaign_id", params.campaignId);
+    conditions.push(eq(adCreatives.campaignId, params.campaignId));
   }
 
-  const sortCol = params.sort || "spend";
-  const ascending = params.order === "asc";
-  query = query.order(sortCol, { ascending });
+  const sortColumns = {
+    spend: adCreatives.spend,
+    ctr: adCreatives.ctr,
+    cpc: adCreatives.cpc,
+    cpa: adCreatives.cpa,
+    impressions: adCreatives.impressions,
+    clicks: adCreatives.clicks,
+    conversions: adCreatives.conversions,
+    days_running: adCreatives.daysRunning,
+    ad_name: adCreatives.adName,
+    created_at: adCreatives.createdAt,
+  } as const;
+  const sortCol =
+    sortColumns[params.sort as keyof typeof sortColumns] ?? adCreatives.spend;
+  const direction = params.order === "asc" ? asc : desc;
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data as AdCreativeRow[];
+  const rows = await db
+    .select()
+    .from(adCreatives)
+    .where(and(...conditions))
+    .orderBy(direction(sortCol));
+
+  return rows.map(toAdCreativeRow);
 }
 
 export interface FatigueAnalysisItem {
@@ -547,17 +623,14 @@ export interface FatigueAnalysisItem {
 export async function getCreativeFatigueAnalysis(
   clientId: string,
 ): Promise<FatigueAnalysisItem[]> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("ad_creatives")
-    .select("*")
-    .eq("client_id", clientId)
-    .gte("days_running", 14);
+  const data = await db
+    .select()
+    .from(adCreatives)
+    .where(and(eq(adCreatives.clientId, clientId), gte(adCreatives.daysRunning, 14)));
 
-  if (error) throw new Error(error.message);
-  if (!data || data.length === 0) return [];
+  if (data.length === 0) return [];
 
-  const rows = data as AdCreativeRow[];
+  const rows = data.map(toAdCreativeRow);
   const avgCtr = rows.reduce((s, r) => s + Number(r.ctr), 0) / rows.length;
   const avgCpa = rows.reduce((s, r) => s + Number(r.cpa), 0) / rows.length;
 

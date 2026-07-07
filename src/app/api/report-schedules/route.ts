@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { buildReport } from "@/lib/report/builder";
+import { db } from "@/lib/db";
+import { clients, reportSchedules } from "@/lib/db/schema";
+import { keysToCamel, keysToSnake } from "@/lib/db/case";
 import { sendMockEmail } from "@/lib/mock-email";
+import type { ReportScheduleRow } from "@/lib/types/database";
 import { format, subDays, subMonths, startOfMonth, endOfMonth, subQuarters, startOfQuarter, endOfQuarter } from "date-fns";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
 
 const scheduleSchema = z.object({
   client_id: z.string().uuid(),
@@ -64,15 +61,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "clientId required" }, { status: 400 });
     }
 
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from("report_schedules")
-      .select("*")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
+    const rows = await db
+      .select()
+      .from(reportSchedules)
+      .where(eq(reportSchedules.clientId, clientId))
+      .orderBy(desc(reportSchedules.createdAt));
 
-    if (error) throw new Error(error.message);
-    return NextResponse.json(data);
+    return NextResponse.json(rows.map(keysToSnake));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch schedules";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -98,15 +93,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from("report_schedules")
-      .insert(parsed.data)
-      .select()
-      .single();
+    const [row] = await db
+      .insert(reportSchedules)
+      .values(keysToCamel(parsed.data) as typeof reportSchedules.$inferInsert)
+      .returning();
 
-    if (error) throw new Error(error.message);
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json(keysToSnake(row), { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create schedule";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -122,16 +114,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "id required" }, { status: 400 });
     }
 
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from("report_schedules")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single();
+    const [row] = await db
+      .update(reportSchedules)
+      .set(
+        keysToCamel({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        }) as Partial<typeof reportSchedules.$inferInsert>
+      )
+      .where(eq(reportSchedules.id, id))
+      .returning();
 
-    if (error) throw new Error(error.message);
-    return NextResponse.json(data);
+    return NextResponse.json(keysToSnake(row));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update schedule";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -147,10 +141,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id required" }, { status: 400 });
     }
 
-    const supabase = getSupabase();
-    const { error } = await supabase.from("report_schedules").delete().eq("id", id);
+    await db.delete(reportSchedules).where(eq(reportSchedules.id, id));
 
-    if (error) throw new Error(error.message);
     return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to delete schedule";
@@ -166,22 +158,23 @@ async function handleSendNow(request: NextRequest) {
     return NextResponse.json({ error: "id required" }, { status: 400 });
   }
 
-  const supabase = getSupabase();
-  const { data: schedule, error: fetchError } = await supabase
-    .from("report_schedules")
-    .select("*")
-    .eq("id", scheduleId)
-    .single();
+  const [scheduleRow] = await db
+    .select()
+    .from(reportSchedules)
+    .where(eq(reportSchedules.id, scheduleId))
+    .limit(1);
 
-  if (fetchError || !schedule) {
+  if (!scheduleRow) {
     return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
   }
 
-  const { data: client } = await supabase
-    .from("clients")
-    .select("name")
-    .eq("id", schedule.client_id)
-    .single();
+  const schedule = keysToSnake(scheduleRow) as unknown as ReportScheduleRow;
+
+  const [client] = await db
+    .select({ name: clients.name })
+    .from(clients)
+    .where(eq(clients.id, schedule.client_id))
+    .limit(1);
 
   const clientName = client?.name || "Unknown Client";
   const dateRange = getDateRangeForType(schedule.date_range_type, schedule.custom_days);
@@ -223,10 +216,11 @@ async function handleSendNow(request: NextRequest) {
     body,
   });
 
-  await supabase
-    .from("report_schedules")
-    .update({ last_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("id", scheduleId);
+  const nowIso = new Date().toISOString();
+  await db
+    .update(reportSchedules)
+    .set({ lastSentAt: nowIso, updatedAt: nowIso })
+    .where(eq(reportSchedules.id, scheduleId));
 
   return NextResponse.json({
     success: true,

@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getMetrics, compareMetrics } from "@/lib/data/queries";
+import { db } from "@/lib/db";
+import { alertHistory, alertRules } from "@/lib/db/schema";
+import { keysToCamel, keysToSnake } from "@/lib/db/case";
 import { sendMockEmail } from "@/lib/mock-email";
-import type { Platform } from "@/lib/types/database";
+import type { AlertRuleRow, Platform } from "@/lib/types/database";
 import { format, subDays, subWeeks } from "date-fns";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
 
 const alertRuleSchema = z.object({
   client_id: z.string().uuid(),
@@ -41,28 +37,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "clientId required" }, { status: 400 });
     }
 
-    const supabase = getSupabase();
-
     if (action === "history") {
-      const { data, error } = await supabase
-        .from("alert_history")
-        .select("*")
-        .eq("client_id", clientId)
-        .order("triggered_at", { ascending: false })
+      const rows = await db
+        .select()
+        .from(alertHistory)
+        .where(eq(alertHistory.clientId, clientId))
+        .orderBy(desc(alertHistory.triggeredAt))
         .limit(100);
 
-      if (error) throw new Error(error.message);
-      return NextResponse.json(data);
+      return NextResponse.json(rows.map(keysToSnake));
     }
 
-    const { data, error } = await supabase
-      .from("alert_rules")
-      .select("*")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
+    const rows = await db
+      .select()
+      .from(alertRules)
+      .where(eq(alertRules.clientId, clientId))
+      .orderBy(desc(alertRules.createdAt));
 
-    if (error) throw new Error(error.message);
-    return NextResponse.json(data);
+    return NextResponse.json(rows.map(keysToSnake));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch alerts";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -88,15 +80,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from("alert_rules")
-      .insert(parsed.data)
-      .select()
-      .single();
+    const [row] = await db
+      .insert(alertRules)
+      .values(keysToCamel(parsed.data) as typeof alertRules.$inferInsert)
+      .returning();
 
-    if (error) throw new Error(error.message);
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json(keysToSnake(row), { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create alert rule";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -112,16 +101,30 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "id required" }, { status: 400 });
     }
 
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from(updates.status !== undefined && updates.rule_id === undefined ? "alert_history" : "alert_rules")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single();
+    // History rows carry a `status` (and no `rule_id`); rule rows are everything
+    // else. alert_history has no `updated_at` column, so only stamp rule updates.
+    const isHistory = updates.status !== undefined && updates.rule_id === undefined;
 
-    if (error) throw new Error(error.message);
-    return NextResponse.json(data);
+    if (isHistory) {
+      const [row] = await db
+        .update(alertHistory)
+        .set(keysToCamel(updates) as Partial<typeof alertHistory.$inferInsert>)
+        .where(eq(alertHistory.id, id))
+        .returning();
+      return NextResponse.json(keysToSnake(row));
+    }
+
+    const [row] = await db
+      .update(alertRules)
+      .set(
+        keysToCamel({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        }) as Partial<typeof alertRules.$inferInsert>
+      )
+      .where(eq(alertRules.id, id))
+      .returning();
+    return NextResponse.json(keysToSnake(row));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -137,10 +140,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id required" }, { status: 400 });
     }
 
-    const supabase = getSupabase();
-    const { error } = await supabase.from("alert_rules").delete().eq("id", id);
+    await db.delete(alertRules).where(eq(alertRules.id, id));
 
-    if (error) throw new Error(error.message);
     return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to delete alert rule";
@@ -156,15 +157,13 @@ async function handleEvaluate(request: NextRequest) {
     return NextResponse.json({ error: "clientId required" }, { status: 400 });
   }
 
-  const supabase = getSupabase();
-  const { data: rules, error } = await supabase
-    .from("alert_rules")
-    .select("*")
-    .eq("client_id", clientId)
-    .eq("enabled", true);
+  const ruleRows = await db
+    .select()
+    .from(alertRules)
+    .where(and(eq(alertRules.clientId, clientId), eq(alertRules.enabled, true)));
 
-  if (error) throw new Error(error.message);
-  if (!rules || rules.length === 0) {
+  const rules = ruleRows.map((r) => keysToSnake(r) as unknown as AlertRuleRow);
+  if (rules.length === 0) {
     return NextResponse.json({ triggered: [], message: "No enabled rules" });
   }
 
@@ -242,19 +241,23 @@ async function handleEvaluate(request: NextRequest) {
     }
 
     if (shouldTrigger) {
-      const { error: insertError } = await supabase.from("alert_history").insert({
-        rule_id: rule.id,
-        client_id: clientId,
-        metric: rule.metric,
-        actual_value: Number(actualValue.toFixed(4)),
-        threshold_value: rule.threshold,
-        severity: rule.severity,
-        status: "triggered",
-        notification_sent: true,
-        rule_name: rule.name,
-      });
-
-      if (insertError) console.error("Failed to insert alert history:", insertError);
+      try {
+        await db.insert(alertHistory).values(
+          keysToCamel({
+            rule_id: rule.id,
+            client_id: clientId,
+            metric: rule.metric,
+            actual_value: Number(actualValue.toFixed(4)),
+            threshold_value: rule.threshold,
+            severity: rule.severity,
+            status: "triggered",
+            notification_sent: true,
+            rule_name: rule.name,
+          }) as typeof alertHistory.$inferInsert
+        );
+      } catch (insertError) {
+        console.error("Failed to insert alert history:", insertError);
+      }
 
       sendMockEmail({
         to: rule.recipients,

@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { desc, eq } from "drizzle-orm";
 import { buildReport } from "@/lib/report/builder";
-import { createClient } from "@supabase/supabase-js";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
+import { db } from "@/lib/db";
+import { reports } from "@/lib/db/schema";
+import { keysToCamel, keysToSnake } from "@/lib/db/case";
 
 const reportSchema = z.object({
   clientId: z.string().uuid(),
@@ -31,38 +27,39 @@ export async function POST(request: NextRequest) {
 
     const reportData = await buildReport(parsed.data);
 
-    const supabase = getSupabase();
-
-    const { data: savedReport, error } = await supabase
-      .from("reports")
-      .insert({
-        client_id: parsed.data.clientId,
-        title: `${parsed.data.clientName} — Performance Report`,
-        date_range_start: parsed.data.startDate,
-        date_range_end: parsed.data.endDate,
-        comparison_start: reportData.comparisonRange.start,
-        comparison_end: reportData.comparisonRange.end,
-        narrative: reportData.narratives.executive,
-        metrics_summary: {
-          comparison: reportData.comparison,
-          campaignBreakdown: reportData.campaignBreakdown,
-          platformBreakdown: reportData.platformBreakdown,
-          trendSummary: reportData.trendSummary,
-          funnel: reportData.funnel,
-          healthScore: reportData.healthScore,
-          narratives: reportData.narratives,
-        },
-      })
-      .select()
-      .single();
-
-    if (error) {
+    let savedReportId: string | undefined;
+    try {
+      const [saved] = await db
+        .insert(reports)
+        .values(
+          keysToCamel({
+            client_id: parsed.data.clientId,
+            title: `${parsed.data.clientName} — Performance Report`,
+            date_range_start: parsed.data.startDate,
+            date_range_end: parsed.data.endDate,
+            comparison_start: reportData.comparisonRange.start,
+            comparison_end: reportData.comparisonRange.end,
+            narrative: reportData.narratives.executive,
+            metrics_summary: {
+              comparison: reportData.comparison,
+              campaignBreakdown: reportData.campaignBreakdown,
+              platformBreakdown: reportData.platformBreakdown,
+              trendSummary: reportData.trendSummary,
+              funnel: reportData.funnel,
+              healthScore: reportData.healthScore,
+              narratives: reportData.narratives,
+            },
+          }) as typeof reports.$inferInsert
+        )
+        .returning({ id: reports.id });
+      savedReportId = saved?.id;
+    } catch (error) {
       console.error("Failed to save report:", error);
     }
 
     return NextResponse.json({
       ...reportData,
-      id: savedReport?.id,
+      id: savedReportId,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to generate report";
@@ -75,20 +72,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const clientId = searchParams.get("clientId");
 
-    const supabase = getSupabase();
-    let query = supabase
-      .from("reports")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const rows = await db
+      .select()
+      .from(reports)
+      .where(clientId ? eq(reports.clientId, clientId) : undefined)
+      .orderBy(desc(reports.createdAt));
 
-    if (clientId) {
-      query = query.eq("client_id", clientId);
-    }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-
-    return NextResponse.json(data);
+    return NextResponse.json(rows.map(keysToSnake));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch reports";
     return NextResponse.json({ error: message }, { status: 500 });

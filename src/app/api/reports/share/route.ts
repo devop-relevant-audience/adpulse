@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
+import { db } from "@/lib/db";
+import { reports } from "@/lib/db/schema";
+import { keysToCamel, keysToSnake } from "@/lib/db/case";
+import type { ReportRow } from "@/lib/types/database";
 
 function generateToken(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -54,23 +51,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabase();
     const token = generateToken();
     const passwordHash = await hashPassword(parsed.data.password);
 
     // If we have an existing report ID, update it
     if (parsed.data.reportId) {
-      const { data: report, error } = await supabase
-        .from("reports")
-        .update({
-          share_token: token,
-          share_password_hash: passwordHash,
-        })
-        .eq("id", parsed.data.reportId)
-        .select()
-        .single();
+      const [report] = await db
+        .update(reports)
+        .set({ shareToken: token, sharePasswordHash: passwordHash })
+        .where(eq(reports.id, parsed.data.reportId))
+        .returning({ id: reports.id });
 
-      if (!error && report) {
+      if (report) {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
         return NextResponse.json({ shareUrl: `${baseUrl}/?share=${token}`, token, reportId: report.id });
       }
@@ -78,26 +70,23 @@ export async function POST(request: NextRequest) {
 
     // Otherwise create a new report entry with share fields
     if (parsed.data.clientId) {
-      const { data: report, error } = await supabase
-        .from("reports")
-        .insert({
-          client_id: parsed.data.clientId,
-          title: `${parsed.data.clientName || "Client"} — Performance Report`,
-          date_range_start: parsed.data.dateRange?.start || "",
-          date_range_end: parsed.data.dateRange?.end || "",
-          comparison_start: parsed.data.comparisonRange?.start || "",
-          comparison_end: parsed.data.comparisonRange?.end || "",
-          narrative: parsed.data.narrative || "",
-          metrics_summary: parsed.data.metricsSummary || {},
-          share_token: token,
-          share_password_hash: passwordHash,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
+      const [report] = await db
+        .insert(reports)
+        .values(
+          keysToCamel({
+            client_id: parsed.data.clientId,
+            title: `${parsed.data.clientName || "Client"} — Performance Report`,
+            date_range_start: parsed.data.dateRange?.start || "",
+            date_range_end: parsed.data.dateRange?.end || "",
+            comparison_start: parsed.data.comparisonRange?.start || "",
+            comparison_end: parsed.data.comparisonRange?.end || "",
+            narrative: parsed.data.narrative || "",
+            metrics_summary: parsed.data.metricsSummary || {},
+            share_token: token,
+            share_password_hash: passwordHash,
+          }) as typeof reports.$inferInsert
+        )
+        .returning({ id: reports.id });
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
       return NextResponse.json({ shareUrl: `${baseUrl}/?share=${token}`, token, reportId: report.id });
@@ -121,17 +110,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Token and password are required" }, { status: 400 });
     }
 
-    const supabase = getSupabase();
+    const [reportRow] = await db
+      .select()
+      .from(reports)
+      .where(eq(reports.shareToken, parsed.data.token))
+      .limit(1);
 
-    const { data: report, error } = await supabase
-      .from("reports")
-      .select("*")
-      .eq("share_token", parsed.data.token)
-      .single();
-
-    if (error || !report) {
+    if (!reportRow) {
       return NextResponse.json({ error: "Report not found or link expired" }, { status: 404 });
     }
+
+    const report = keysToSnake(reportRow) as unknown as ReportRow;
 
     const passwordHash = await hashPassword(parsed.data.password);
     if (report.share_password_hash !== passwordHash) {

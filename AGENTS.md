@@ -23,16 +23,20 @@ Copy `.env.example` to `.env.local`. Required to run:
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — validated by `src/lib/env.ts` (zod).
 - `SUPABASE_SERVICE_ROLE_KEY` — **not** validated by `env.ts` but used by the server data layer and the seed route. Without it, `src/lib/data/queries.ts` and `src/app/api/seed/route.ts` fall back to the anon key and most reads/writes will fail.
 - `OPENROUTER_API_KEY` — optional. Without it the chat route degrades to a non-AI "basic mode" summary instead of erroring.
+- `DATABASE_URL` — direct Postgres connection string, required for Drizzle (`drizzle-kit pull`/`generate` and the client in `src/lib/db/index.ts`). Use Supabase's transaction pooler (port 6543) for app runtime; introspection may need the direct connection (port 5432). Not used by the existing `src/lib/data/*` query layer, which still goes through `supabase-js`.
 
 Note: `src/lib/env.ts` exists but the API routes read `process.env` directly — do not assume env validation runs as a gate.
 
 ## Architecture
 
-- **UI is a single route, not file-based routing.** `src/app/page.tsx` is the whole app; views (dashboard, anomalies, pacing, funnel, optimizer, health, reports) are toggled via the Zustand store in `src/store/app-store.ts` (`VIEWS`/`activeView`). Only `/` and `/api/*` exist as routes.
-- **Data layer:** `src/lib/data/queries.ts` queries Supabase directly (service role key). `src/lib/data/optimizer.ts` and `health-score.ts` derive analytics. These are called from API routes, not Server Components.
-- **API routes** (`src/app/api/*`): `metrics` (GET, multi-action via `?action=`), `chat` (POST, SSE stream), `clients`, `campaigns`, `reports`, `optimizer`, `seed`.
+- **UI is a single route, not file-based routing.** `src/app/page.tsx` is the whole app; views (dashboard, anomalies, pacing, funnel, optimizer, health, creatives, alerts, compare, reports) are toggled via the Zustand store in `src/store/app-store.ts` (`VIEWS`/`activeView`). Only `/` and `/api/*` exist as routes.
+- **Data layer:** `src/lib/data/queries.ts` queries Postgres via **Drizzle** (`src/lib/db`). `src/lib/data/optimizer.ts` and `health-score.ts` derive analytics on top of `getMetrics`. These are called from API routes, not Server Components.
+- **API routes** (`src/app/api/*`): `metrics` (GET, multi-action via `?action=`), `chat` (POST, SSE stream), `clients`, `campaigns`, `reports`, `reports/share`, `report-schedules`, `optimizer`, `alerts`, `creatives`, `creatives/generate`, `seed`.
 - **Mock data + adapters:** `src/lib/mock-data/{google,meta,tiktok}-ads.ts` generate fake data; `src/lib/adapters/*` normalize each platform into the unified schema. Used only by the seed route.
 - **Database types are hand-written** in `src/lib/types/database.ts` (not generated via `supabase gen-types`). Tables: `clients`, `campaign_performance`, `campaign_budgets`, `reports`, `chat_sessions`, `chat_messages`. Update this file when the schema changes.
+- **Drizzle ORM is the DB layer** (`drizzle.config.ts`, `src/lib/db/schema.ts`, `src/lib/db/index.ts`). All DB reads (`src/lib/data/queries.ts`) and all API-route writes (`reports`, `reports/share`, `alerts`, `report-schedules`, `seed`) go through Drizzle. `@supabase/supabase-js` is retained only for the browser client (`src/lib/supabase/client.ts`) for future Auth/Storage — do **not** reintroduce it for DB access.
+- **camelCase ↔ snake_case boundary:** Drizzle models columns in camelCase, but the app (Zod schemas, mock data, the `*Row` types, the frontend, and the chat tools) speaks snake_case. Cross the boundary with `keysToSnake`/`keysToCamel` from `src/lib/db/case.ts` (shallow — nested JSON column values like `raw_payload`/`metrics_summary`/`reference_context` are passed through untouched). Reads map results with `keysToSnake`; writes map payloads with `keysToCamel`. `queries.ts` alternatively uses explicit aliased `select({ snake_case: table.camelColumn })` maps.
+- **`npm run db:pull` (`drizzle-kit pull`) currently crashes** on this project (`drizzle-kit@0.31.10`) with `TypeError: Cannot read properties of undefined (reading 'replace')` while processing CHECK constraints — reproduced directly against this DB's `pg_get_constraintdef` output showing no null values, so it looks like a drizzle-kit introspection bug, not a data issue. `src/lib/db/schema.ts` is therefore **hand-written** (10 tables, mirrors the live DB as of 2026-07-07) rather than generated. If you retry `db:pull` after a drizzle-kit upgrade and it succeeds, review the diff carefully before trusting it over the hand-written version.
 
 ## AI chat — do not "fix" the provider
 
