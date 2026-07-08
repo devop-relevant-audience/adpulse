@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useAppStore } from "@/store/app-store";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { isAgencyRole } from "@/lib/auth/roles";
 import {
   useGeneratedReports,
   useReportSchedules,
@@ -286,6 +288,10 @@ function ScheduleForm({
 
 export function ReportsView() {
   const clientId = useAppStore((s) => s.selectedClientId);
+  const { data: me } = useCurrentUser();
+  // Scheduled deliveries are managed via agency-only APIs. A client_user keeps
+  // report viewing + export, but never the schedules tab.
+  const canManageSchedules = isAgencyRole(me?.profile.role);
   const [tab, setTab] = useState<"reports" | "schedules">("reports");
   const [showForm, setShowForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ReportScheduleRow | undefined>();
@@ -307,24 +313,26 @@ export function ReportsView() {
         <p className="text-[13px] text-ink-muted mt-0.5">Generated reports and scheduled email deliveries</p>
       </div>
 
-      <div className="flex items-center gap-1 bg-canvas-soft rounded-lg p-1 w-fit">
-        <button
-          onClick={() => setTab("reports")}
-          className={cn("px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors",
-            tab === "reports" ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-          )}
-        >
-          Generated Reports
-        </button>
-        <button
-          onClick={() => setTab("schedules")}
-          className={cn("px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors",
-            tab === "schedules" ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-          )}
-        >
-          Scheduled Deliveries
-        </button>
-      </div>
+      {canManageSchedules && (
+        <div className="flex items-center gap-1 bg-canvas-soft rounded-lg p-1 w-fit">
+          <button
+            onClick={() => setTab("reports")}
+            className={cn("px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors",
+              tab === "reports" ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+            )}
+          >
+            Generated Reports
+          </button>
+          <button
+            onClick={() => setTab("schedules")}
+            className={cn("px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors",
+              tab === "schedules" ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+            )}
+          >
+            Scheduled Deliveries
+          </button>
+        </div>
+      )}
 
       {tab === "reports" && (
         <div className="space-y-3">
@@ -353,7 +361,7 @@ export function ReportsView() {
         </div>
       )}
 
-      {tab === "schedules" && (
+      {canManageSchedules && tab === "schedules" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-[13px] text-ink-muted">{schedules?.length || 0} schedule{schedules?.length !== 1 ? "s" : ""}</p>

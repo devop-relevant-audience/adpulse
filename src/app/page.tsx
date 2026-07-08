@@ -19,6 +19,8 @@ import { SharedReportView } from "@/components/report/shared-report-view";
 import { useAppStore } from "@/store/app-store";
 import { VIEWS } from "@/store/app-store";
 import { useClients } from "@/hooks/use-metrics";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { AccountNotProvisioned } from "@/components/layout/account-not-provisioned";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function DashboardSkeleton() {
@@ -111,12 +113,32 @@ function MainDashboard() {
   const clientId = useAppStore((s) => s.selectedClientId);
   const setSelectedClientId = useAppStore((s) => s.setSelectedClientId);
   const { data: clients, isLoading: clientsLoading } = useClients();
+  const { isLoading: userLoading, error: userError } = useCurrentUser();
 
   useEffect(() => {
     if (!clientId && clients && clients.length > 0) {
       setSelectedClientId(clients[0].id);
     }
   }, [clientId, clients, setSelectedClientId]);
+
+  // Authenticated but unprovisioned (no user_profiles row): dedicated full-page
+  // state, no app shell. The proxy already redirects 401s (no session) to
+  // /login, so we only special-case 403 here.
+  if (userError?.status === 403) {
+    return <AccountNotProvisioned />;
+  }
+
+  // Gate the shell on identity too, so the sidebar/header never flash for an
+  // unprovisioned account before the 403 resolves.
+  if (userLoading) {
+    return (
+      <div className="min-h-screen bg-[#f8f8f7] px-8 py-6">
+        <div className="max-w-[1400px] mx-auto">
+          <DashboardSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   const isReady = !!clientId;
 

@@ -13,6 +13,8 @@ import {
 } from "react-grid-layout";
 import { Pencil, Plus, Check, X, RotateCcw, LayoutDashboard } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { isAgencyRole } from "@/lib/auth/roles";
 import { useDashboard, useSaveDashboard } from "@/hooks/use-dashboard";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { buildDefaultDashboard } from "@/lib/dashboard/default-preset";
@@ -34,6 +36,10 @@ import { cn } from "@/lib/utils";
 
 export function CustomizableDashboard() {
   const clientId = useAppStore((s) => s.selectedClientId);
+  const { data: me } = useCurrentUser();
+  // Editing the layout is agency-only (the dashboards PUT is agency-gated
+  // server-side); a client_user gets the saved layout read-only.
+  const canEdit = isAgencyRole(me?.profile.role);
   // RGL 2.x self-measures via this hook (WidthProvider was removed in 2.0).
   const { width, containerRef } = useContainerWidth();
   const { data: saved, isLoading } = useDashboard(clientId);
@@ -135,9 +141,11 @@ export function CustomizableDashboard() {
               </Button>
             </>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => beginEdit(config)}>
-              <Pencil className="w-4 h-4" /> Customize
-            </Button>
+            canEdit && (
+              <Button variant="outline" size="sm" onClick={() => beginEdit(config)}>
+                <Pencil className="w-4 h-4" /> Customize
+              </Button>
+            )
           )}
         </div>
       </div>
@@ -147,16 +155,22 @@ export function CustomizableDashboard() {
           <LayoutDashboard className="w-8 h-8 text-ink-faint mb-3" />
           <p className="text-sm font-medium text-ink">This dashboard is empty</p>
           <p className="text-xs text-ink-muted mt-1 mb-4">
-            {editMode ? "Add widgets to build your view." : "Customize to add widgets."}
+            {editMode
+              ? "Add widgets to build your view."
+              : canEdit
+                ? "Customize to add widgets."
+                : "No widgets have been configured yet."}
           </p>
           {editMode ? (
             <Button size="sm" onClick={() => setCatalogOpen(true)}>
               <Plus className="w-4 h-4" /> Add widget
             </Button>
           ) : (
-            <Button size="sm" onClick={() => beginEdit(config)}>
-              <Pencil className="w-4 h-4" /> Customize
-            </Button>
+            canEdit && (
+              <Button size="sm" onClick={() => beginEdit(config)}>
+                <Pencil className="w-4 h-4" /> Customize
+              </Button>
+            )
           )}
         </div>
       ) : (

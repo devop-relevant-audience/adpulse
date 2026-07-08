@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAppStore } from "@/store/app-store";
 import { useClients } from "@/hooks/use-metrics";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { isAgencyRole } from "@/lib/auth/roles";
 import { FileText, Download, Loader2, Presentation, Link2, ChevronDown } from "lucide-react";
 import type { ReportData } from "@/lib/report/builder";
 import { ShareDialog } from "./share-dialog";
@@ -21,6 +23,10 @@ export function ReportGenerator() {
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
   const { data: clients } = useClients();
+  const { data: me } = useCurrentUser();
+  // Share-link creation writes a share token via the reports/share API, which
+  // is agency-only. Export (PDF/PPTX) stays available to everyone.
+  const canShare = isAgencyRole(me?.profile.role);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingFormat, setGeneratingFormat] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -139,11 +145,15 @@ export function ReportGenerator() {
               PowerPoint (PPTX)
             </DropdownMenuItem>
           </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleShareLink}>
-            <Link2 className="w-4 h-4 mr-2" />
-            Shareable Link
-          </DropdownMenuItem>
+          {canShare && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleShareLink}>
+                <Link2 className="w-4 h-4 mr-2" />
+                Shareable Link
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/store/app-store";
 import { useClients } from "@/hooks/use-metrics";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { isAgencyRole, isAdminRole, roleLabel } from "@/lib/auth/roles";
+import { signOutAndRedirect } from "@/lib/auth/sign-out";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -26,9 +29,11 @@ import {
   ArrowLeftRight,
   Image,
   Coins,
+  LogOut,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { VIEWS, type ViewId } from "@/store/app-store";
+import type { AppRole } from "@/lib/types/database";
 
 type NavItem = {
   id: string;
@@ -104,17 +109,45 @@ function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const selectedClient = clients?.find((c) => c.id === selectedClientId);
+  // The server already filters clients to those the caller may access. With a
+  // single option there's nothing to switch between, so render it as a static
+  // label rather than a (misleading) dropdown.
+  const isSingleClient = !!clients && clients.length === 1;
 
   if (collapsed) {
     return (
       <div className="px-2">
         <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold hover:bg-primary/15 transition-colors"
+          onClick={() => !isSingleClient && setIsOpen(!isOpen)}
+          className={cn(
+            "w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold transition-colors",
+            !isSingleClient && "hover:bg-primary/15",
+            isSingleClient && "cursor-default"
+          )}
           title={selectedClient?.name || "Select client"}
         >
           {selectedClient ? selectedClient.name.charAt(0) : "?"}
         </button>
+      </div>
+    );
+  }
+
+  if (isSingleClient) {
+    return (
+      <div className="px-3">
+        <div className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg bg-canvas-soft border border-transparent">
+          <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+            {selectedClient ? selectedClient.name.charAt(0) : <Building2 className="w-3.5 h-3.5" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-ink truncate">
+              {selectedClient?.name || "—"}
+            </p>
+            {selectedClient && (
+              <p className="text-[11px] text-ink-muted truncate capitalize">{selectedClient.industry}</p>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -173,12 +206,81 @@ function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+function UserFooter({
+  collapsed,
+  email,
+  role,
+}: {
+  collapsed: boolean;
+  email?: string | null;
+  role?: AppRole;
+}) {
+  const [signingOut, setSigningOut] = useState(false);
+
+  function handleSignOut() {
+    setSigningOut(true);
+    void signOutAndRedirect();
+  }
+
+  const initial = (email?.charAt(0) || "?").toUpperCase();
+
+  if (collapsed) {
+    return (
+      <div className="px-2 pt-1">
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          title={`${email ?? "Signed in"} — sign out`}
+          className="w-9 h-9 rounded-lg bg-canvas-soft text-ink flex items-center justify-center text-sm font-semibold hover:bg-hairline/60 transition-colors mx-auto"
+        >
+          {signingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : initial}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-1 pt-1 flex items-center gap-2">
+      <div className="w-7 h-7 rounded-md bg-canvas-soft text-ink flex items-center justify-center text-xs font-semibold shrink-0">
+        {initial}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] font-medium text-ink truncate">{email ?? "Signed in"}</p>
+        {role && (
+          <span className="text-[10px] font-medium text-ink-muted bg-canvas-soft px-1.5 py-0.5 rounded">
+            {roleLabel(role)}
+          </span>
+        )}
+      </div>
+      <button
+        onClick={handleSignOut}
+        disabled={signingOut}
+        title="Sign out"
+        className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-canvas-soft transition-colors shrink-0"
+      >
+        {signingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const toggleChat = useAppStore((s) => s.toggleChat);
   const isChatOpen = useAppStore((s) => s.isChatOpen);
   const activeView = useAppStore((s) => s.activeView);
   const setActiveView = useAppStore((s) => s.setActiveView);
+  const { data: me } = useCurrentUser();
+  const role = me?.profile.role;
+  const isAgency = isAgencyRole(role);
+
+  // Alerts is agency-only. A client_user landing on it (e.g. persisted deep
+  // state) is bounced back to the dashboard.
+  useEffect(() => {
+    if (!isAgency && activeView === VIEWS.alerts) {
+      setActiveView(VIEWS.dashboard);
+    }
+  }, [isAgency, activeView, setActiveView]);
 
   const navItems: NavItem[] = [
     {
@@ -286,7 +388,9 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5">
-        {navItems.map((item) => (
+        {navItems
+          .filter((item) => isAgency || item.id !== VIEWS.alerts)
+          .map((item) => (
           <button
             key={item.id}
             onClick={item.onClick}
@@ -320,7 +424,8 @@ export function Sidebar() {
 
       {/* Bottom Section */}
       <div className="border-t border-hairline py-3 px-2 space-y-1">
-        <SeedControl collapsed={collapsed} />
+        {isAdminRole(role) && <SeedControl collapsed={collapsed} />}
+        <UserFooter collapsed={collapsed} email={me?.user.email} role={role} />
       </div>
 
       {/* Collapse Toggle */}

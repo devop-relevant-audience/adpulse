@@ -8,16 +8,25 @@ export interface CurrentUser {
   profile: { full_name: string | null; role: AppRole };
 }
 
+// Carries the /api/me status so callers can tell a 403 (authenticated but not
+// provisioned) apart from a 401 (no session) or a network failure.
+export class AuthError extends Error {
+  constructor(public status: number) {
+    super(`auth error ${status}`);
+    this.name = "AuthError";
+  }
+}
+
 // Fetches the signed-in user's identity from /api/me. Identity doesn't change
 // within a session, so cache it forever and never retry (a 401/403 is a real
 // answer, not a transient error).
 export function useCurrentUser() {
-  return useQuery<CurrentUser>({
+  return useQuery<CurrentUser, AuthError>({
     queryKey: ["current-user"],
     queryFn: async () => {
       const res = await fetch("/api/me");
       if (!res.ok) {
-        throw new Error("Not authenticated");
+        throw new AuthError(res.status);
       }
       return (await res.json()) as CurrentUser;
     },

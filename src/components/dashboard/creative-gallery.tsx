@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useAppStore } from "@/store/app-store";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { isAgencyRole } from "@/lib/auth/roles";
 import { useCreatives } from "@/hooks/use-metrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -218,6 +220,9 @@ function MetricCell({ label, value }: { label: string; value: string }) {
 export function CreativeGallery() {
   const clientId = useAppStore((s) => s.selectedClientId);
   const setReferenceContext = useAppStore((s) => s.setReferenceContext);
+  const { data: me } = useCurrentUser();
+  // AI variant generation posts to the agency-only creatives/generate API.
+  const canGenerate = isAgencyRole(me?.profile.role);
 
   const [platformFilter, setPlatformFilter] = useState<Platform | "">("");
   const [statusFilter, setStatusFilter] = useState<CreativeStatus | "">("");
@@ -284,13 +289,15 @@ export function CreativeGallery() {
           <span className="text-[11px] text-ink-muted bg-canvas-soft px-2 py-0.5 rounded-md font-medium">
             {allCreatives.length}
           </span>
-          <button
-            onClick={() => setGeneratorOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Generate Variants
-          </button>
+          {canGenerate && (
+            <button
+              onClick={() => setGeneratorOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Generate Variants
+            </button>
+          )}
         </div>
 
         {/* Filters */}
