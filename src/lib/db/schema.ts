@@ -72,6 +72,7 @@ export const reports = pgTable("reports", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   shareToken: text("share_token"),
   sharePasswordHash: text("share_password_hash"),
+  shareExpiresAt: timestamp("share_expires_at", { withTimezone: true, mode: "string" }),
 });
 
 export const chatSessions = pgTable("chat_sessions", {
@@ -275,3 +276,36 @@ export const dashboards = pgTable("dashboards", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
 });
+
+// --- Auth & tenancy ---
+// One profile row per Supabase auth user. `id` is the auth.users id; the
+// cross-schema FK to auth.users(id) ON DELETE CASCADE lives in the migration
+// (drizzle/0004_auth_tenancy.sql) since Drizzle doesn't model the auth schema.
+export const userProfiles = pgTable(
+  "user_profiles",
+  {
+    id: uuid("id").primaryKey(),
+    fullName: text("full_name"),
+    role: text("role").notNull().default("client_user"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("user_profiles_role_check", sql`(${table.role} = ANY (ARRAY['agency_admin'::text, 'agency_member'::text, 'client_user'::text]))`),
+  ]
+);
+
+// Per-client membership — grants a (non-agency) user access to a single client.
+export const clientMembers = pgTable(
+  "client_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => userProfiles.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("viewer"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("client_members_role_check", sql`(${table.role} = ANY (ARRAY['viewer'::text]))`),
+  ]
+);

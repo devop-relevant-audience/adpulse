@@ -65,6 +65,7 @@ export interface ReportRow {
   metrics_summary: Record<string, unknown>;
   share_token: string | null;
   share_password_hash: string | null;
+  share_expires_at: string | null;
   created_at: string;
 }
 
@@ -80,6 +81,7 @@ export interface ReportInsert {
   metrics_summary: Record<string, unknown>;
   share_token?: string | null;
   share_password_hash?: string | null;
+  share_expires_at?: string | null;
   created_at?: string;
 }
 
@@ -400,9 +402,61 @@ export interface DashboardInsert {
   updated_at?: string;
 }
 
+// --- Auth & tenancy ---
+// Application-level roles. `agency_*` roles see all clients; `client_user` sees
+// only clients they're a member of (via client_members). Later stages import this.
+export type AppRole = 'agency_admin' | 'agency_member' | 'client_user';
+
+// One profile per Supabase auth user; `id` is the auth.users id. The FK to
+// auth.users(id) lives in the migration, not in Drizzle.
+export interface UserProfileRow {
+  id: string;
+  full_name: string | null;
+  role: AppRole;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserProfileInsert {
+  id: string;
+  full_name?: string | null;
+  role?: AppRole;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const CLIENT_MEMBER_ROLES = ['viewer'] as const;
+export type ClientMemberRole = (typeof CLIENT_MEMBER_ROLES)[number];
+
+export interface ClientMemberRow {
+  id: string;
+  user_id: string;
+  client_id: string;
+  role: ClientMemberRole;
+  created_at: string;
+}
+
+export interface ClientMemberInsert {
+  id?: string;
+  user_id: string;
+  client_id: string;
+  role?: ClientMemberRole;
+  created_at?: string;
+}
+
 export interface Database {
   public: {
     Tables: {
+      user_profiles: {
+        Row: UserProfileRow;
+        Insert: UserProfileInsert;
+        Update: Partial<UserProfileInsert>;
+      };
+      client_members: {
+        Row: ClientMemberRow;
+        Insert: ClientMemberInsert;
+        Update: Partial<ClientMemberInsert>;
+      };
       dashboards: {
         Row: DashboardRow;
         Insert: DashboardInsert;
