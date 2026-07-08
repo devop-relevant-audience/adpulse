@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getMetrics, compareMetrics, getDailyTrend, detectAnomalies, getFunnelData, getCampaignPacing } from "@/lib/data/queries";
 import { calculateHealthScore } from "@/lib/data/health-score";
 import { z } from "zod";
+import { requireClientAccess, requireUser } from "@/lib/auth/guard";
 import type { Platform } from "@/lib/types/database";
 
 const metricsSchema = z.object({
@@ -13,6 +14,9 @@ const metricsSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const action = searchParams.get("action") || "raw";
@@ -31,6 +35,9 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const access = await requireClientAccess(gate.ctx, parsed.data.clientId);
+    if (!access.ok) return access.response;
 
     const params = {
       ...parsed.data,

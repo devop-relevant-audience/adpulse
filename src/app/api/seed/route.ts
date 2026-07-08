@@ -12,6 +12,7 @@ import {
   reports,
 } from "@/lib/db/schema";
 import { keysToCamel } from "@/lib/db/case";
+import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
 import { generateGoogleAdsData } from "@/lib/mock-data/google-ads";
 import { generateMetaAdsData } from "@/lib/mock-data/meta-ads";
 import { generateTikTokAdsData } from "@/lib/mock-data/tiktok-ads";
@@ -29,6 +30,11 @@ const CLIENTS = [
 ];
 
 export async function POST(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx, "agency_admin");
+  if (!role.ok) return role.response;
+
   try {
     const body = await request.json().catch(() => ({}));
     const forceReseed = (body as { force?: boolean }).force === true;

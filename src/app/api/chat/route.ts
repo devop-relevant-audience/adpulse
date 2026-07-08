@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getMetrics, compareMetrics, listCampaigns, getDailyTrend, detectAnomalies, getFunnelData, getCreatives, getCreativeFatigueAnalysis } from '@/lib/data/queries';
 import { getChannelMixAnalysis } from '@/lib/data/optimizer';
 import { calculateHealthScore } from '@/lib/data/health-score';
+import { requireClientAccess, requireUser } from '@/lib/auth/guard';
 import type { Platform } from '@/lib/types/database';
 import { format, subDays } from 'date-fns';
 
@@ -357,6 +358,9 @@ async function resolveToolCalls(messages: OpenRouterMessage[], apiKey: string): 
 }
 
 export async function POST(request: NextRequest) {
+	const gate = await requireUser();
+	if (!gate.ok) return gate.response;
+
 	try {
 		const body = await request.json();
 		const parsed = chatSchema.safeParse(body);
@@ -366,6 +370,10 @@ export async function POST(request: NextRequest) {
 		}
 
 		const { message, clientId, referenceContext, history } = parsed.data;
+
+		// Authorize the target client BEFORE opening the SSE stream.
+		const access = await requireClientAccess(gate.ctx, clientId);
+		if (!access.ok) return access.response;
 
 		const apiKey = process.env.OPENROUTER_API_KEY;
 		if (!apiKey) {

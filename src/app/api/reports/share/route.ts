@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { reports } from "@/lib/db/schema";
 import { keysToCamel, keysToSnake } from "@/lib/db/case";
+import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
 import type { ReportRow } from "@/lib/types/database";
 
 function generateToken(): string {
@@ -25,6 +26,7 @@ async function hashPassword(password: string): Promise<string> {
 
 const createShareSchema = z.object({
   password: z.string().min(4, "Password must be at least 4 characters"),
+  expiresInDays: z.number().int().positive().max(365).default(30),
   reportId: z.string().uuid().optional(),
   clientId: z.string().uuid().optional(),
   clientName: z.string().optional(),
@@ -40,6 +42,11 @@ const accessShareSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const body = await request.json();
     const parsed = createShareSchema.safeParse(body);
@@ -53,12 +60,15 @@ export async function POST(request: NextRequest) {
 
     const token = generateToken();
     const passwordHash = await hashPassword(parsed.data.password);
+    const shareExpiresAt = new Date(
+      Date.now() + parsed.data.expiresInDays * 24 * 60 * 60 * 1000
+    ).toISOString();
 
     // If we have an existing report ID, update it
     if (parsed.data.reportId) {
       const [report] = await db
         .update(reports)
-        .set({ shareToken: token, sharePasswordHash: passwordHash })
+        .set({ shareToken: token, sharePasswordHash: passwordHash, shareExpiresAt })
         .where(eq(reports.id, parsed.data.reportId))
         .returning({ id: reports.id });
 
@@ -84,6 +94,7 @@ export async function POST(request: NextRequest) {
             metrics_summary: parsed.data.metricsSummary || {},
             share_token: token,
             share_password_hash: passwordHash,
+            share_expires_at: shareExpiresAt,
           }) as typeof reports.$inferInsert
         )
         .returning({ id: reports.id });
@@ -117,6 +128,11 @@ export async function GET(request: NextRequest) {
       .limit(1);
 
     if (!reportRow) {
+      return NextResponse.json({ error: "Report not found or link expired" }, { status: 404 });
+    }
+
+    // Treat an elapsed expiry as a dead link (same opaque message as not-found).
+    if (reportRow.shareExpiresAt && new Date(reportRow.shareExpiresAt).getTime() < Date.now()) {
       return NextResponse.json({ error: "Report not found or link expired" }, { status: 404 });
     }
 

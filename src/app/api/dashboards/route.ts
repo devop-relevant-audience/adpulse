@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDashboard, upsertDashboard } from "@/lib/data/dashboards";
 import { DASHBOARD_CONFIG_VERSION } from "@/lib/dashboard/types";
+import { requireAgencyRole, requireClientAccess, requireUser } from "@/lib/auth/guard";
 
 const gridItemSchema = z.object({
   i: z.string(),
@@ -40,6 +41,9 @@ const putSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const clientId = searchParams.get("clientId");
@@ -50,6 +54,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Valid clientId is required" }, { status: 400 });
     }
 
+    const access = await requireClientAccess(gate.ctx, parsed.data);
+    if (!access.ok) return access.response;
+
     const dashboard = await getDashboard(parsed.data, name);
     return NextResponse.json(dashboard);
   } catch (error) {
@@ -59,6 +66,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  // Dashboard layouts are per-client shared assets: client users view, agencies edit.
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const body = await request.json().catch(() => null);
     const parsed = putSchema.safeParse(body);

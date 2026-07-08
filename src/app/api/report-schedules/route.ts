@@ -5,6 +5,7 @@ import { buildReport } from "@/lib/report/builder";
 import { db } from "@/lib/db";
 import { clients, reportSchedules } from "@/lib/db/schema";
 import { keysToCamel, keysToSnake } from "@/lib/db/case";
+import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
 import { sendMockEmail } from "@/lib/mock-email";
 import type { ReportScheduleRow } from "@/lib/types/database";
 import { format, subDays, subMonths, startOfMonth, endOfMonth, subQuarters, startOfQuarter, endOfQuarter } from "date-fns";
@@ -53,6 +54,11 @@ function getDateRangeForType(type: string, customDays?: number | null): { start:
 }
 
 export async function GET(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const clientId = searchParams.get("clientId");
@@ -75,6 +81,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const action = searchParams.get("action");
@@ -106,6 +117,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const body = await request.json();
     const { id, ...updates } = body;
@@ -133,6 +149,11 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const id = searchParams.get("id");

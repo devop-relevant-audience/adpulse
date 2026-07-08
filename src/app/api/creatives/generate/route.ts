@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCreatives } from "@/lib/data/queries";
+import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
 import type { Platform, CreativeType, AdCreativeRow } from "@/lib/types/database";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -69,6 +70,11 @@ function summarizeTopPerformers(creatives: AdCreativeRow[]): string {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const body = await request.json();
     const parsed = requestSchema.safeParse(body);

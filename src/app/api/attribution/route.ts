@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRevenueOverview, getAttributionComparison, getCohortAnalysis } from "@/lib/data/attribution";
+import { requireClientAccess, requireUser } from "@/lib/auth/guard";
 import type { Platform } from "@/lib/types/database";
 
 const attributionSchema = z.object({
@@ -11,6 +12,9 @@ const attributionSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const action = searchParams.get("action") || "overview";
@@ -28,6 +32,9 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const access = await requireClientAccess(gate.ctx, parsed.data.clientId);
+    if (!access.ok) return access.response;
 
     const params = {
       ...parsed.data,

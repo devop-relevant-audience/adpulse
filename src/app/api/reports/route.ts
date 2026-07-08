@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { buildReport } from "@/lib/report/builder";
 import { db } from "@/lib/db";
 import { reports } from "@/lib/db/schema";
 import { keysToCamel, keysToSnake } from "@/lib/db/case";
+import { allowedClientIds, requireClientAccess, requireUser } from "@/lib/auth/guard";
 
 const reportSchema = z.object({
   clientId: z.string().uuid(),
@@ -14,6 +15,9 @@ const reportSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+
   try {
     const body = await request.json();
     const parsed = reportSchema.safeParse(body);
@@ -24,6 +28,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const access = await requireClientAccess(gate.ctx, parsed.data.clientId);
+    if (!access.ok) return access.response;
 
     const reportData = await buildReport(parsed.data);
 
@@ -68,14 +75,32 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const clientId = searchParams.get("clientId");
 
+    if (clientId) {
+      const access = await requireClientAccess(gate.ctx, clientId);
+      if (!access.ok) return access.response;
+    }
+
+    // No clientId: agency sees all; a client_user is scoped to their memberships.
+    const allowed = await allowedClientIds(gate.ctx);
+    let filter;
+    if (clientId) {
+      filter = eq(reports.clientId, clientId);
+    } else if (allowed !== null) {
+      if (allowed.length === 0) return NextResponse.json([]);
+      filter = inArray(reports.clientId, allowed);
+    }
+
     const rows = await db
       .select()
       .from(reports)
-      .where(clientId ? eq(reports.clientId, clientId) : undefined)
+      .where(filter)
       .orderBy(desc(reports.createdAt));
 
     return NextResponse.json(rows.map(keysToSnake));

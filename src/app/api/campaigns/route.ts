@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listCampaigns } from "@/lib/data/queries";
 import { z } from "zod";
+import { requireClientAccess, requireUser } from "@/lib/auth/guard";
 import type { Platform } from "@/lib/types/database";
 
 const querySchema = z.object({
@@ -9,6 +10,9 @@ const querySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const parsed = querySchema.safeParse({
@@ -22,6 +26,9 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const access = await requireClientAccess(gate.ctx, parsed.data.clientId);
+    if (!access.ok) return access.response;
 
     const campaigns = await listCampaigns(
       parsed.data.clientId,

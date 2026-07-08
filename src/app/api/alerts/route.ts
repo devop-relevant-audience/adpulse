@@ -5,6 +5,7 @@ import { getMetrics, compareMetrics } from "@/lib/data/queries";
 import { db } from "@/lib/db";
 import { alertHistory, alertRules } from "@/lib/db/schema";
 import { keysToCamel, keysToSnake } from "@/lib/db/case";
+import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
 import { sendMockEmail } from "@/lib/mock-email";
 import type { AlertRuleRow, Platform } from "@/lib/types/database";
 import { format, subDays, subWeeks } from "date-fns";
@@ -28,6 +29,11 @@ const alertRuleSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const clientId = searchParams.get("clientId");
@@ -62,6 +68,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const action = searchParams.get("action");
@@ -93,6 +104,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const body = await request.json();
     const { id, ...updates } = body;
@@ -132,6 +148,11 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+  const role = requireAgencyRole(gate.ctx);
+  if (!role.ok) return role.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const id = searchParams.get("id");

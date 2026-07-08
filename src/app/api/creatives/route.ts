@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCreatives, getCreativeFatigueAnalysis } from "@/lib/data/queries";
+import { requireClientAccess, requireUser } from "@/lib/auth/guard";
 import type { Platform, CreativeStatus } from "@/lib/types/database";
 
 export async function GET(request: NextRequest) {
+  const gate = await requireUser();
+  if (!gate.ok) return gate.response;
+
   try {
     const { searchParams } = request.nextUrl;
     const clientId = searchParams.get("clientId");
@@ -13,6 +17,9 @@ export async function GET(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    const access = await requireClientAccess(gate.ctx, clientId);
+    if (!access.ok) return access.response;
 
     const action = searchParams.get("action");
 
