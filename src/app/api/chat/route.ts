@@ -198,7 +198,14 @@ const TOOL_DEFINITIONS = [
 	},
 ];
 
-async function executeTool(name: string, args: Record<string, string>): Promise<string> {
+async function executeTool(
+	name: string,
+	args: Record<string, string>,
+	authorizedClientId: string,
+): Promise<string> {
+	// Never trust the model-emitted clientId: the request's clientId was
+	// membership-checked in POST; tool calls must not cross that boundary.
+	args.clientId = authorizedClientId;
 	switch (name) {
 		case 'getMetrics': {
 			const data = await getMetrics({
@@ -318,7 +325,11 @@ async function callOpenRouter(messages: OpenRouterMessage[], apiKey: string, str
 	});
 }
 
-async function resolveToolCalls(messages: OpenRouterMessage[], apiKey: string): Promise<OpenRouterMessage[]> {
+async function resolveToolCalls(
+	messages: OpenRouterMessage[],
+	apiKey: string,
+	authorizedClientId: string,
+): Promise<OpenRouterMessage[]> {
 	let maxIterations = 5;
 
 	while (maxIterations > 0) {
@@ -343,7 +354,7 @@ async function resolveToolCalls(messages: OpenRouterMessage[], apiKey: string): 
 
 		for (const toolCall of assistantMessage.tool_calls) {
 			const args = JSON.parse(toolCall.function.arguments);
-			const result = await executeTool(toolCall.function.name, args);
+			const result = await executeTool(toolCall.function.name, args, authorizedClientId);
 			messages.push({
 				role: 'tool',
 				tool_call_id: toolCall.id,
@@ -414,7 +425,7 @@ IMPORTANT RULES:
 
 		messages.push({ role: 'user', content: message });
 
-		const resolvedMessages = await resolveToolCalls([...messages], apiKey);
+		const resolvedMessages = await resolveToolCalls([...messages], apiKey, clientId);
 
 		const streamResponse = await callOpenRouter(resolvedMessages, apiKey, true);
 

@@ -124,11 +124,22 @@ function MainDashboard() {
     }
   }, [clientId, clients, setSelectedClientId]);
 
+  // A 401 here means the session expired after the page loaded (the proxy
+  // handles the no-session case on navigation).
+  const sessionExpired = userError?.status === 401;
+  useEffect(() => {
+    if (sessionExpired) {
+      window.location.assign("/login");
+    }
+  }, [sessionExpired]);
+
   // Authenticated but unprovisioned (no user_profiles row): dedicated full-page
-  // state, no app shell. The proxy already redirects 401s (no session) to
-  // /login, so we only special-case 403 here.
+  // state, no app shell.
   if (userError?.status === 403) {
     return <AccountNotProvisioned />;
+  }
+  if (sessionExpired) {
+    return null;
   }
 
   // Gate the shell on identity too, so the sidebar/header never flash for an
