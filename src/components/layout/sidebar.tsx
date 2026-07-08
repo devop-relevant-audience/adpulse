@@ -29,6 +29,7 @@ import {
   ArrowLeftRight,
   Image,
   Coins,
+  Users,
   LogOut,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -273,14 +274,18 @@ export function Sidebar() {
   const { data: me } = useCurrentUser();
   const role = me?.profile.role;
   const isAgency = isAgencyRole(role);
+  const isAdmin = isAdminRole(role);
 
-  // Alerts is agency-only. A client_user landing on it (e.g. persisted deep
-  // state) is bounced back to the dashboard.
+  // Alerts is agency-only; Team is agency_admin-only. A user landing on a view
+  // above their role (e.g. persisted deep state) is bounced to the dashboard.
   useEffect(() => {
-    if (!isAgency && activeView === VIEWS.alerts) {
+    if (
+      (!isAgency && activeView === VIEWS.alerts) ||
+      (!isAdmin && activeView === VIEWS.team)
+    ) {
       setActiveView(VIEWS.dashboard);
     }
-  }, [isAgency, activeView, setActiveView]);
+  }, [isAgency, isAdmin, activeView, setActiveView]);
 
   const navItems: NavItem[] = [
     {
@@ -360,6 +365,13 @@ export function Sidebar() {
       active: activeView === VIEWS.reports,
       onClick: () => setActiveView(VIEWS.reports),
     },
+    {
+      id: VIEWS.team,
+      label: "Team",
+      icon: <Users className="w-4 h-4" />,
+      active: activeView === VIEWS.team,
+      onClick: () => setActiveView(VIEWS.team),
+    },
   ];
 
   return (
@@ -389,7 +401,11 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5">
         {navItems
-          .filter((item) => isAgency || item.id !== VIEWS.alerts)
+          .filter((item) => {
+            if (item.id === VIEWS.alerts) return isAgency;
+            if (item.id === VIEWS.team) return isAdmin;
+            return true;
+          })
           .map((item) => (
           <button
             key={item.id}

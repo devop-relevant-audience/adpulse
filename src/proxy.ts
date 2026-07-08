@@ -45,6 +45,9 @@ export async function proxy(request: NextRequest) {
   const isPublic =
     pathname === "/login" ||
     pathname === "/auth/callback" ||
+    // Invite acceptance: the session materializes client-side from the URL
+    // (hash tokens) on this page, so it must load without a prior session.
+    pathname === "/auth/accept-invite" ||
     // Public shared-report links land on `/` with a ?share= token.
     (pathname === "/" && searchParams.has("share")) ||
     // Public share-view API (token + password checked inside the route).

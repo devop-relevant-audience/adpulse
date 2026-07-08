@@ -14,6 +14,7 @@ export const VIEWS = {
   alerts: "alerts",
   compare: "compare",
   reports: "reports",
+  team: "team",
 } as const;
 
 export type ViewId = (typeof VIEWS)[keyof typeof VIEWS];

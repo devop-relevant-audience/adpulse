@@ -15,6 +15,7 @@ import { ComparisonView } from "@/components/dashboard/comparison-view";
 import { AttributionView } from "@/components/dashboard/attribution-view";
 import { CreativeGallery } from "@/components/dashboard/creative-gallery";
 import { CustomizableDashboard } from "@/components/dashboard/customizable-dashboard";
+import { TeamView } from "@/components/team/team-view";
 import { SharedReportView } from "@/components/report/shared-report-view";
 import { useAppStore } from "@/store/app-store";
 import { VIEWS } from "@/store/app-store";
@@ -84,6 +85,8 @@ function ActiveView() {
       return <ComparisonView />;
     case VIEWS.reports:
       return <ReportsView />;
+    case VIEWS.team:
+      return <TeamView />;
     case VIEWS.dashboard:
     default:
       return <CustomizableDashboard />;
