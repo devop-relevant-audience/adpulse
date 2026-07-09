@@ -45,18 +45,7 @@ import type { Platform } from "@/lib/types/database";
 import { Panel } from "@/components/ui/panel";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { SERIES_PALETTE, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/dashboard/chart-theme";
-
-function formatNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
-
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
-}
+import { formatCurrency, formatNumber as formatNum } from "@/lib/format";
 
 function DeltaBadge({ value, invert = false }: { value: number; invert?: boolean }) {
   if (value === 0) return <span className="inline-flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded text-ink-muted bg-canvas-soft"><BiMinus className="w-3 h-3" />0%</span>;

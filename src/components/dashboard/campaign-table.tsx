@@ -16,6 +16,8 @@ import { useAppStore } from "@/store/app-store";
 import { BiSort, BiDownArrowAlt, BiUpArrowAlt, BiDownload, BiMessageRounded } from "react-icons/bi";
 import { cn } from "@/lib/utils";
 import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
+import { formatNumber as formatNum } from "@/lib/format";
+import { aggregateCampaignTotals } from "@/lib/data/campaign-aggregate";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
 
 interface CampaignSummary {
@@ -32,43 +34,18 @@ interface CampaignSummary {
 }
 
 function aggregateByCampaign(rows: CampaignPerformanceRow[]): CampaignSummary[] {
-  const map = new Map<string, CampaignSummary>();
-
-  for (const row of rows) {
-    const existing = map.get(row.campaign_id);
-    if (existing) {
-      existing.totalImpressions += Number(row.impressions);
-      existing.totalClicks += Number(row.clicks);
-      existing.totalSpend += Number(row.spend);
-      existing.totalConversions += Number(row.conversions);
-    } else {
-      map.set(row.campaign_id, {
-        campaignId: row.campaign_id,
-        campaignName: row.campaign_name,
-        platform: row.platform,
-        totalImpressions: Number(row.impressions),
-        totalClicks: Number(row.clicks),
-        totalSpend: Number(row.spend),
-        totalConversions: Number(row.conversions),
-        avgCtr: 0,
-        avgCpc: 0,
-        avgCpa: 0,
-      });
-    }
-  }
-
-  return Array.from(map.values()).map((c) => ({
-    ...c,
-    avgCtr: c.totalImpressions > 0 ? Number(((c.totalClicks / c.totalImpressions) * 100).toFixed(2)) : 0,
-    avgCpc: c.totalClicks > 0 ? Number((c.totalSpend / c.totalClicks).toFixed(2)) : 0,
-    avgCpa: c.totalConversions > 0 ? Number((c.totalSpend / c.totalConversions).toFixed(2)) : 0,
+  return aggregateCampaignTotals(rows).map((c) => ({
+    campaignId: c.campaignId,
+    campaignName: c.campaignName,
+    platform: c.platform,
+    totalImpressions: c.impressions,
+    totalClicks: c.clicks,
+    totalSpend: c.spend,
+    totalConversions: c.conversions,
+    avgCtr: c.impressions > 0 ? Number(((c.clicks / c.impressions) * 100).toFixed(2)) : 0,
+    avgCpc: c.clicks > 0 ? Number((c.spend / c.clicks).toFixed(2)) : 0,
+    avgCpa: c.conversions > 0 ? Number((c.spend / c.conversions).toFixed(2)) : 0,
   }));
-}
-
-function formatNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
 }
 
 type SortField = keyof CampaignSummary;

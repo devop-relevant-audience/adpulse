@@ -6,7 +6,7 @@ import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/dashboard/metrics";
+import { formatCurrency } from "@/lib/format";
 import { PLATFORM_LABELS_SHORT as PLATFORM_LABELS } from "@/lib/dashboard/chart-theme";
 import type { Platform } from "@/lib/types/database";
 

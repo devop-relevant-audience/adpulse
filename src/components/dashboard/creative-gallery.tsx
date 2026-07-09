@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { BiImage, BiVideo, BiCarousel, BiError, BiMessageRounded, BiSort, BiTrendingDown, BiSolidMagicWand } from "react-icons/bi";
 import { CreativeGenerator } from "@/components/dashboard/creative-generator";
 import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
+import { formatNumber as formatNum } from "@/lib/format";
 import type { AdCreativeRow, Platform, CreativeStatus } from "@/lib/types/database";
 
 const CREATIVE_TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -34,12 +35,6 @@ const STATUS_STYLES: Record<CreativeStatus, { bg: string; text: string; label: s
 };
 
 type SortKey = "spend" | "ctr" | "cpa" | "impressions" | "conversions";
-
-function formatNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
 
 function FatigueBar({ daysRunning }: { daysRunning: number }) {
   const pct = Math.min((daysRunning / 90) * 100, 100);

@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/panel";
 import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { BiBulb, BiTrendingUp, BiTrendingDown, BiDollar, BiPointer, BiShow, BiLineChart, BiCalendar, BiSolidMagicWand } from "react-icons/bi";
+import { formatCurrency, formatNumber } from "@/lib/format";
 import type { HealthScoreResult } from "@/lib/data/health-score";
 
 const GRADE_CONFIG = {
@@ -105,18 +106,6 @@ function SubScoreCard({ name, score, weight, description }: {
       <p className="text-[11px] text-ink-muted leading-relaxed">{description}</p>
     </div>
   );
-}
-
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
-}
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
 }
 
 export function HealthScore() {

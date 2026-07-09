@@ -9,6 +9,7 @@ import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { BiRightArrowAlt, BiTrendingDown } from "react-icons/bi";
 import { PLATFORM_COLORS, PLATFORM_LABELS, SERIES_PALETTE } from "@/lib/dashboard/chart-theme";
+import { formatNumber } from "@/lib/format";
 import type { FunnelStage } from "@/lib/data/queries";
 import type { Platform } from "@/lib/types/database";
 
@@ -19,12 +20,6 @@ const STAGE_COLORS = SERIES_PALETTE.slice(0, 3).map((main) => ({
   light: `${main}14`,
   border: `${main}33`,
 }));
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
 
 function HorizontalFunnel({ stages, byPlatform }: { stages: FunnelStage[]; byPlatform: Record<string, FunnelStage[]> }) {
   if (stages.length === 0) {

@@ -13,6 +13,7 @@ import {
 import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { PLATFORM_COLORS, PLATFORM_LABELS } from "@/lib/dashboard/chart-theme";
+import { formatCurrencyCompact as formatCurrency } from "@/lib/format";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
 
 function aggregateByPlatform(rows: CampaignPerformanceRow[]) {
@@ -44,12 +45,6 @@ function aggregateByPlatform(rows: CampaignPerformanceRow[]) {
     ctr: data.impressions > 0 ? Number(((data.clicks / data.impressions) * 100).toFixed(2)) : 0,
     pct: totalSpend > 0 ? Number(((data.spend / totalSpend) * 100).toFixed(1)) : 0,
   }));
-}
-
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
 }
 
 export function PlatformBreakdown() {

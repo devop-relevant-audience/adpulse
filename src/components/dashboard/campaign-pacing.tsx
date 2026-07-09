@@ -8,6 +8,7 @@ import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT, STATUS_COLORS } from "@/lib/dashboard/chart-theme";
+import { formatCurrencyCompact as formatCurrency } from "@/lib/format";
 import type { CampaignPacingItem } from "@/lib/data/queries";
 
 const STATUS_CONFIG = {
@@ -15,12 +16,6 @@ const STATUS_CONFIG = {
   underpacing: { label: "Underpacing", bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", barColor: STATUS_COLORS.warning },
   overpacing: { label: "Overpacing", bg: "bg-red-50", border: "border-red-200", text: "text-red-700", barColor: STATUS_COLORS.bad },
 } as const;
-
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
-}
 
 function PacingSummaryCards({ totalBudget, totalSpent, totalProjected, overallStatus }: {
   totalBudget: number;

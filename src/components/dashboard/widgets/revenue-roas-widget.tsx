@@ -5,7 +5,7 @@ import { useRevenueOverview } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
-import { formatCurrency } from "@/lib/dashboard/metrics";
+import { formatCurrency } from "@/lib/format";
 
 export function RevenueRoasWidget() {
   const clientId = useAppStore((s) => s.selectedClientId);

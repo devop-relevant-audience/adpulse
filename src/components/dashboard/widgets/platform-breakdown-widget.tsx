@@ -5,7 +5,7 @@ import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
-import { formatCurrency, formatNumber } from "@/lib/dashboard/metrics";
+import { formatCurrency, formatNumber } from "@/lib/format";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
 import type { WidgetRenderProps } from "@/lib/dashboard/types";
 import type { Platform } from "@/lib/types/database";
