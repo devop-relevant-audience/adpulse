@@ -10,20 +10,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
-import {
-  Sparkles,
-  Loader2,
-  Image,
-  Video,
-  Layers,
-  Lightbulb,
-  Trophy,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Check,
-} from "lucide-react";
+import { BiSolidMagicWand, BiRefresh, BiImage, BiVideo, BiCarousel, BiBulb, BiTrophy, BiChevronDown, BiChevronUp, BiCopy, BiCheck } from "react-icons/bi";
+import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
 import type { Platform, CreativeType } from "@/lib/types/database";
 
 interface GeneratedCreative {
@@ -51,16 +41,10 @@ interface GenerateResponse {
   generatedWith: "ai" | "fallback";
 }
 
-const PLATFORM_DOTS: Record<Platform, string> = {
-  google: "#4285F4",
-  meta: "#0668E1",
-  tiktok: "#121212",
-};
-
 const TYPE_ICONS: Record<CreativeType, React.ReactNode> = {
-  image: <Image className="w-3.5 h-3.5" />,
-  video: <Video className="w-3.5 h-3.5" />,
-  carousel: <Layers className="w-3.5 h-3.5" />,
+  image: <BiImage className="w-3.5 h-3.5" />,
+  video: <BiVideo className="w-3.5 h-3.5" />,
+  carousel: <BiCarousel className="w-3.5 h-3.5" />,
 };
 
 function VariantCard({
@@ -83,8 +67,8 @@ function VariantCard({
   );
 
   return (
-    <div className="bg-white rounded-xl border border-hairline overflow-hidden hover:shadow-md transition-shadow duration-200">
-      <div className="relative aspect-4/3 bg-gray-50 overflow-hidden">
+    <Panel className="overflow-hidden hover:shadow-md transition-shadow duration-200">
+      <div className="relative aspect-4/3 bg-canvas-soft overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={variant.thumbnail_url}
@@ -92,12 +76,12 @@ function VariantCard({
           className="w-full h-full object-cover"
           loading="lazy"
         />
-        <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-medium backdrop-blur-sm">
+        <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-ink/80 text-white text-[11px] font-medium">
           {TYPE_ICONS[variant.creative_type]}
           <span className="capitalize">{variant.creative_type}</span>
         </div>
-        <div className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-500/90 text-white text-[10px] font-medium backdrop-blur-sm">
-          <Sparkles className="w-2.5 h-2.5" />
+        <div className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary text-white text-[11px] font-medium">
+          <BiSolidMagicWand className="w-2.5 h-2.5" />
           #{index + 1}
         </div>
       </div>
@@ -114,9 +98,9 @@ function VariantCard({
               title="Copy headline"
             >
               {copied === "headline" ? (
-                <Check className="w-3 h-3 text-emerald-500" />
+                <BiCheck className="w-3 h-3 text-emerald-500" />
               ) : (
-                <Copy className="w-3 h-3" />
+                <BiCopy className="w-3 h-3" />
               )}
             </button>
           </div>
@@ -130,9 +114,9 @@ function VariantCard({
               title="Copy body"
             >
               {copied === "body" ? (
-                <Check className="w-3 h-3 text-emerald-500" />
+                <BiCheck className="w-3 h-3 text-emerald-500" />
               ) : (
-                <Copy className="w-3 h-3" />
+                <BiCopy className="w-3 h-3" />
               )}
             </button>
           </div>
@@ -141,27 +125,27 @@ function VariantCard({
         <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
           <span
             className="w-2 h-2 rounded-full shrink-0"
-            style={{ backgroundColor: PLATFORM_DOTS[variant.platform] }}
+            style={{ backgroundColor: PLATFORM_COLORS[variant.platform] }}
           />
           <span className="capitalize">{variant.platform}</span>
         </div>
 
         <button
           onClick={() => setShowRationale(!showRationale)}
-          className="flex items-center gap-1 w-full text-[11px] text-violet-600 hover:text-violet-800 transition-colors"
+          className="flex items-center gap-1 w-full text-[11px] text-primary hover:text-primary/80 transition-colors"
         >
-          <Lightbulb className="w-3 h-3" />
+          <BiBulb className="w-3 h-3" />
           <span>Strategy</span>
           {showRationale ? (
-            <ChevronUp className="w-3 h-3 ml-auto" />
+            <BiChevronUp className="w-3 h-3 ml-auto" />
           ) : (
-            <ChevronDown className="w-3 h-3 ml-auto" />
+            <BiChevronDown className="w-3 h-3 ml-auto" />
           )}
         </button>
 
         {showRationale && (
-          <div className="bg-violet-50 rounded-lg p-2.5 space-y-1.5">
-            <p className="text-[11px] text-violet-800 leading-relaxed">
+          <div className="bg-primary/5 rounded-lg p-2.5 space-y-1.5">
+            <p className="text-[11px] text-primary leading-relaxed">
               {variant.rationale}
             </p>
             {variant.inspired_by.length > 0 && (
@@ -169,9 +153,9 @@ function VariantCard({
                 {variant.inspired_by.map((source) => (
                   <span
                     key={source}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-100 text-[9px] font-medium text-violet-700"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-[11px] font-medium text-primary"
                   >
-                    <Trophy className="w-2 h-2" />
+                    <BiTrophy className="w-2 h-2" />
                     {source.length > 25 ? source.slice(0, 25) + "..." : source}
                   </span>
                 ))}
@@ -180,18 +164,18 @@ function VariantCard({
           </div>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
 
 function TopPerformerPill({ performer }: { performer: TopPerformerSummary }) {
   return (
     <div className="flex items-center gap-2 px-2.5 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100 min-w-0">
-      <Trophy className="w-3 h-3 text-emerald-600 shrink-0" />
+      <BiTrophy className="w-3 h-3 text-emerald-600 shrink-0" />
       <span className="text-[11px] font-medium text-emerald-800 truncate">
         {performer.headline}
       </span>
-      <span className="text-[10px] text-emerald-600 tabular-nums whitespace-nowrap">
+      <span className="text-[11px] text-emerald-600 tabular-nums whitespace-nowrap">
         {(Number(performer.ctr) * 100).toFixed(1)}% CTR
       </span>
     </div>
@@ -250,8 +234,8 @@ export function CreativeGenerator({
       <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-violet-500" />
-            AI Creative Generator
+            <BiSolidMagicWand className="w-4 h-4 text-primary" />
+            AI creative generator
           </DialogTitle>
           <DialogDescription>
             Analyze your top-performing creatives and generate new variants that
@@ -261,47 +245,11 @@ export function CreativeGenerator({
 
         {!result ? (
           <div className="space-y-4">
-            <div className="bg-canvas-soft rounded-xl p-4 space-y-3">
-              <h3 className="text-[12px] font-semibold text-ink uppercase tracking-wider">
-                How it works
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
-                  {
-                    step: "1",
-                    title: "Analyze",
-                    desc: "Reviews your top performers by CTR, conversions & CPA",
-                  },
-                  {
-                    step: "2",
-                    title: "Combine",
-                    desc: "Mixes winning headlines, copy angles & formats",
-                  },
-                  {
-                    step: "3",
-                    title: "Generate",
-                    desc: "Creates new variants with preview thumbnails",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.step}
-                    className="flex items-start gap-2.5"
-                  >
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold shrink-0 mt-0.5">
-                      {item.step}
-                    </span>
-                    <div>
-                      <p className="text-[12px] font-semibold text-ink">
-                        {item.title}
-                      </p>
-                      <p className="text-[11px] text-ink-muted leading-relaxed">
-                        {item.desc}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <p className="text-[13px] text-ink-muted leading-relaxed">
+              Reviews your top performers by CTR, conversions, and CPA, then
+              generates new variants that combine their winning headlines, copy
+              angles, and formats — each with a preview thumbnail.
+            </p>
 
             <div className="flex items-center gap-3">
               <label className="text-[12px] font-medium text-ink">
@@ -315,8 +263,8 @@ export function CreativeGenerator({
                     className={cn(
                       "px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors",
                       count === n
-                        ? "bg-violet-100 text-violet-700 border border-violet-200"
-                        : "bg-white border border-hairline text-ink-muted hover:text-ink hover:border-gray-300",
+                        ? "bg-primary/10 text-primary border border-primary/20"
+                        : "bg-white border border-hairline text-ink-muted hover:text-ink hover:border-ink-muted/40",
                     )}
                   >
                     {n}
@@ -334,17 +282,17 @@ export function CreativeGenerator({
             <Button
               onClick={handleGenerate}
               disabled={isGenerating || !clientId}
-              className="w-full bg-violet-600 hover:bg-violet-700 text-white"
+              className="w-full bg-primary hover:bg-primary/90 text-white"
             >
               {isGenerating ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Analyzing top performers & generating...
+                  <BiRefresh className="w-4 h-4 animate-spin" />
+                  Analyzing top performers and generating…
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
-                  Generate {count} Creative Variants
+                  <BiSolidMagicWand className="w-4 h-4" />
+                  Generate {count} creative variants
                 </>
               )}
             </Button>
@@ -357,7 +305,7 @@ export function CreativeGenerator({
                   {result.variants.length} variants generated
                 </span>
                 {result.generatedWith === "ai" && (
-                  <span className="px-1.5 py-0.5 rounded bg-violet-100 text-[10px] font-medium text-violet-700">
+                  <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[11px] font-medium text-primary">
                     AI-powered
                   </span>
                 )}
@@ -369,7 +317,7 @@ export function CreativeGenerator({
 
             {result.topPerformers.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">
+                <p className="text-[12px] font-medium text-ink-muted">
                   Based on top performers
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -377,7 +325,7 @@ export function CreativeGenerator({
                     <TopPerformerPill key={p.headline} performer={p} />
                   ))}
                   {result.topPerformers.length > 4 && (
-                    <span className="text-[10px] text-ink-muted self-center">
+                    <span className="text-[11px] text-ink-muted self-center">
                       +{result.topPerformers.length - 4} more
                     </span>
                   )}

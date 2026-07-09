@@ -3,21 +3,16 @@
 import { usePacing } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import type { Platform } from "@/lib/types/database";
+import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT, STATUS_COLORS } from "@/lib/dashboard/chart-theme";
 import type { CampaignPacingItem } from "@/lib/data/queries";
 
-const PLATFORM_META: Record<Platform, { label: string; color: string }> = {
-  google: { label: "Google", color: "#4285F4" },
-  meta: { label: "Meta", color: "#0668E1" },
-  tiktok: { label: "TikTok", color: "#121212" },
-};
-
 const STATUS_CONFIG = {
-  on_track: { label: "On Track", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", barColor: "#16a34a" },
-  underpacing: { label: "Underpacing", bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", barColor: "#f59e0b" },
-  overpacing: { label: "Overpacing", bg: "bg-red-50", border: "border-red-200", text: "text-red-700", barColor: "#ef4444" },
+  on_track: { label: "On track", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", barColor: STATUS_COLORS.good },
+  underpacing: { label: "Underpacing", bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", barColor: STATUS_COLORS.warning },
+  overpacing: { label: "Overpacing", bg: "bg-red-50", border: "border-red-200", text: "text-red-700", barColor: STATUS_COLORS.bad },
 } as const;
 
 function formatCurrency(n: number): string {
@@ -36,22 +31,22 @@ function PacingSummaryCards({ totalBudget, totalSpent, totalProjected, overallSt
   const utilizationPercent = totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : "0";
 
   const cards = [
-    { label: "Total Budget", value: formatCurrency(totalBudget) },
-    { label: "Spent to Date", value: formatCurrency(totalSpent) },
-    { label: "Projected Spend", value: formatCurrency(totalProjected) },
+    { label: "Total budget", value: formatCurrency(totalBudget) },
+    { label: "Spent to date", value: formatCurrency(totalSpent) },
+    { label: "Projected spend", value: formatCurrency(totalProjected) },
     { label: "Utilization", value: `${utilizationPercent}%` },
   ];
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
       {cards.map((card) => (
-        <div key={card.label} className="bg-white rounded-xl border border-hairline p-4">
-          <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">{card.label}</p>
+        <Panel key={card.label} className="p-4">
+          <p className="text-[12px] font-medium text-ink-muted">{card.label}</p>
           <p className="text-xl font-semibold text-ink mt-1 tabular-nums">{card.value}</p>
-        </div>
+        </Panel>
       ))}
       <div className={cn("rounded-xl border p-4", statusConfig.bg, statusConfig.border)}>
-        <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">Status</p>
+        <p className="text-[12px] font-medium text-ink-muted">Status</p>
         <p className={cn("text-xl font-semibold mt-1", statusConfig.text)}>{statusConfig.label}</p>
       </div>
     </div>
@@ -69,23 +64,23 @@ function PacingBar({ item }: { item: CampaignPacingItem }) {
           <div className="flex items-center gap-2">
             <span
               className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: PLATFORM_META[item.platform]?.color || "#888" }}
+              style={{ backgroundColor: PLATFORM_COLORS[item.platform] ?? "#6b6b6b" }}
             />
             <span className="text-[13px] font-medium text-ink truncate">{item.campaignName}</span>
-            <span className="text-[11px] text-ink-muted">{PLATFORM_META[item.platform]?.label || item.platform}</span>
+            <span className="text-[11px] text-ink-muted">{PLATFORM_LABELS_SHORT[item.platform] ?? item.platform}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[12px] text-ink-muted tabular-nums">
               {formatCurrency(item.spentToDate)} / {formatCurrency(item.monthlyBudget)}
             </span>
-            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border", statusConfig.bg, statusConfig.border, statusConfig.text)}>
+            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border", statusConfig.bg, statusConfig.border, statusConfig.text)}>
               {statusConfig.label}
             </span>
           </div>
         </div>
         <div className="relative h-2.5 bg-canvas-soft rounded-full overflow-hidden">
           <div
-            className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+            className="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
             style={{
               width: `${Math.max(spentPercent, 1)}%`,
               backgroundColor: statusConfig.barColor,
@@ -98,11 +93,11 @@ function PacingBar({ item }: { item: CampaignPacingItem }) {
           />
         </div>
         <div className="flex items-center justify-between mt-1">
-          <span className="text-[10px] text-ink-faint">
+          <span className="text-[11px] text-ink-muted">
             Pacing: {item.pacingPercent}% | Projected: {formatCurrency(item.projectedSpend)}
           </span>
           {item.daysRemaining > 0 && (
-            <span className="text-[10px] text-ink-faint">
+            <span className="text-[11px] text-ink-muted">
               Need {formatCurrency(item.requiredDailySpend)}/day for {item.daysRemaining}d remaining
             </span>
           )}
@@ -136,12 +131,12 @@ export function CampaignPacing() {
     return (
       <div className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-ink">Campaign Pacing</h2>
+          <h2 className="text-lg font-semibold text-ink">Campaign pacing</h2>
           <p className="text-sm text-ink-muted mt-0.5">Budget utilization and spend forecasting for {format(new Date(currentMonth + "-01"), "MMMM yyyy")}.</p>
         </div>
-        <div className="bg-white rounded-xl border border-hairline p-8 text-center">
+        <Panel className="p-8 text-center">
           <p className="text-ink-muted text-sm">No budget data available. Re-seed your data to generate campaign budgets.</p>
-        </div>
+        </Panel>
       </div>
     );
   }
@@ -188,16 +183,16 @@ export function CampaignPacing() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-hairline overflow-hidden">
+      <Panel className="overflow-hidden">
         <div className="px-5 py-3 border-b border-hairline">
-          <h3 className="text-sm font-semibold text-ink">Per-Campaign Pacing</h3>
+          <h3 className="text-sm font-semibold text-ink">Per-campaign pacing</h3>
         </div>
         <div className="divide-y divide-hairline/60">
           {pacingData.campaigns.map((item) => (
             <PacingBar key={item.campaignId} item={item} />
           ))}
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

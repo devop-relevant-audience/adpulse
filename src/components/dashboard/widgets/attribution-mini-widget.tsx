@@ -5,20 +5,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveCo
 import { useAttributionComparison } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
 import type { WidgetRenderProps } from "@/lib/dashboard/types";
 import type { Platform, AttributionModel } from "@/lib/types/database";
-
-const PLATFORM_COLORS: Record<Platform, string> = {
-  google: "#4285f4",
-  meta: "#0866ff",
-  tiktok: "#121212",
-};
-
-const PLATFORM_LABELS: Record<Platform, string> = {
-  google: "Google",
-  meta: "Meta",
-  tiktok: "TikTok",
-};
 
 const PLATFORMS: Platform[] = ["google", "meta", "tiktok"];
 
@@ -56,7 +45,7 @@ export function AttributionMiniWidget({ config }: WidgetRenderProps) {
     const a = data.models.find((m) => m.model === modelA);
     const b = data.models.find((m) => m.model === modelB);
     return PLATFORMS.map((p) => ({
-      platform: PLATFORM_LABELS[p],
+      platform: PLATFORM_LABELS_SHORT[p],
       color: PLATFORM_COLORS[p],
       [a?.label ?? "Model A"]: Number((a?.credit.find((c) => c.platform === p)?.sharePct ?? 0).toFixed(1)),
       [b?.label ?? "Model B"]: Number((b?.credit.find((c) => c.platform === p)?.sharePct ?? 0).toFixed(1)),
@@ -73,10 +62,10 @@ export function AttributionMiniWidget({ config }: WidgetRenderProps) {
   return (
     <div className="h-full w-full flex flex-col">
       <div className="flex items-center justify-between px-1 mb-1">
-        <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider truncate">
+        <p className="text-[12px] font-medium text-ink-muted truncate">
           {labelA} vs {labelB}
         </p>
-        <div className="flex items-center gap-2 text-[10px] text-ink-faint shrink-0">
+        <div className="flex items-center gap-2 text-[11px] text-ink-muted shrink-0">
           <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm opacity-40 bg-ink-faint" />{labelA}</span>
           <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-ink-faint" />{labelB}</span>
         </div>
@@ -85,8 +74,8 @@ export function AttributionMiniWidget({ config }: WidgetRenderProps) {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} barGap={2} barCategoryGap="24%" margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <CartesianGrid stroke="#f0f0f0" strokeDasharray="none" vertical={false} />
-            <XAxis dataKey="platform" tick={{ fontSize: 10, fill: "#a39e98" }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: "#a39e98" }} axisLine={false} tickLine={false} width={28} tickFormatter={(v) => `${v}%`} />
+            <XAxis dataKey="platform" tick={{ fontSize: 10, fill: "#6b6b6b" }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 9, fill: "#6b6b6b" }} axisLine={false} tickLine={false} width={28} tickFormatter={(v) => `${v}%`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => [`${Number(v).toFixed(1)}%`, ""]} />
             <Bar dataKey={labelA} radius={[3, 3, 0, 0]}>
               {chartData.map((entry, i) => (

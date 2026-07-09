@@ -4,15 +4,17 @@ import { useAnomalies, useDailyTrend } from '@/hooks/use-metrics';
 import { useAppStore } from '@/store/app-store';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, TrendingUp, TrendingDown, Info } from 'lucide-react';
+import { BiError, BiErrorCircle, BiTrendingUp, BiTrendingDown, BiInfoCircle } from "react-icons/bi";
 import { format, parseISO } from 'date-fns';
 import { ResponsiveContainer, ComposedChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceDot } from 'recharts';
 import type { AnomalyPoint } from '@/lib/data/queries';
 
+// Each severity carries a distinct icon so critical vs warning never rely on
+// colour alone to be told apart.
 const SEVERITY_CONFIG = {
-  critical: { color: '#ef4444', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', label: 'Critical' },
-  warning: { color: '#f59e0b', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', label: 'Warning' },
-  info: { color: '#3b82f6', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', label: 'Info' },
+  critical: { color: '#ef4444', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', label: 'Critical', icon: BiError },
+  warning: { color: '#f59e0b', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', label: 'Warning', icon: BiErrorCircle },
+  info: { color: '#3b82f6', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', label: 'Info', icon: BiInfoCircle },
 } as const;
 
 const METRIC_LABELS: Record<string, string> = {
@@ -25,11 +27,10 @@ const METRIC_LABELS: Record<string, string> = {
 
 function SeverityBadge({ severity }: { severity: AnomalyPoint['severity'] }) {
   const config = SEVERITY_CONFIG[severity];
+  const Icon = config.icon;
   return (
     <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border', config.bg, config.border, config.text)}>
-      {severity === 'critical' && <AlertTriangle className='w-3 h-3' />}
-      {severity === 'warning' && <AlertTriangle className='w-3 h-3' />}
-      {severity === 'info' && <Info className='w-3 h-3' />}
+      <Icon className='w-3 h-3' />
       {config.label}
     </span>
   );
@@ -41,7 +42,7 @@ function AnomalySummaryCards({ anomalies }: { anomalies: AnomalyPoint[] }) {
   const infoCount = anomalies.filter((a) => a.severity === 'info').length;
 
   const cards = [
-    { label: 'Total Anomalies', value: anomalies.length, color: 'text-ink' },
+    { label: 'Total anomalies', value: anomalies.length, color: 'text-ink' },
     { label: 'Critical', value: criticalCount, color: 'text-red-600' },
     { label: 'Warning', value: warningCount, color: 'text-amber-600' },
     { label: 'Info', value: infoCount, color: 'text-blue-600' },
@@ -51,7 +52,7 @@ function AnomalySummaryCards({ anomalies }: { anomalies: AnomalyPoint[] }) {
     <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
       {cards.map((card) => (
         <div key={card.label} className='bg-white rounded-xl border border-hairline p-4'>
-          <p className='text-[11px] font-medium text-ink-muted uppercase tracking-wider'>{card.label}</p>
+          <p className='text-[12px] font-medium text-ink-muted'>{card.label}</p>
           <p className={cn('text-2xl font-semibold mt-1 tabular-nums', card.color)}>{card.value}</p>
         </div>
       ))}
@@ -86,6 +87,7 @@ function AnomalyChartTooltip({
       {matchingAnomalies.map((anomaly, i) => {
         const deviation = ((anomaly.value - anomaly.expected) / anomaly.expected) * 100;
         const sevConfig = SEVERITY_CONFIG[anomaly.severity];
+        const SevIcon = sevConfig.icon;
         return (
           <div key={i} className='px-3 py-2 border-t border-hairline/40 first:border-t-0'>
             <div className='flex items-center justify-between gap-2 mb-1.5'>
@@ -97,7 +99,7 @@ function AnomalyChartTooltip({
                   sevConfig.text,
                 )}
               >
-                {anomaly.severity === 'info' ? <Info className='w-2.5 h-2.5' /> : <AlertTriangle className='w-2.5 h-2.5' />}
+                <SevIcon className='w-2.5 h-2.5' />
                 {sevConfig.label}
               </span>
               <span className={cn('text-[11px] font-semibold tabular-nums', deviation > 0 ? 'text-red-600' : 'text-emerald-600')}>
@@ -164,12 +166,12 @@ function AnomalyChart({ anomalies }: { anomalies: AnomalyPoint[] }) {
           <XAxis
             dataKey='date'
             tickFormatter={(v) => format(parseISO(v), 'MMM d')}
-            tick={{ fontSize: 11, fill: '#a39e98' }}
+            tick={{ fontSize: 11, fill: '#6b6b6b' }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 11, fill: '#a39e98' }}
+            tick={{ fontSize: 11, fill: '#6b6b6b' }}
             axisLine={false}
             tickLine={false}
             width={55}
@@ -231,9 +233,9 @@ function AnomalyList({ anomalies }: { anomalies: AnomalyPoint[] }) {
             >
               <div className='shrink-0'>
                 {anomaly.direction === 'spike' ? (
-                  <TrendingUp className={cn('w-4 h-4', SEVERITY_CONFIG[anomaly.severity].text)} />
+                  <BiTrendingUp className={cn('w-4 h-4', SEVERITY_CONFIG[anomaly.severity].text)} />
                 ) : (
-                  <TrendingDown className={cn('w-4 h-4', SEVERITY_CONFIG[anomaly.severity].text)} />
+                  <BiTrendingDown className={cn('w-4 h-4', SEVERITY_CONFIG[anomaly.severity].text)} />
                 )}
               </div>
               <div className='flex-1 min-w-0'>
@@ -248,7 +250,7 @@ function AnomalyList({ anomalies }: { anomalies: AnomalyPoint[] }) {
                         : anomaly.value.toLocaleString()}
                   </span>
                 </p>
-                <p className='text-[11px] text-ink-faint mt-0.5'>
+                <p className='text-[11px] text-ink-muted mt-0.5'>
                   Expected: {anomaly.expected.toLocaleString()} | Z-Score: {anomaly.zScore}
                 </p>
               </div>
@@ -257,7 +259,7 @@ function AnomalyList({ anomalies }: { anomalies: AnomalyPoint[] }) {
                   {deviation > 0 ? '+' : ''}
                   {deviation.toFixed(1)}%
                 </p>
-                <p className='text-[11px] text-ink-faint'>{format(parseISO(anomaly.date), 'MMM d, yyyy')}</p>
+                <p className='text-[11px] text-ink-muted'>{format(parseISO(anomaly.date), 'MMM d, yyyy')}</p>
               </div>
               <SeverityBadge severity={anomaly.severity} />
             </button>
@@ -273,7 +275,7 @@ export function AnomalyDetector() {
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
 
-  const { data: anomalies, isLoading } = useAnomalies({
+  const { data: anomalies, isLoading, isError } = useAnomalies({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -286,6 +288,24 @@ export function AnomalyDetector() {
         <Skeleton className='h-24 w-full' />
         <Skeleton className='h-[300px] w-full' />
         <Skeleton className='h-[200px] w-full' />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className='space-y-4'>
+        <div>
+          <h2 className='text-lg font-semibold text-ink'>Anomaly Detection</h2>
+          <p className='text-sm text-ink-muted mt-0.5'>Z-score analysis over a 7-day rolling window. Flags deviations exceeding 2 standard deviations.</p>
+        </div>
+        <div className='bg-white rounded-xl border border-red-200 p-8 flex flex-col items-center text-center'>
+          <div className='w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-3'>
+            <BiError className='w-5 h-5' />
+          </div>
+          <p className='text-[13px] font-medium text-ink'>Couldn&apos;t load anomaly data</p>
+          <p className='text-[12px] text-ink-muted mt-1'>Something went wrong while analyzing this period. Try again or adjust the date range.</p>
+        </div>
       </div>
     );
   }

@@ -10,15 +10,7 @@ import {
 } from "@/hooks/use-metrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import {
-  Lightbulb,
-  Coins,
-  DollarSign,
-  ShoppingCart,
-  AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-} from "lucide-react";
+import { BiBulb, BiCoinStack, BiDollar, BiCart, BiError, BiTrendingUp, BiTrendingDown } from "react-icons/bi";
 import {
   ResponsiveContainer,
   BarChart,
@@ -36,25 +28,25 @@ import {
   ReferenceLine,
 } from "recharts";
 import type { Platform, AttributionModel } from "@/lib/types/database";
+import { Panel } from "@/components/ui/panel";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  PLATFORM_COLORS,
+  PLATFORM_LABELS,
+  SERIES_PALETTE,
+  CHART_GRID,
+  CHART_AXIS_TEXT,
+} from "@/lib/dashboard/chart-theme";
 
-const PLATFORM_COLORS: Record<Platform, string> = {
-  google: "#4285f4",
-  meta: "#0866ff",
-  tiktok: "#121212",
-};
-
-const PLATFORM_LABELS: Record<Platform, string> = {
-  google: "Google Ads",
-  meta: "Meta Ads",
-  tiktok: "TikTok Ads",
-};
-
+// Model identity drawn from the canonical SERIES_PALETTE (blue, violet, cyan,
+// pink, teal) — one entry per model, by index. No model uses red/green/amber,
+// which are reserved for good/bad status signaling.
 const MODEL_COLORS: Record<AttributionModel, string> = {
-  first_touch: "#8b5cf6",
-  last_touch: "#0075de",
-  linear: "#16a34a",
-  time_decay: "#f59e0b",
-  position_based: "#ec4899",
+  first_touch: SERIES_PALETTE[0],
+  last_touch: SERIES_PALETTE[1],
+  linear: SERIES_PALETTE[2],
+  time_decay: SERIES_PALETTE[3],
+  position_based: SERIES_PALETTE[4],
 };
 
 function formatCurrency(n: number): string {
@@ -78,20 +70,6 @@ const chartTooltipStyle = {
   padding: "10px 14px",
 };
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors",
-        active ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 function InsightCallout({ icon, text, tone = "primary" }: { icon: React.ReactNode; text: string; tone?: "primary" | "warning" }) {
   return (
     <div
@@ -108,14 +86,14 @@ function InsightCallout({ icon, text, tone = "primary" }: { icon: React.ReactNod
 
 function StatCard({ label, value, sub, icon }: { label: string; value: string; sub?: string; icon: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-hairline p-5">
+    <Panel className="p-5">
       <div className="flex items-center gap-2 mb-2">
         <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">{icon}</div>
-        <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">{label}</p>
+        <p className="text-[12px] font-medium text-ink-muted">{label}</p>
       </div>
       <p className="text-2xl font-semibold text-ink tabular-nums leading-none">{value}</p>
       {sub && <p className="text-[11px] text-ink-muted mt-1.5">{sub}</p>}
-    </div>
+    </Panel>
   );
 }
 
@@ -160,31 +138,31 @@ function RevenueRoasTab({ clientId }: { clientId: string }) {
           label="Blended ROAS"
           value={`${data.blended.roas.toFixed(2)}x`}
           sub={`vs ${data.platformReported.roas.toFixed(2)}x platform-reported`}
-          icon={<TrendingUp className="w-3.5 h-3.5" />}
+          icon={<BiTrendingUp className="w-3.5 h-3.5" />}
         />
         <StatCard
-          label="Real Revenue"
+          label="Real revenue"
           value={formatCurrency(data.blended.revenue)}
           sub={`Platforms claim ${formatCurrency(data.platformReported.revenue)}`}
-          icon={<DollarSign className="w-3.5 h-3.5" />}
+          icon={<BiDollar className="w-3.5 h-3.5" />}
         />
         <StatCard
           label="Blended AOV"
           value={formatCurrency(data.blended.aov)}
           sub={`CPA ${formatCurrency(data.blended.cpa)} · Spend ${formatCurrency(data.totalSpend)}`}
-          icon={<ShoppingCart className="w-3.5 h-3.5" />}
+          icon={<BiCart className="w-3.5 h-3.5" />}
         />
       </div>
 
-      <InsightCallout icon={<Lightbulb className="w-4 h-4" />} text={data.insight} />
+      <InsightCallout icon={<BiBulb className="w-4 h-4" />} text={data.insight} />
 
       <InsightCallout
-        icon={<AlertTriangle className="w-4 h-4" />}
+        icon={<BiError className="w-4 h-4" />}
         tone="warning"
         text={`Over-attribution: platforms collectively claim ${formatNum(data.overAttribution.conversionsClaimed)} conversions vs ${formatNum(data.overAttribution.conversionsActual)} real (deduplicated) conversions — a ${data.overAttribution.inflationPct.toFixed(0)}% inflation.`}
       />
 
-      <div className="bg-white rounded-xl border border-hairline">
+      <Panel>
         <div className="px-5 py-3.5 border-b border-hairline">
           <h3 className="text-sm font-semibold text-ink">Reported ROAS vs Blended (Real) ROAS</h3>
           <p className="text-[12px] text-ink-muted mt-0.5">The gap is each platform&apos;s self-attribution inflation.</p>
@@ -192,9 +170,9 @@ function RevenueRoasTab({ clientId }: { clientId: string }) {
         <div className="px-2 pt-3">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData} barGap={4}>
-              <CartesianGrid stroke="#f0f0f0" strokeDasharray="none" vertical={false} />
-              <XAxis dataKey="platform" tick={{ fontSize: 11, fill: "#a39e98" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "#a39e98" }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `${v}x`} />
+              <CartesianGrid stroke={CHART_GRID} strokeDasharray="none" vertical={false} />
+              <XAxis dataKey="platform" tick={{ fontSize: 11, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `${v}x`} />
               <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => [`${Number(v).toFixed(2)}x`, ""]} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="Reported ROAS" fill="#d4d4d4" radius={[4, 4, 0, 0]} />
@@ -204,23 +182,23 @@ function RevenueRoasTab({ clientId }: { clientId: string }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </Panel>
 
-      <div className="bg-white rounded-xl border border-hairline overflow-hidden">
+      <Panel className="overflow-hidden">
         <div className="px-5 py-3.5 border-b border-hairline">
-          <h3 className="text-sm font-semibold text-ink">Per-Platform Breakdown</h3>
+          <h3 className="text-sm font-semibold text-ink">Per-platform breakdown</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-hairline bg-canvas-soft/50">
-                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider">Platform</th>
-                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">Spend</th>
-                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">Reported Conv.</th>
-                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">Blended Conv.</th>
-                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">Reported ROAS</th>
-                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">Blended ROAS</th>
-                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">Gap</th>
+                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted">Platform</th>
+                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted text-right">Spend</th>
+                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted text-right">Reported conv.</th>
+                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted text-right">Blended conv.</th>
+                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted text-right">Reported ROAS</th>
+                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted text-right">Blended ROAS</th>
+                <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted text-right">Gap</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline/60">
@@ -239,7 +217,7 @@ function RevenueRoasTab({ clientId }: { clientId: string }) {
                   <td className="px-5 py-3 text-right text-[13px] tabular-nums font-semibold text-ink">{p.blendedRoas.toFixed(2)}x</td>
                   <td className="px-5 py-3 text-right">
                     <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-red-500 tabular-nums">
-                      <TrendingDown className="w-3 h-3" />
+                      <BiTrendingDown className="w-3 h-3" />
                       -{p.roasGap.toFixed(2)}x
                     </span>
                   </td>
@@ -248,7 +226,7 @@ function RevenueRoasTab({ clientId }: { clientId: string }) {
             </tbody>
           </table>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
@@ -310,15 +288,15 @@ function AttributionModelsTab({ clientId }: { clientId: string }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <StatCard label="Total Blended Revenue" value={formatCurrency(data.totalRevenue)} icon={<DollarSign className="w-3.5 h-3.5" />} />
-        <StatCard label="Total Blended Conversions" value={formatNum(data.totalConversions)} icon={<Coins className="w-3.5 h-3.5" />} />
+        <StatCard label="Total blended revenue" value={formatCurrency(data.totalRevenue)} icon={<BiDollar className="w-3.5 h-3.5" />} />
+        <StatCard label="Total blended conversions" value={formatNum(data.totalConversions)} icon={<BiCoinStack className="w-3.5 h-3.5" />} />
       </div>
 
-      <InsightCallout icon={<Lightbulb className="w-4 h-4" />} text={data.insight} />
+      <InsightCallout icon={<BiBulb className="w-4 h-4" />} text={data.insight} />
 
-      <div className="bg-white rounded-xl border border-hairline">
+      <Panel>
         <div className="px-5 py-3.5 border-b border-hairline">
-          <h3 className="text-sm font-semibold text-ink">Revenue Share by Model, per Platform</h3>
+          <h3 className="text-sm font-semibold text-ink">Revenue share by model, per platform</h3>
           <p className="text-[12px] text-ink-muted mt-0.5">
             Watch Google&apos;s share collapse from last-touch to first-touch — it harvests demand top-funnel platforms created.
           </p>
@@ -326,9 +304,9 @@ function AttributionModelsTab({ clientId }: { clientId: string }) {
         <div className="px-2 pt-3">
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={groupedData} barGap={2} barCategoryGap="20%">
-              <CartesianGrid stroke="#f0f0f0" strokeDasharray="none" vertical={false} />
-              <XAxis dataKey="platform" tick={{ fontSize: 11, fill: "#a39e98" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "#a39e98" }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `${v}%`} />
+              <CartesianGrid stroke={CHART_GRID} strokeDasharray="none" vertical={false} />
+              <XAxis dataKey="platform" tick={{ fontSize: 11, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `${v}%`} />
               <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => [`${Number(v).toFixed(1)}%`, ""]} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="Platform-Reported" fill="#d4d4d4" radius={[3, 3, 0, 0]} />
@@ -338,25 +316,18 @@ function AttributionModelsTab({ clientId }: { clientId: string }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </Panel>
 
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h3 className="text-sm font-semibold text-ink">Model Explorer</h3>
-          <div className="flex items-center gap-1 bg-canvas-soft rounded-lg p-1 flex-wrap">
-            {models.map((m) => (
-              <button
-                key={m.model}
-                onClick={() => setSelectedModel(m.model)}
-                className={cn(
-                  "px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors",
-                  selectedModel === m.model ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-                )}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <h3 className="text-sm font-semibold text-ink">Model explorer</h3>
+          <Tabs value={selectedModel} onValueChange={(v) => setSelectedModel(v as AttributionModel)}>
+            <TabsList>
+              {models.map((m) => (
+                <TabsTrigger key={m.model} value={m.model}>{m.label}</TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
           <ResponsiveContainer width="100%" height={220}>
@@ -382,13 +353,13 @@ function AttributionModelsTab({ clientId }: { clientId: string }) {
                 </div>
                 <div className="text-right">
                   <p className="text-[13px] font-semibold text-ink tabular-nums">{c.sharePct.toFixed(1)}%</p>
-                  <p className="text-[10px] text-ink-muted tabular-nums">{formatCurrency(c.revenue)} · {c.roas.toFixed(2)}x ROAS</p>
+                  <p className="text-[11px] text-ink-muted tabular-nums">{formatCurrency(c.revenue)} · {c.roas.toFixed(2)}x ROAS</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
@@ -437,36 +408,36 @@ function CohortsTab({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-4">
-      <InsightCallout icon={<Lightbulb className="w-4 h-4" />} text={data.insight} />
+      <InsightCallout icon={<BiBulb className="w-4 h-4" />} text={data.insight} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-hairline p-4">
-          <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider mb-2">Ranked by Day-0 ROAS</p>
+        <Panel className="p-4">
+          <p className="text-[12px] font-medium text-ink-muted mb-2">Ranked by Day-0 ROAS</p>
           <div className="space-y-1.5">
             {byDay0Roas.map((c, i) => (
               <div key={c.platform} className="flex items-center justify-between text-[13px]">
-                <span className="flex items-center gap-1.5"><span className="text-ink-faint w-3">#{i + 1}</span><span className="w-2 h-2 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[c.platform] }} />{PLATFORM_LABELS[c.platform]}</span>
+                <span className="flex items-center gap-1.5"><span className="text-ink-muted tabular-nums w-3">{i + 1}</span><span className="w-2 h-2 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[c.platform] }} />{PLATFORM_LABELS[c.platform]}</span>
                 <span className="font-semibold tabular-nums text-ink">{c.day0Roas.toFixed(2)}x</span>
               </div>
             ))}
           </div>
-        </div>
-        <div className="bg-white rounded-xl border border-hairline p-4">
-          <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider mb-2">Ranked by LTV:CAC</p>
+        </Panel>
+        <Panel className="p-4">
+          <p className="text-[12px] font-medium text-ink-muted mb-2">Ranked by LTV:CAC</p>
           <div className="space-y-1.5">
             {byLtvCac.map((c, i) => (
               <div key={c.platform} className="flex items-center justify-between text-[13px]">
-                <span className="flex items-center gap-1.5"><span className="text-ink-faint w-3">#{i + 1}</span><span className="w-2 h-2 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[c.platform] }} />{PLATFORM_LABELS[c.platform]}</span>
+                <span className="flex items-center gap-1.5"><span className="text-ink-muted tabular-nums w-3">{i + 1}</span><span className="w-2 h-2 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[c.platform] }} />{PLATFORM_LABELS[c.platform]}</span>
                 <span className="font-semibold tabular-nums text-ink">{c.ltvCacRatio.toFixed(2)}x</span>
               </div>
             ))}
           </div>
-        </div>
+        </Panel>
       </div>
 
       {byDay0Roas[0]?.platform !== byLtvCac[0]?.platform && (
         <InsightCallout
-          icon={<AlertTriangle className="w-4 h-4" />}
+          icon={<BiError className="w-4 h-4" />}
           tone="warning"
           text={`Ranking inversion: ${PLATFORM_LABELS[byDay0Roas[0].platform]} wins on Day-0 ROAS, but ${PLATFORM_LABELS[byLtvCac[0].platform]} wins on LTV:CAC once retention plays out. Short-window ROAS is misleading budget signal here.`}
         />
@@ -474,48 +445,48 @@ function CohortsTab({ clientId }: { clientId: string }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {data.cohorts.map((c) => (
-          <div key={c.platform} className="bg-white rounded-xl border border-hairline p-5">
+          <Panel key={c.platform} className="p-5">
             <div className="flex items-center gap-2 mb-3">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[c.platform] }} />
               <h4 className="text-sm font-semibold text-ink">{PLATFORM_LABELS[c.platform]}</h4>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-[10px] text-ink-muted uppercase tracking-wider">CAC</p>
+                <p className="text-[11px] text-ink-muted">CAC</p>
                 <p className="text-[15px] font-semibold text-ink tabular-nums">{formatCurrency(c.cac)}</p>
               </div>
               <div>
-                <p className="text-[10px] text-ink-muted uppercase tracking-wider">LTV</p>
+                <p className="text-[11px] text-ink-muted">LTV</p>
                 <p className="text-[15px] font-semibold text-ink tabular-nums">{formatCurrency(c.ltv)}</p>
               </div>
               <div>
-                <p className="text-[10px] text-ink-muted uppercase tracking-wider">LTV:CAC</p>
+                <p className="text-[11px] text-ink-muted">LTV:CAC</p>
                 <p className={cn("text-[15px] font-semibold tabular-nums", c.ltvCacRatio >= 3 ? "text-emerald-600" : c.ltvCacRatio >= 2 ? "text-amber-600" : "text-red-500")}>{c.ltvCacRatio.toFixed(2)}x</p>
               </div>
               <div>
-                <p className="text-[10px] text-ink-muted uppercase tracking-wider">Day-0 ROAS</p>
+                <p className="text-[11px] text-ink-muted">Day-0 ROAS</p>
                 <p className="text-[15px] font-semibold text-ink tabular-nums">{c.day0Roas.toFixed(2)}x</p>
               </div>
               <div className="col-span-2">
-                <p className="text-[10px] text-ink-muted uppercase tracking-wider">Payback Period</p>
+                <p className="text-[11px] text-ink-muted">Payback period</p>
                 <p className="text-[15px] font-semibold text-ink tabular-nums">{c.paybackMonths !== null ? `${c.paybackMonths} mo` : "Never"}</p>
               </div>
             </div>
-          </div>
+          </Panel>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-hairline">
+      <Panel>
         <div className="px-5 py-3.5 border-b border-hairline">
-          <h3 className="text-sm font-semibold text-ink">Cumulative LTV Curve</h3>
+          <h3 className="text-sm font-semibold text-ink">Cumulative LTV curve</h3>
           <p className="text-[12px] text-ink-muted mt-0.5">Cumulative revenue per customer vs. months since acquisition. Dashed lines mark each platform&apos;s CAC (breakeven).</p>
         </div>
         <div className="px-2 pt-3 pb-3">
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={lineChartData}>
               <CartesianGrid stroke="#f0f0f0" strokeDasharray="none" vertical={false} />
-              <XAxis dataKey="monthOffset" tick={{ fontSize: 10, fill: "#a39e98" }} axisLine={false} tickLine={false} tickFormatter={(v) => `M${v}`} />
-              <YAxis tick={{ fontSize: 10, fill: "#a39e98" }} axisLine={false} tickLine={false} width={55} tickFormatter={(v) => formatCurrency(v)} />
+              <XAxis dataKey="monthOffset" tick={{ fontSize: 10, fill: "#6b6b6b" }} axisLine={false} tickLine={false} tickFormatter={(v) => `M${v}`} />
+              <YAxis tick={{ fontSize: 10, fill: "#6b6b6b" }} axisLine={false} tickLine={false} width={55} tickFormatter={(v) => formatCurrency(v)} />
               <Tooltip contentStyle={chartTooltipStyle} labelFormatter={(v) => `Month ${v}`} formatter={(v, name) => [formatCurrency(Number(v)), PLATFORM_LABELS[name as Platform] || String(name)]} />
               <Legend formatter={(v) => PLATFORM_LABELS[v as Platform] || v} wrapperStyle={{ fontSize: 12 }} />
               {data.cohorts.map((c) => (
@@ -537,16 +508,16 @@ function CohortsTab({ clientId }: { clientId: string }) {
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="bg-white rounded-xl border border-hairline p-10 text-center">
+    <Panel className="p-10 text-center">
       <p className="text-[13px] text-ink-muted">No attribution data available for this range.</p>
-    </div>
+    </Panel>
   );
 }
 
@@ -565,11 +536,13 @@ export function AttributionView() {
         <p className="text-[13px] text-ink-muted mt-0.5">Blended revenue truth, model divergence, and long-term customer value across platforms</p>
       </div>
 
-      <div className="flex items-center gap-1 bg-canvas-soft rounded-lg p-1 w-fit flex-wrap">
-        <TabButton active={tab === "revenue"} onClick={() => setTab("revenue")}>Revenue &amp; ROAS</TabButton>
-        <TabButton active={tab === "models"} onClick={() => setTab("models")}>Attribution Models</TabButton>
-        <TabButton active={tab === "cohorts"} onClick={() => setTab("cohorts")}>LTV &amp; Cohorts</TabButton>
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "revenue" | "models" | "cohorts")}>
+        <TabsList>
+          <TabsTrigger value="revenue">Revenue &amp; ROAS</TabsTrigger>
+          <TabsTrigger value="models">Attribution models</TabsTrigger>
+          <TabsTrigger value="cohorts">LTV &amp; cohorts</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {tab === "revenue" && <RevenueRoasTab clientId={clientId} />}
       {tab === "models" && <AttributionModelsTab clientId={clientId} />}

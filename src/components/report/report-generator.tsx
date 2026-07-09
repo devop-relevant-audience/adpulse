@@ -15,7 +15,7 @@ import { useAppStore } from "@/store/app-store";
 import { useClients } from "@/hooks/use-metrics";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { isAgencyRole } from "@/lib/auth/roles";
-import { FileText, Download, Loader2, Presentation, Link2, ChevronDown } from "lucide-react";
+import { BiFile, BiDownload, BiRefresh, BiSlideshow, BiLink, BiChevronDown } from "react-icons/bi";
 import type { ReportData } from "@/lib/report/builder";
 import { ShareDialog } from "./share-dialog";
 
@@ -31,6 +31,7 @@ export function ReportGenerator() {
   const [generatingFormat, setGeneratingFormat] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const lastParamsRef = useRef<string>("");
 
@@ -50,6 +51,7 @@ export function ReportGenerator() {
     if (reportData) return reportData;
 
     setIsGenerating(true);
+    setExportError(null);
     try {
       const res = await fetch("/api/reports", {
         method: "POST",
@@ -68,6 +70,7 @@ export function ReportGenerator() {
       return data;
     } catch (error) {
       console.error("Report generation failed:", error);
+      setExportError("We couldn't generate the report. Please try again.");
       return null;
     } finally {
       setIsGenerating(false);
@@ -86,6 +89,8 @@ export function ReportGenerator() {
       printWindow.document.write(html);
       printWindow.document.close();
       setTimeout(() => printWindow.print(), 500);
+    } else {
+      setExportError("We couldn't open the print view. Please allow pop-ups and try again.");
     }
     setGeneratingFormat(null);
   }
@@ -95,8 +100,13 @@ export function ReportGenerator() {
     const data = await generateReport();
     if (!data) { setGeneratingFormat(null); return; }
 
-    const { exportPptx } = await import("@/lib/report/export-pptx");
-    await exportPptx(data);
+    try {
+      const { exportPptx } = await import("@/lib/report/export-pptx");
+      await exportPptx(data);
+    } catch (error) {
+      console.error("PPTX export failed:", error);
+      setExportError("We couldn't export the PowerPoint file. Please try again.");
+    }
     setGeneratingFormat(null);
   }
 
@@ -113,6 +123,7 @@ export function ReportGenerator() {
 
   return (
     <>
+      <div className="relative">
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
@@ -125,23 +136,23 @@ export function ReportGenerator() {
           }
         >
           {isBusy ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <BiRefresh className="w-4 h-4 animate-spin" />
           ) : (
-            <FileText className="w-4 h-4" />
+            <BiFile className="w-4 h-4" />
           )}
-          {isBusy ? "Generating..." : "Export Report"}
-          <ChevronDown className="w-3 h-3 opacity-60" />
+          {isBusy ? "Generating…" : "Export report"}
+          <BiChevronDown className="w-3 h-3 opacity-60" />
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="end" sideOffset={6}>
           <DropdownMenuGroup>
             <DropdownMenuLabel>Export format</DropdownMenuLabel>
             <DropdownMenuItem onClick={handleExportPdf}>
-              <Download className="w-4 h-4 mr-2" />
+              <BiDownload className="w-4 h-4 mr-2" />
               PDF
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleExportPptx}>
-              <Presentation className="w-4 h-4 mr-2" />
+              <BiSlideshow className="w-4 h-4 mr-2" />
               PowerPoint (PPTX)
             </DropdownMenuItem>
           </DropdownMenuGroup>
@@ -149,13 +160,23 @@ export function ReportGenerator() {
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleShareLink}>
-                <Link2 className="w-4 h-4 mr-2" />
-                Shareable Link
+                <BiLink className="w-4 h-4 mr-2" />
+                Shareable link
               </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      {exportError && (
+        <p
+          role="alert"
+          aria-live="polite"
+          className="absolute right-0 top-full z-10 mt-1.5 max-w-[260px] rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[12px] text-red-600 shadow-sm"
+        >
+          {exportError}
+        </p>
+      )}
+      </div>
 
       {showShareDialog && reportData && (
         <ShareDialog

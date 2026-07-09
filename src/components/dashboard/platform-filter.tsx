@@ -2,13 +2,14 @@
 
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
+import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
 import type { Platform } from "@/lib/types/database";
 
-const PLATFORM_OPTIONS: Array<{ value: Platform | "all"; label: string; color: string }> = [
-  { value: "all", label: "All", color: "bg-ink-muted" },
-  { value: "google", label: "Google", color: "bg-[#4285F4]" },
-  { value: "meta", label: "Meta", color: "bg-[#0668E1]" },
-  { value: "tiktok", label: "TikTok", color: "bg-[#121212]" },
+const PLATFORM_OPTIONS: Array<{ value: Platform | "all"; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "google", label: "Google" },
+  { value: "meta", label: "Meta" },
+  { value: "tiktok", label: "TikTok" },
 ];
 
 export function PlatformFilter() {
@@ -30,13 +31,20 @@ export function PlatformFilter() {
           role="tab"
           aria-selected={currentValue === opt.value}
           className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 text-[12px] rounded-md transition-all duration-150",
+            "flex items-center gap-1.5 px-2.5 py-1 text-[12px] rounded-md transition-colors duration-150 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
             currentValue === opt.value
               ? "bg-white font-medium text-ink shadow-sm"
               : "text-ink-muted hover:text-ink"
           )}
         >
-          <span className={cn("w-1.5 h-1.5 rounded-full", opt.color)} />
+          {opt.value === "all" ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-ink-muted" />
+          ) : (
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: PLATFORM_COLORS[opt.value] }}
+            />
+          )}
           {opt.label}
         </button>
       ))}

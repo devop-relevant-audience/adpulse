@@ -10,17 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/ui/panel";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
-import { ArrowUpDown, ArrowDown, ArrowUp, Download, MessageCircle } from "lucide-react";
+import { BiSort, BiDownArrowAlt, BiUpArrowAlt, BiDownload, BiMessageRounded } from "react-icons/bi";
 import { cn } from "@/lib/utils";
+import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
-
-const PLATFORM_DOTS: Record<Platform, string> = {
-  google: "#4285F4",
-  meta: "#0668E1",
-  tiktok: "#121212",
-};
 
 interface CampaignSummary {
   campaignId: string;
@@ -96,13 +92,13 @@ export function CampaignTable() {
 
   if (!clientId || isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full" />
           ))}
         </div>
-      </div>
+      </Panel>
     );
   }
 
@@ -127,8 +123,8 @@ export function CampaignTable() {
   };
 
   const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
-    return sortDirection === "asc" ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
+    if (sortField !== field) return <BiSort className="w-3 h-3 ml-1 opacity-40" />;
+    return sortDirection === "asc" ? <BiUpArrowAlt className="w-3 h-3 ml-1" /> : <BiDownArrowAlt className="w-3 h-3 ml-1" />;
   };
 
   const handleExportCSV = () => {
@@ -159,7 +155,7 @@ export function CampaignTable() {
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-hairline">
+    <Panel>
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-hairline">
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-semibold text-ink">Campaigns</h3>
@@ -171,7 +167,7 @@ export function CampaignTable() {
           onClick={handleExportCSV}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium text-ink-muted hover:text-ink hover:bg-canvas-soft transition-colors"
         >
-          <Download className="w-3.5 h-3.5" />
+          <BiDownload className="w-3.5 h-3.5" />
           Export
         </button>
       </div>
@@ -183,7 +179,7 @@ export function CampaignTable() {
                 <TableHead
                   key={col.key}
                   className={cn(
-                    "text-[11px] font-semibold uppercase tracking-wider text-ink-muted cursor-pointer hover:text-ink transition-colors h-9",
+                    "text-[11px] font-medium text-ink-muted cursor-pointer hover:text-ink transition-colors h-9",
                     col.align === "right" && "text-right",
                     i === 0 && "pl-5",
                     i === columns.length - 1 && "pr-5"
@@ -202,7 +198,7 @@ export function CampaignTable() {
             {campaigns.map((campaign) => (
               <TableRow
                 key={campaign.campaignId}
-                className="border-hairline hover:bg-[#fafaf9] cursor-pointer group transition-colors duration-100"
+                className="border-hairline hover:bg-canvas-soft cursor-pointer group transition-colors duration-100"
                 onClick={() =>
                   setReferenceContext({
                     campaignId: campaign.campaignId,
@@ -227,12 +223,12 @@ export function CampaignTable() {
                 <TableCell className="pl-5 font-medium text-[13px] text-ink max-w-[220px]">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate">{campaign.campaignName}</span>
-                    <MessageCircle className="w-3 h-3 text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <BiMessageRounded className="w-3 h-3 text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5 text-[12px] text-ink-secondary capitalize">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: PLATFORM_DOTS[campaign.platform] }} />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: PLATFORM_COLORS[campaign.platform] }} />
                     {campaign.platform}
                   </div>
                 </TableCell>
@@ -262,6 +258,6 @@ export function CampaignTable() {
           </TableBody>
         </Table>
       </div>
-    </div>
+    </Panel>
   );
 }

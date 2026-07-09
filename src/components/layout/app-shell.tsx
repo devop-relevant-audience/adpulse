@@ -10,7 +10,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isChatOpen = useAppStore((s) => s.isChatOpen);
 
   return (
-    <div className="flex h-screen bg-[#f8f8f7] overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />
       <div className="flex flex-1 overflow-hidden">
         <main

@@ -1,16 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Users,
-  Plus,
-  Loader2,
-  X,
-  Trash2,
-  Pencil,
-  AlertTriangle,
-  Building2,
-} from "lucide-react";
+import { BiGroup, BiPlus, BiRefresh, BiTrash, BiPencil, BiError, BiBuildings } from "react-icons/bi";
 import { format, parseISO } from "date-fns";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useClients } from "@/hooks/use-metrics";
@@ -23,9 +14,17 @@ import {
 } from "@/hooks/use-team";
 import { roleLabel } from "@/lib/auth/roles";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -118,24 +117,19 @@ function ModalShell({
   footer: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-2xl border border-hairline shadow-xl w-full max-w-[480px] max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-hairline">
-          <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="px-6 py-5 space-y-4">{children}</div>
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-hairline">
-          {footer}
-        </div>
-      </div>
-    </div>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[80vh] overflow-y-auto space-y-4">{children}</div>
+        <DialogFooter>{footer}</DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-const FIELD_LABEL = "text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5";
+const FIELD_LABEL = "text-[12px] font-medium text-ink-muted block mb-1.5";
 
 function RoleSelect({
   value,
@@ -199,7 +193,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
             Cancel
           </Button>
           <Button size="sm" onClick={handleSubmit} disabled={!canSubmit}>
-            {invite.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
+            {invite.isPending ? <BiRefresh className="w-4 h-4 animate-spin mr-1.5" /> : null}
             Send invite
           </Button>
         </>
@@ -288,7 +282,7 @@ function EditDialog({ user, onClose }: { user: TeamUser; onClose: () => void }) 
             Cancel
           </Button>
           <Button size="sm" onClick={handleSubmit} disabled={!canSubmit}>
-            {update.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
+            {update.isPending ? <BiRefresh className="w-4 h-4 animate-spin mr-1.5" /> : null}
             Save changes
           </Button>
         </>
@@ -355,7 +349,7 @@ function RemoveDialog({ user, onClose }: { user: TeamUser; onClose: () => void }
             Cancel
           </Button>
           <Button variant="destructive" size="sm" onClick={handleRemove} disabled={remove.isPending}>
-            {remove.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
+            {remove.isPending ? <BiRefresh className="w-4 h-4 animate-spin mr-1.5" /> : null}
             Remove
           </Button>
         </>
@@ -401,7 +395,7 @@ export function TeamView() {
           </p>
         </div>
         <Button size="sm" onClick={() => setInviting(true)} className="gap-1.5">
-          <Plus className="w-3.5 h-3.5" /> Invite member
+          <BiPlus className="w-3.5 h-3.5" /> Invite member
         </Button>
       </div>
 
@@ -413,37 +407,37 @@ export function TeamView() {
         </div>
       ) : error ? (
         <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center">
-          <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
+          <BiError className="w-8 h-8 text-destructive mx-auto mb-2" />
           <p className="text-[13px] text-destructive">
             {error instanceof Error ? error.message : "Failed to load team"}
           </p>
         </div>
       ) : sorted.length === 0 ? (
         <div className="text-center py-12">
-          <Users className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
+          <BiGroup className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
           <p className="text-[13px] text-ink-muted">No team members yet.</p>
           <p className="text-[12px] text-ink-muted mt-1">
             Invite someone to give them access to the workspace.
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-hairline overflow-hidden">
+        <Panel className="overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-hairline">
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9 pl-4">
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9 pl-4">
                   Member
                 </TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9">
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9">
                   Role
                 </TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9">
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9">
                   Client access
                 </TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9">
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9">
                   Joined
                 </TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9 pr-4 text-right">
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9 pr-4 text-right">
                   Actions
                 </TableHead>
               </TableRow>
@@ -484,7 +478,7 @@ export function TeamView() {
                         <span className="text-[12px] text-amber-600">No clients</span>
                       ) : (
                         <div className="flex items-center gap-1 flex-wrap">
-                          <Building2 className="w-3 h-3 text-ink-muted shrink-0" />
+                          <BiBuildings className="w-3 h-3 text-ink-muted shrink-0" />
                           <span className="text-[12px] text-ink truncate max-w-[220px]">
                             {user.clients.map((c) => c.name).join(", ")}
                           </span>
@@ -501,7 +495,7 @@ export function TeamView() {
                           title="Edit member"
                           className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-canvas-soft"
                         >
-                          <Pencil className="w-3.5 h-3.5" />
+                          <BiPencil className="w-3.5 h-3.5" />
                         </button>
                         {!isSelf && (
                           <button
@@ -511,7 +505,7 @@ export function TeamView() {
                               "p-1.5 rounded-md text-ink-muted hover:text-red-600 hover:bg-red-50"
                             )}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <BiTrash className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
@@ -521,7 +515,7 @@ export function TeamView() {
               })}
             </TableBody>
           </Table>
-        </div>
+        </Panel>
       )}
 
       {inviting && <InviteDialog onClose={() => setInviting(false)} />}

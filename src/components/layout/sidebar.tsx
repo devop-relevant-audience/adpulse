@@ -8,32 +8,10 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { isAgencyRole, isAdminRole, roleLabel } from "@/lib/auth/roles";
 import { signOutAndRedirect } from "@/lib/auth/sign-out";
 import { cn } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  FileText,
-  MessageCircle,
-  ChevronLeft,
-  ChevronRight,
-  Zap,
-  Database,
-  Loader2,
-  Check,
-  ChevronDown,
-  Building2,
-  AlertTriangle,
-  Gauge,
-  Funnel,
-  Sliders,
-  HeartPulse,
-  Bell,
-  ArrowLeftRight,
-  Image,
-  Coins,
-  Users,
-  LogOut,
-} from "lucide-react";
+import { BiGridAlt, BiFile, BiMessageRounded, BiChevronLeft, BiChevronRight, BiData, BiRefresh, BiCheck, BiChevronDown, BiBuildings, BiError, BiTachometer, BiFilterAlt, BiSliderAlt, BiPulse, BiBell, BiTransferAlt, BiImage, BiCoinStack, BiGroup, BiLogOut } from "react-icons/bi";
+import { Logo } from "@/components/brand/logo";
 import { useQueryClient } from "@tanstack/react-query";
-import { VIEWS, type ViewId } from "@/store/app-store";
+import { VIEWS } from "@/store/app-store";
 import type { AppRole } from "@/lib/types/database";
 
 type NavItem = {
@@ -78,8 +56,8 @@ function SeedControl({ collapsed }: { collapsed: boolean }) {
           collapsed && "justify-center px-0"
         )}
       >
-        <Check className="w-4 h-4 shrink-0" />
-        {!collapsed && <span>Data Ready</span>}
+        <BiCheck className="w-4 h-4 shrink-0" />
+        {!collapsed && <span>Data ready</span>}
       </button>
     );
   }
@@ -94,11 +72,11 @@ function SeedControl({ collapsed }: { collapsed: boolean }) {
       )}
     >
       {isSeeding ? (
-        <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+        <BiRefresh className="w-4 h-4 shrink-0 animate-spin" />
       ) : (
-        <Database className="w-4 h-4 shrink-0" />
+        <BiData className="w-4 h-4 shrink-0" />
       )}
-      {!collapsed && <span>{isSeeding ? "Seeding..." : "Seed Demo Data"}</span>}
+      {!collapsed && <span>{isSeeding ? "Seeding…" : "Seed demo data"}</span>}
     </button>
   );
 }
@@ -138,7 +116,7 @@ function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
       <div className="px-3">
         <div className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg bg-canvas-soft border border-transparent">
           <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
-            {selectedClient ? selectedClient.name.charAt(0) : <Building2 className="w-3.5 h-3.5" />}
+            {selectedClient ? selectedClient.name.charAt(0) : <BiBuildings className="w-3.5 h-3.5" />}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-ink truncate">
@@ -160,7 +138,7 @@ function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
         className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg bg-canvas-soft hover:bg-hairline/50 border border-transparent hover:border-hairline transition-all text-left group"
       >
         <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
-          {selectedClient ? selectedClient.name.charAt(0) : <Building2 className="w-3.5 h-3.5" />}
+          {selectedClient ? selectedClient.name.charAt(0) : <BiBuildings className="w-3.5 h-3.5" />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-ink truncate">
@@ -170,7 +148,7 @@ function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
             <p className="text-[11px] text-ink-muted truncate capitalize">{selectedClient.industry}</p>
           )}
         </div>
-        <ChevronDown className={cn("w-3.5 h-3.5 text-ink-muted transition-transform", isOpen && "rotate-180")} />
+        <BiChevronDown className={cn("w-3.5 h-3.5 text-ink-muted transition-transform", isOpen && "rotate-180")} />
       </button>
       {isOpen && clients && clients.length > 0 && (
         <div className="absolute left-3 right-3 top-full mt-1 bg-white border border-hairline rounded-lg shadow-(--shadow-elevated) z-50 py-1 max-h-60 overflow-y-auto">
@@ -197,7 +175,7 @@ function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
                 <p className="text-[11px] text-ink-muted capitalize">{client.industry}</p>
               </div>
               {client.id === selectedClientId && (
-                <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                <BiCheck className="w-4 h-4 text-primary shrink-0" />
               )}
             </button>
           ))}
@@ -234,7 +212,7 @@ function UserFooter({
           title={`${email ?? "Signed in"} — sign out`}
           className="w-9 h-9 rounded-lg bg-canvas-soft text-ink flex items-center justify-center text-sm font-semibold hover:bg-hairline/60 transition-colors mx-auto"
         >
-          {signingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : initial}
+          {signingOut ? <BiRefresh className="w-4 h-4 animate-spin" /> : initial}
         </button>
       </div>
     );
@@ -248,7 +226,7 @@ function UserFooter({
       <div className="flex-1 min-w-0">
         <p className="text-[12px] font-medium text-ink truncate">{email ?? "Signed in"}</p>
         {role && (
-          <span className="text-[10px] font-medium text-ink-muted bg-canvas-soft px-1.5 py-0.5 rounded">
+          <span className="text-[11px] font-medium text-ink-muted bg-canvas-soft px-1.5 py-0.5 rounded">
             {roleLabel(role)}
           </span>
         )}
@@ -259,7 +237,7 @@ function UserFooter({
         title="Sign out"
         className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-canvas-soft transition-colors shrink-0"
       >
-        {signingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+        {signingOut ? <BiRefresh className="w-4 h-4 animate-spin" /> : <BiLogOut className="w-4 h-4" />}
       </button>
     </div>
   );
@@ -291,84 +269,84 @@ export function Sidebar() {
     {
       id: VIEWS.dashboard,
       label: "Dashboard",
-      icon: <LayoutDashboard className="w-4 h-4" />,
+      icon: <BiGridAlt className="w-4 h-4" />,
       active: activeView === VIEWS.dashboard,
       onClick: () => setActiveView(VIEWS.dashboard),
     },
     {
       id: VIEWS.anomalies,
       label: "Anomalies",
-      icon: <AlertTriangle className="w-4 h-4" />,
+      icon: <BiError className="w-4 h-4" />,
       active: activeView === VIEWS.anomalies,
       onClick: () => setActiveView(VIEWS.anomalies),
     },
     {
       id: VIEWS.pacing,
       label: "Pacing",
-      icon: <Gauge className="w-4 h-4" />,
+      icon: <BiTachometer className="w-4 h-4" />,
       active: activeView === VIEWS.pacing,
       onClick: () => setActiveView(VIEWS.pacing),
     },
     {
       id: VIEWS.funnel,
       label: "Funnel",
-      icon: <Funnel className="w-4 h-4" />,
+      icon: <BiFilterAlt className="w-4 h-4" />,
       active: activeView === VIEWS.funnel,
       onClick: () => setActiveView(VIEWS.funnel),
     },
     {
       id: VIEWS.optimizer,
-      label: "Channel Mix",
-      icon: <Sliders className="w-4 h-4" />,
+      label: "Channel mix",
+      icon: <BiSliderAlt className="w-4 h-4" />,
       active: activeView === VIEWS.optimizer,
       onClick: () => setActiveView(VIEWS.optimizer),
     },
     {
       id: VIEWS.attribution,
       label: "Attribution",
-      icon: <Coins className="w-4 h-4" />,
+      icon: <BiCoinStack className="w-4 h-4" />,
       active: activeView === VIEWS.attribution,
       onClick: () => setActiveView(VIEWS.attribution),
     },
     {
       id: VIEWS.health,
-      label: "Health Score",
-      icon: <HeartPulse className="w-4 h-4" />,
+      label: "Health score",
+      icon: <BiPulse className="w-4 h-4" />,
       active: activeView === VIEWS.health,
       onClick: () => setActiveView(VIEWS.health),
     },
     {
       id: VIEWS.creatives,
       label: "Creatives",
-      icon: <Image className="w-4 h-4" />,
+      icon: <BiImage className="w-4 h-4" />,
       active: activeView === VIEWS.creatives,
       onClick: () => setActiveView(VIEWS.creatives),
     },
     {
       id: VIEWS.compare,
       label: "Compare",
-      icon: <ArrowLeftRight className="w-4 h-4" />,
+      icon: <BiTransferAlt className="w-4 h-4" />,
       active: activeView === VIEWS.compare,
       onClick: () => setActiveView(VIEWS.compare),
     },
     {
       id: VIEWS.alerts,
       label: "Alerts",
-      icon: <Bell className="w-4 h-4" />,
+      icon: <BiBell className="w-4 h-4" />,
       active: activeView === VIEWS.alerts,
       onClick: () => setActiveView(VIEWS.alerts),
     },
     {
       id: VIEWS.reports,
       label: "Reports",
-      icon: <FileText className="w-4 h-4" />,
+      icon: <BiFile className="w-4 h-4" />,
       active: activeView === VIEWS.reports,
       onClick: () => setActiveView(VIEWS.reports),
     },
     {
       id: VIEWS.team,
       label: "Team",
-      icon: <Users className="w-4 h-4" />,
+      icon: <BiGroup className="w-4 h-4" />,
       active: activeView === VIEWS.team,
       onClick: () => setActiveView(VIEWS.team),
     },
@@ -382,15 +360,8 @@ export function Sidebar() {
       )}
     >
       {/* Logo */}
-      <div className={cn("flex items-center h-14 shrink-0 border-b border-hairline", collapsed ? "justify-center px-0" : "px-4 gap-2.5")}>
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0">
-          <Zap className="w-4 h-4 text-white" />
-        </div>
-        {!collapsed && (
-          <span className="text-[15px] font-bold tracking-tight select-none text-ink">
-            AdPulse
-          </span>
-        )}
+      <div className={cn("flex items-center h-14 shrink-0 border-b border-hairline", collapsed ? "justify-center px-0" : "px-4")}>
+        <Logo markSize={30} showWordmark={!collapsed} />
       </div>
 
       {/* Client Switcher */}
@@ -433,8 +404,8 @@ export function Sidebar() {
               : "text-ink-muted hover:text-ink hover:bg-canvas-soft"
           )}
         >
-          <MessageCircle className="w-4 h-4" />
-          {!collapsed && <span>AI Assistant</span>}
+          <BiMessageRounded className="w-4 h-4" />
+          {!collapsed && <span>AI assistant</span>}
         </button>
       </nav>
 
@@ -451,7 +422,7 @@ export function Sidebar() {
         onClick={() => setCollapsed(!collapsed)}
         className="absolute -right-3 top-[72px] w-6 h-6 rounded-full bg-white border-hairline shadow-sm z-10 hover:bg-canvas-soft"
       >
-        {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+        {collapsed ? <BiChevronRight className="w-3.5 h-3.5" /> : <BiChevronLeft className="w-3.5 h-3.5" />}
       </Button>
     </aside>
   );

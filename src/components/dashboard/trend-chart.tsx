@@ -13,19 +13,24 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Panel } from "@/components/ui/panel";
+import { SERIES_PALETTE, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/dashboard/chart-theme";
 
+// Colors are drawn deterministically from the canonical SERIES_PALETTE (blue,
+// violet, cyan, pink, teal, indigo, fuchsia) — one entry per metric, by index.
+// The palette deliberately excludes red/green/amber, so no metric line ever
+// reads as a good/bad semantic signal (CTR isn't red, CPA isn't an alarm).
 const METRICS = [
-  { key: "spend", label: "Spend", color: "#0075de", prefix: "$", yAxisId: "left" },
-  { key: "conversions", label: "Conversions", color: "#16a34a", prefix: "", yAxisId: "right" },
-  { key: "clicks", label: "Clicks", color: "#f59e0b", prefix: "", yAxisId: "right" },
-  { key: "impressions", label: "Impressions", color: "#8b5cf6", prefix: "", yAxisId: "right" },
-  { key: "ctr", label: "CTR", color: "#ef4444", prefix: "", suffix: "%", yAxisId: "right" },
-  { key: "cpc", label: "CPC", color: "#06b6d4", prefix: "$", yAxisId: "right" },
-  { key: "cpa", label: "CPA", color: "#ec4899", prefix: "$", yAxisId: "right" },
+  { key: "spend", label: "Spend", color: SERIES_PALETTE[0], prefix: "$", yAxisId: "left" },
+  { key: "conversions", label: "Conversions", color: SERIES_PALETTE[1], prefix: "", yAxisId: "right" },
+  { key: "clicks", label: "Clicks", color: SERIES_PALETTE[2], prefix: "", yAxisId: "right" },
+  { key: "impressions", label: "Impressions", color: SERIES_PALETTE[3], prefix: "", yAxisId: "right" },
+  { key: "ctr", label: "CTR", color: SERIES_PALETTE[4], prefix: "", suffix: "%", yAxisId: "right" },
+  { key: "cpc", label: "CPC", color: SERIES_PALETTE[5], prefix: "$", yAxisId: "right" },
+  { key: "cpa", label: "CPA", color: SERIES_PALETTE[6], prefix: "$", yAxisId: "right" },
 ] as const;
 
 type MetricKey = (typeof METRICS)[number]["key"];
@@ -98,17 +103,17 @@ export function TrendChart() {
 
   if (!clientId) {
     return (
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <Skeleton className="h-[320px] w-full" />
-      </div>
+      </Panel>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <Skeleton className="h-[320px] w-full" />
-      </div>
+      </Panel>
     );
   }
 
@@ -123,9 +128,9 @@ export function TrendChart() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-hairline">
+    <Panel>
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <h3 className="text-sm font-semibold text-ink">Performance Over Time</h3>
+        <h3 className="text-sm font-semibold text-ink">Performance over time</h3>
       </div>
 
       {/* Metric Toggles */}
@@ -137,7 +142,7 @@ export function TrendChart() {
               key={metric.key}
               onClick={() => toggleMetric(metric.key)}
               className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all border",
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all border outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 isActive
                   ? "border-transparent shadow-sm"
                   : "border-transparent text-ink-muted hover:text-ink hover:bg-canvas-soft"
@@ -146,7 +151,7 @@ export function TrendChart() {
             >
               <span
                 className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: isActive ? metric.color : "#a39e98" }}
+                style={{ backgroundColor: isActive ? metric.color : "#6b6b6b" }}
               />
               {metric.label}
             </button>
@@ -155,7 +160,11 @@ export function TrendChart() {
       </div>
 
       {/* Chart */}
-      <div className="px-2 pb-4 relative">
+      <div
+        className="px-2 pb-4 relative"
+        role="group"
+        aria-label="Trend chart — click a point to add it to the AI assistant"
+      >
         <ResponsiveContainer width="100%" height={300} style={{ outline: "none" }}>
           <ComposedChart
             data={trend}
@@ -174,18 +183,18 @@ export function TrendChart() {
                 );
               })}
             </defs>
-            <CartesianGrid stroke="#f0f0f0" strokeDasharray="none" vertical={false} />
+            <CartesianGrid stroke={CHART_GRID} strokeDasharray="none" vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={(v) => format(parseISO(v), "MMM d")}
-              tick={{ fontSize: 11, fill: "#a39e98" }}
+              tick={{ fontSize: 11, fill: CHART_AXIS_TEXT }}
               axisLine={false}
               tickLine={false}
               dy={8}
             />
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: 11, fill: "#a39e98" }}
+              tick={{ fontSize: 11, fill: CHART_AXIS_TEXT }}
               axisLine={false}
               tickLine={false}
               width={55}
@@ -195,7 +204,7 @@ export function TrendChart() {
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fontSize: 11, fill: "#a39e98" }}
+                tick={{ fontSize: 11, fill: CHART_AXIS_TEXT }}
                 axisLine={false}
                 tickLine={false}
                 width={55}
@@ -223,12 +232,6 @@ export function TrendChart() {
                 return [`${prefix}${Number(value).toLocaleString()}${suffix}`, metric.label];
               }}
             />
-            <Legend
-              verticalAlign="top"
-              align="right"
-              height={0}
-              wrapperStyle={{ display: "none" }}
-            />
 
             {activeMetrics.map((key, idx) => {
               const metric = METRICS.find((m) => m.key === key)!;
@@ -246,6 +249,7 @@ export function TrendChart() {
                     fill={`url(#grad-${key})`}
                     dot={false}
                     activeDot={{ r: 4, fill: metric.color, stroke: "white", strokeWidth: 2 }}
+                    animationDuration={300}
                     name={key}
                   />
                 );
@@ -262,6 +266,7 @@ export function TrendChart() {
                   strokeDasharray={idx > 1 ? "6 3" : undefined}
                   dot={false}
                   activeDot={{ r: 4, fill: metric.color, stroke: "white", strokeWidth: 2 }}
+                  animationDuration={300}
                   name={key}
                 />
               );
@@ -269,6 +274,6 @@ export function TrendChart() {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </Panel>
   );
 }

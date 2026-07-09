@@ -4,7 +4,7 @@ import { useHealthScore } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Zap } from "lucide-react";
+import { BiSolidMagicWand } from "react-icons/bi";
 import type { HealthScoreResult } from "@/lib/data/health-score";
 
 const GRADE_CONFIG = {
@@ -47,7 +47,7 @@ function MiniGauge({ score, grade }: { score: number; grade: HealthScoreResult["
           strokeWidth="16"
           strokeLinecap="round"
           strokeDasharray={`${progress} ${halfCircumference}`}
-          className="transition-all duration-1000 ease-out"
+          className="transition-all duration-300 ease-out"
         />
         <text x="100" y="82" textAnchor="middle" className="text-3xl font-bold" fill="#1a1a1a">
           {score}
@@ -97,8 +97,8 @@ export function HealthGaugeWidget() {
         <div className="w-full space-y-1 px-1">
           {topRecommendations.map((rec, i) => (
             <div key={i} className="flex items-start gap-1.5 text-left">
-              <Zap className="w-3 h-3 text-amber-500 mt-0.5 shrink-0" />
-              <p className="text-[10px] text-ink-muted leading-snug line-clamp-2">{rec}</p>
+              <BiSolidMagicWand className="w-3 h-3 text-primary mt-0.5 shrink-0" />
+              <p className="text-[11px] text-ink-muted leading-snug line-clamp-2">{rec}</p>
             </div>
           ))}
         </div>

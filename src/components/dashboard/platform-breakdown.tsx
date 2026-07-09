@@ -1,15 +1,19 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/ui/panel";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
+import { PLATFORM_COLORS, PLATFORM_LABELS } from "@/lib/dashboard/chart-theme";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
-
-const PLATFORM_META: Record<Platform, { label: string; color: string }> = {
-  google: { label: "Google Ads", color: "#4285F4" },
-  meta: { label: "Meta Ads", color: "#0668E1" },
-  tiktok: { label: "TikTok Ads", color: "#121212" },
-};
 
 function aggregateByPlatform(rows: CampaignPerformanceRow[]) {
   const map = new Map<Platform, { spend: number; conversions: number; clicks: number; impressions: number }>();
@@ -60,9 +64,9 @@ export function PlatformBreakdown() {
 
   if (!clientId || isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <Skeleton className="h-[200px] w-full" />
-      </div>
+      </Panel>
     );
   }
 
@@ -70,48 +74,48 @@ export function PlatformBreakdown() {
   const totalSpend = platformData.reduce((s, p) => s + p.spend, 0);
 
   return (
-    <div className="bg-white rounded-xl border border-hairline">
+    <Panel>
       <div className="px-5 py-4">
-        <h3 className="text-sm font-semibold text-ink">Spend by Platform</h3>
+        <h3 className="text-sm font-semibold text-ink">Spend by platform</h3>
         <p className="text-xs text-ink-muted mt-0.5">Total: {formatCurrency(totalSpend)}</p>
       </div>
 
       {/* Consolidated mini-table */}
       <div className="px-5 pb-4">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-hairline">
-              <th className="text-left text-[10px] font-medium text-ink-muted uppercase tracking-wider pb-2">Platform</th>
-              <th className="text-right text-[10px] font-medium text-ink-muted uppercase tracking-wider pb-2">Spend</th>
-              <th className="text-right text-[10px] font-medium text-ink-muted uppercase tracking-wider pb-2">% Total</th>
-              <th className="text-right text-[10px] font-medium text-ink-muted uppercase tracking-wider pb-2">CTR</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-hairline/60">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-hairline hover:bg-transparent">
+              <TableHead className="h-auto px-0 pb-2 text-[11px] font-medium text-ink-muted">Platform</TableHead>
+              <TableHead className="h-auto px-0 pb-2 text-right text-[11px] font-medium text-ink-muted">Spend</TableHead>
+              <TableHead className="h-auto px-0 pb-2 text-right text-[11px] font-medium text-ink-muted">% total</TableHead>
+              <TableHead className="h-auto px-0 pb-2 text-right text-[11px] font-medium text-ink-muted">CTR</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {platformData.map((p) => (
-              <tr key={p.platform} className="group">
-                <td className="py-3">
+              <TableRow key={p.platform} className="group border-hairline/60 hover:bg-transparent">
+                <TableCell className="px-0 py-3">
                   <div className="flex items-center gap-2">
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: PLATFORM_META[p.platform].color }}
+                      style={{ backgroundColor: PLATFORM_COLORS[p.platform] }}
                     />
-                    <span className="text-[13px] font-medium text-ink">{PLATFORM_META[p.platform].label}</span>
+                    <span className="text-[13px] font-medium text-ink">{PLATFORM_LABELS[p.platform]}</span>
                   </div>
-                </td>
-                <td className="py-3 text-right">
+                </TableCell>
+                <TableCell className="px-0 py-3 text-right">
                   <span className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(p.spend)}</span>
-                </td>
-                <td className="py-3 text-right">
+                </TableCell>
+                <TableCell className="px-0 py-3 text-right">
                   <span className="text-[12px] text-ink-muted tabular-nums">{p.pct}%</span>
-                </td>
-                <td className="py-3 text-right">
+                </TableCell>
+                <TableCell className="px-0 py-3 text-right">
                   <span className="text-[12px] font-semibold text-ink tabular-nums">{p.ctr}%</span>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {/* Stacked bar visualization */}
@@ -123,12 +127,12 @@ export function PlatformBreakdown() {
               className="h-full first:rounded-l-full last:rounded-r-full transition-all"
               style={{
                 width: `${p.pct}%`,
-                backgroundColor: PLATFORM_META[p.platform].color,
+                backgroundColor: PLATFORM_COLORS[p.platform],
               }}
             />
           ))}
         </div>
       </div>
-    </div>
+    </Panel>
   );
 }

@@ -12,14 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
 import type { WidgetRenderProps, WidgetConfigFormProps } from "@/lib/dashboard/types";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
-
-const PLATFORM_DOTS: Record<Platform, string> = {
-  google: "#4285f4",
-  meta: "#0866ff",
-  tiktok: "#121212",
-};
 
 const SORT_OPTIONS = [
   { value: "spend", label: "Spend" },
@@ -125,11 +120,11 @@ export function CampaignTableWidget({ config }: WidgetRenderProps) {
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="sticky top-0 bg-white">
-            <th className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted pb-1.5">Campaign</th>
-            <th className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted pb-1.5 text-right">Spend</th>
-            <th className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted pb-1.5 text-right">Conv.</th>
-            <th className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted pb-1.5 text-right">CTR</th>
-            <th className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted pb-1.5 text-right">CPA</th>
+            <th className="text-[11px] font-medium text-ink-muted pb-1.5">Campaign</th>
+            <th className="text-[11px] font-medium text-ink-muted pb-1.5 text-right">Spend</th>
+            <th className="text-[11px] font-medium text-ink-muted pb-1.5 text-right">Conv.</th>
+            <th className="text-[11px] font-medium text-ink-muted pb-1.5 text-right">CTR</th>
+            <th className="text-[11px] font-medium text-ink-muted pb-1.5 text-right">CPA</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-hairline/60">
@@ -148,7 +143,7 @@ export function CampaignTableWidget({ config }: WidgetRenderProps) {
             >
               <td className="py-1.5 pr-2 max-w-[140px]">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: PLATFORM_DOTS[c.platform] }} />
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: PLATFORM_COLORS[c.platform] }} />
                   <span className="text-[12px] text-ink truncate">{c.campaignName}</span>
                 </div>
               </td>

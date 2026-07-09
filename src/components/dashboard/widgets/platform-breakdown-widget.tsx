@@ -5,14 +5,9 @@ import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatNumber } from "@/lib/dashboard/metrics";
+import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
 import type { WidgetRenderProps } from "@/lib/dashboard/types";
 import type { Platform } from "@/lib/types/database";
-
-const PLATFORM_META: Record<Platform, { label: string; color: string }> = {
-  google: { label: "Google", color: "#4285f4" },
-  meta: { label: "Meta", color: "#0866ff" },
-  tiktok: { label: "TikTok", color: "#121212" },
-};
 
 export function PlatformBreakdownWidget({ config }: WidgetRenderProps) {
   const clientId = useAppStore((s) => s.selectedClientId);
@@ -50,13 +45,12 @@ export function PlatformBreakdownWidget({ config }: WidgetRenderProps) {
   return (
     <div className="h-full w-full flex flex-col justify-center gap-3">
       {rows.map((r) => {
-        const meta = PLATFORM_META[r.platform];
         return (
           <div key={r.platform}>
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="flex items-center gap-1.5 text-ink font-medium">
-                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: meta.color }} />
-                {meta.label}
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: PLATFORM_COLORS[r.platform] }} />
+                {PLATFORM_LABELS_SHORT[r.platform]}
               </span>
               <span className="text-ink-muted">
                 {metricKey === "conversions" ? formatNumber(r.value) : formatCurrency(r.value)}
@@ -66,7 +60,7 @@ export function PlatformBreakdownWidget({ config }: WidgetRenderProps) {
             <div className="h-2 rounded-full bg-canvas-soft overflow-hidden">
               <div
                 className="h-full rounded-full transition-all"
-                style={{ width: `${r.pct}%`, background: meta.color }}
+                style={{ width: `${r.pct}%`, background: PLATFORM_COLORS[r.platform] }}
               />
             </div>
           </div>

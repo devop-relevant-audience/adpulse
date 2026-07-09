@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Zap, Loader2, Mail, CheckCircle2 } from "lucide-react";
+import { BiRefresh, BiEnvelope, BiCheckCircle } from "react-icons/bi";
+import { Logo } from "@/components/brand/logo";
 import { createClient } from "@/lib/supabase/client";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -68,12 +69,12 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
   return (
     <div className="w-full max-w-sm">
       {/* Brand */}
-      <div className="mb-8 flex flex-col items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary">
-          <Zap className="h-5 w-5 text-white" />
-        </div>
+      <div className="mb-8 flex flex-col items-center gap-4">
+        <Logo markSize={40} showWordmark={false} />
         <div className="text-center">
-          <h1 className="text-xl font-bold tracking-tight text-ink">AdPulse</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-ink">
+            Ad<span className="text-ink-secondary">Pulse</span>
+          </h1>
           <p className="mt-1 text-sm text-ink-muted">
             Sign in to your reporting workspace
           </p>
@@ -143,7 +144,7 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
               <Button type="submit" size="lg" className="w-full" disabled={pending}>
                 {pending ? (
                   <>
-                    <Loader2 className="animate-spin" />
+                    <BiRefresh className="animate-spin" />
                     Signing in…
                   </>
                 ) : (
@@ -157,7 +158,7 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
           <TabsContent value="magic" className="pt-5">
             {magicSent ? (
               <div className="flex flex-col items-center gap-3 py-4 text-center">
-                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                <BiCheckCircle className="h-8 w-8 text-emerald-600" />
                 <div>
                   <p className="text-sm font-medium text-ink">Check your email</p>
                   <p className="mt-1 text-sm text-ink-muted">
@@ -200,17 +201,17 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
                 >
                   {pending ? (
                     <>
-                      <Loader2 className="animate-spin" />
+                      <BiRefresh className="animate-spin" />
                       Sending…
                     </>
                   ) : (
                     <>
-                      <Mail />
+                      <BiEnvelope />
                       Email me a magic link
                     </>
                   )}
                 </Button>
-                <p className="text-center text-xs text-ink-faint">
+                <p className="text-center text-xs text-ink-muted">
                   Magic links only work for existing accounts.
                 </p>
               </form>

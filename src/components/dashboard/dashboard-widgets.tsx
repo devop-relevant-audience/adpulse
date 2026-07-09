@@ -3,8 +3,10 @@
 import { useHealthScore, useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
-import { Activity, Target } from "lucide-react";
+import { BiPulse, BiLineChart } from "react-icons/bi";
+import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
 
 const GRADE_CONFIG = {
@@ -16,11 +18,11 @@ const GRADE_CONFIG = {
 } as const;
 
 function getScoreColor(score: number): string {
-  if (score >= 80) return "#16a34a";
-  if (score >= 60) return "#2563eb";
-  if (score >= 40) return "#f59e0b";
-  if (score >= 20) return "#f97316";
-  return "#ef4444";
+  if (score >= 80) return "#15803d";
+  if (score >= 60) return "#1d4ed8";
+  if (score >= 40) return "#b45309";
+  if (score >= 20) return "#c2410c";
+  return "#b91c1c";
 }
 
 export function HealthWidget() {
@@ -35,9 +37,9 @@ export function HealthWidget() {
 
   if (!clientId || isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <Skeleton className="h-[200px] w-full" />
-      </div>
+      </Panel>
     );
   }
 
@@ -47,10 +49,10 @@ export function HealthWidget() {
   const color = getScoreColor(healthData.overallScore);
 
   return (
-    <div className="bg-white rounded-xl border border-hairline p-5">
+    <Panel className="p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-ink">Health Score</h3>
-        <Activity className="w-4 h-4 text-ink-muted" />
+        <h3 className="text-sm font-semibold text-ink">Health score</h3>
+        <BiPulse className="w-4 h-4 text-ink-muted" />
       </div>
 
       <div className="flex items-center gap-4 mb-4">
@@ -82,7 +84,7 @@ export function HealthWidget() {
           </div>
         ))}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -110,9 +112,9 @@ export function ConversionWidget() {
 
   if (!clientId || isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <Skeleton className="h-[200px] w-full" />
-      </div>
+      </Panel>
     );
   }
 
@@ -140,23 +142,11 @@ export function ConversionWidget() {
     }))
     .sort((a, b) => b.rate - a.rate);
 
-  const PLATFORM_COLORS: Record<Platform, string> = {
-    google: "#4285F4",
-    meta: "#0668E1",
-    tiktok: "#121212",
-  };
-
-  const PLATFORM_LABELS: Record<Platform, string> = {
-    google: "Google",
-    meta: "Meta",
-    tiktok: "TikTok",
-  };
-
   return (
-    <div className="bg-white rounded-xl border border-hairline p-5">
+    <Panel className="p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-ink">Conversions</h3>
-        <Target className="w-4 h-4 text-ink-muted" />
+        <BiLineChart className="w-4 h-4 text-ink-muted" />
       </div>
 
       <div className="flex items-baseline gap-2 mb-1">
@@ -182,7 +172,7 @@ export function ConversionWidget() {
               className="w-2 h-2 rounded-full shrink-0"
               style={{ backgroundColor: PLATFORM_COLORS[p.platform] }}
             />
-            <span className="text-[11px] text-ink-muted w-14 truncate">{PLATFORM_LABELS[p.platform]}</span>
+            <span className="text-[11px] text-ink-muted w-14 truncate">{PLATFORM_LABELS_SHORT[p.platform]}</span>
             <div className="flex-1 h-2 bg-canvas-soft rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all"
@@ -197,6 +187,6 @@ export function ConversionWidget() {
           </div>
         ))}
       </div>
-    </div>
+    </Panel>
   );
 }

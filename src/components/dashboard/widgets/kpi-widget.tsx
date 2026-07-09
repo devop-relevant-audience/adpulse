@@ -1,7 +1,7 @@
 "use client";
 
 import { format, subDays } from "date-fns";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { BiTrendingUp, BiTrendingDown } from "react-icons/bi";
 import { useComparison } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -75,7 +75,7 @@ export function KpiWidget({ config }: WidgetRenderProps) {
       }
       className="h-full w-full flex flex-col justify-center text-left px-1 group"
     >
-      <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">{metric.label}</p>
+      <p className="text-[12px] font-medium text-ink-muted">{metric.label}</p>
       <p className="text-2xl font-semibold tracking-tight text-ink leading-tight truncate mt-1">
         {formatMetric(value, metric.format)}
       </p>
@@ -87,7 +87,7 @@ export function KpiWidget({ config }: WidgetRenderProps) {
               isGood ? "text-emerald-700 bg-emerald-50" : "text-red-600 bg-red-50"
             )}
           >
-            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            {isPositive ? <BiTrendingUp className="w-3 h-3" /> : <BiTrendingDown className="w-3 h-3" />}
             {Math.abs(delta).toFixed(1)}%
           </span>
         )}

@@ -23,6 +23,7 @@ import { useClients } from "@/hooks/use-metrics";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { AccountNotProvisioned } from "@/components/layout/account-not-provisioned";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/ui/panel";
 
 function DashboardSkeleton() {
   return (
@@ -33,30 +34,30 @@ function DashboardSkeleton() {
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border border-hairline p-5 space-y-2">
+          <Panel key={i} className="p-5 space-y-2">
             <Skeleton className="h-3 w-14" />
             <Skeleton className="h-7 w-20" />
             <Skeleton className="h-3 w-16" />
-          </div>
+          </Panel>
         ))}
       </div>
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <Skeleton className="h-[340px] w-full" />
-      </div>
+      </Panel>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-hairline p-5">
+        <Panel className="p-5">
           <Skeleton className="h-[200px] w-full" />
-        </div>
-        <div className="bg-white rounded-xl border border-hairline p-5">
+        </Panel>
+        <Panel className="p-5">
           <Skeleton className="h-[200px] w-full" />
-        </div>
-        <div className="bg-white rounded-xl border border-hairline p-5">
+        </Panel>
+        <Panel className="p-5">
           <Skeleton className="h-[200px] w-full" />
-        </div>
+        </Panel>
       </div>
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <Skeleton className="h-[200px] w-full" />
-      </div>
+      </Panel>
     </div>
   );
 }
@@ -146,7 +147,7 @@ function MainDashboard() {
   // unprovisioned account before the 403 resolves.
   if (userLoading) {
     return (
-      <div className="min-h-screen bg-[#f8f8f7] px-8 py-6">
+      <div className="min-h-screen bg-background px-8 py-6">
         <div className="max-w-[1400px] mx-auto">
           <DashboardSkeleton />
         </div>

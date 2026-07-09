@@ -1,25 +1,10 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Target,
-  Activity,
-  ArrowRight,
-  BarChart3,
-  Zap,
-  ChevronRight,
-  Lightbulb,
-  MessageCircle,
-  Image,
-  Layers,
-  Video,
-  AlertTriangle,
-  PieChart,
-} from "lucide-react";
+import { BiTrendingUp, BiTrendingDown, BiPulse, BiChevronRight, BiSolidMagicWand, BiBulb, BiMessageRounded, BiImage, BiVideo, BiCarousel, BiError, BiFilterAlt, BiBroadcast, BiSliderAlt } from "react-icons/bi";
 import { cn } from "@/lib/utils";
+import { Panel } from "@/components/ui/panel";
+import { PLATFORM_COLORS, PLATFORM_LABELS, SERIES_PALETTE, STATUS_COLORS, CHART_AXIS_TEXT } from "@/lib/dashboard/chart-theme";
 import { useAppStore } from "@/store/app-store";
 import type { ReferenceContext } from "@/store/app-store";
 import type { Platform } from "@/lib/types/database";
@@ -44,40 +29,22 @@ function DeltaBadge({ value, invert = false }: { value: number; invert?: boolean
       "inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-full",
       isGood ? "text-emerald-700 bg-emerald-50" : "text-red-600 bg-red-50"
     )}>
-      {value >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+      {value >= 0 ? <BiTrendingUp className="w-3 h-3" /> : <BiTrendingDown className="w-3 h-3" />}
       {value >= 0 ? "+" : ""}{value.toFixed(1)}%
     </span>
   );
 }
 
-const PLATFORM_LABELS: Record<string, string> = {
-  google: "Google Ads",
-  meta: "Meta Ads",
-  tiktok: "TikTok Ads",
-};
-
-const PLATFORM_COLORS: Record<string, string> = {
-  google: "#4285F4",
-  meta: "#0668E1",
-  tiktok: "#fe2c55",
-};
-
 function getScoreColor(score: number): string {
-  if (score >= 80) return "#16a34a";
-  if (score >= 60) return "#2563eb";
-  if (score >= 40) return "#f59e0b";
-  return "#ef4444";
+  if (score >= 80) return STATUS_COLORS.good;
+  if (score >= 60) return SERIES_PALETTE[0];
+  if (score >= 40) return STATUS_COLORS.warning;
+  return STATUS_COLORS.bad;
 }
 
-function getScoreGradient(score: number): [string, string] {
-  if (score >= 80) return ["#16a34a", "#22c55e"];
-  if (score >= 60) return ["#2563eb", "#3b82f6"];
-  if (score >= 40) return ["#d97706", "#f59e0b"];
-  return ["#dc2626", "#ef4444"];
-}
-
-function SparklineChart({ data, height = 48, color = "#2563eb" }: { data: number[]; height?: number; color?: string }) {
+function SparklineChart({ data, height = 48, color = "var(--chart-1)" }: { data: number[]; height?: number; color?: string }) {
   if (data.length < 2) return null;
+  const gradId = `spark-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
@@ -97,12 +64,12 @@ function SparklineChart({ data, height = 48, color = "#2563eb" }: { data: number
   return (
     <svg viewBox={`0 0 ${w} ${height}`} className="w-full" style={{ height }} preserveAspectRatio="none">
       <defs>
-        <linearGradient id={`spark-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.2" />
           <stop offset="100%" stopColor={color} stopOpacity="0.02" />
         </linearGradient>
       </defs>
-      <path d={areaPath} fill={`url(#spark-${color.replace("#", "")})`} />
+      <path d={areaPath} fill={`url(#${gradId})`} />
       <path d={linePath} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
@@ -122,7 +89,7 @@ function HorizontalBarChart({ items, maxValue }: { items: Array<{ label: string;
           </div>
           <div className="h-2 bg-canvas-soft rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full transition-all duration-500"
+              className="h-full rounded-full transition-[width] duration-300 ease-out"
               style={{
                 width: `${maxValue > 0 ? (item.value / maxValue) * 100 : 0}%`,
                 backgroundColor: item.color,
@@ -177,7 +144,7 @@ function DonutChart({ segments, centerLabel, centerValue }: {
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-lg font-bold text-ink leading-none">{centerValue}</span>
-          <span className="text-[9px] text-ink-muted font-medium uppercase tracking-wider mt-0.5">{centerLabel}</span>
+          <span className="text-[11px] text-ink-muted font-medium mt-0.5">{centerLabel}</span>
         </div>
       </div>
       <div className="space-y-1.5 flex-1">
@@ -201,25 +168,18 @@ function FunnelVisualization({ stages }: { stages: Array<{ stage: string; volume
     <div className="space-y-1.5">
       {stages.map((stage, i) => {
         const widthPct = i === 0 ? maxWidth : Math.max(15, (stage.percentOfFirst / 100) * maxWidth);
-        const colors = [
-          "from-blue-500 to-blue-400",
-          "from-violet-500 to-violet-400",
-          "from-emerald-500 to-emerald-400",
-          "from-amber-500 to-amber-400",
-        ];
 
         return (
           <div key={stage.stage} className="flex items-center gap-3">
             <div className="w-[80px] shrink-0 text-right">
-              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">{stage.stage}</p>
+              <p className="text-[11px] font-medium text-ink-muted">{stage.stage}</p>
             </div>
-            <div className="flex-1 relative">
+            <div className="flex-1 flex items-center gap-2.5">
               <div
-                className={cn("h-10 rounded-lg bg-linear-to-r flex items-center px-3 transition-all duration-500", colors[i % colors.length])}
-                style={{ width: `${widthPct}%` }}
-              >
-                <span className="text-[13px] font-bold text-white tabular-nums">{formatNum(stage.volume)}</span>
-              </div>
+                className="h-10 rounded-lg transition-[width] duration-300 ease-out"
+                style={{ width: `${widthPct}%`, backgroundColor: SERIES_PALETTE[i % SERIES_PALETTE.length] }}
+              />
+              <span className="text-[13px] font-bold text-ink tabular-nums shrink-0">{formatNum(stage.volume)}</span>
             </div>
             <div className="w-[56px] shrink-0 text-right">
               {i > 0 && (
@@ -242,7 +202,7 @@ function HealthGauge({ score, grade }: { score: number; grade: string }) {
   const endAngle = 405;
   const totalAngle = endAngle - startAngle;
   const scoreAngle = startAngle + (score / 100) * totalAngle;
-  const [c1, c2] = getScoreGradient(score);
+  const scoreColor = getScoreColor(score);
 
   function polarToCartesian(angle: number) {
     const rad = (angle * Math.PI) / 180;
@@ -259,20 +219,14 @@ function HealthGauge({ score, grade }: { score: number; grade: string }) {
   return (
     <div className="relative" style={{ width: 120, height: 100 }}>
       <svg viewBox="0 0 120 120" className="w-full h-full">
-        <defs>
-          <linearGradient id="health-grad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={c1} />
-            <stop offset="100%" stopColor={c2} />
-          </linearGradient>
-        </defs>
-        <path d={arc(startAngle, endAngle)} fill="none" stroke="#f0f0f0" strokeWidth={strokeWidth} strokeLinecap="round" />
+        <path d={arc(startAngle, endAngle)} fill="none" stroke="var(--color-hairline)" strokeWidth={strokeWidth} strokeLinecap="round" />
         {score > 0 && (
-          <path d={arc(startAngle, scoreAngle)} fill="none" stroke="url(#health-grad)" strokeWidth={strokeWidth} strokeLinecap="round" />
+          <path d={arc(startAngle, scoreAngle)} fill="none" stroke={scoreColor} strokeWidth={strokeWidth} strokeLinecap="round" />
         )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
         <span className="text-2xl font-bold leading-none" style={{ color: getScoreColor(score) }}>{score}</span>
-        <span className="text-[10px] font-semibold text-ink-muted mt-0.5">Grade {grade}</span>
+        <span className="text-[11px] font-semibold text-ink-muted mt-0.5">Grade {grade}</span>
       </div>
     </div>
   );
@@ -298,14 +252,11 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
   const c = data.comparison.current;
   const d = data.comparison.deltas;
 
-  const heroKpis = [
-    { label: "Spend", value: formatCurrency(c.totalSpend), delta: d.totalSpend.percentage, icon: <DollarSign className="w-4 h-4" /> },
-    { label: "Conversions", value: formatNum(c.totalConversions), delta: d.totalConversions.percentage, icon: <Target className="w-4 h-4" /> },
-    { label: "CPA", value: formatCurrency(c.avgCpa), delta: d.avgCpa.percentage, icon: <DollarSign className="w-4 h-4" />, invert: true },
-    { label: "CTR", value: `${c.avgCtr}%`, delta: d.avgCtr.percentage, icon: <BarChart3 className="w-4 h-4" /> },
-  ];
-
-  const secondaryKpis = [
+  const allKpis: Array<{ label: string; value: string; delta: number; invert?: boolean }> = [
+    { label: "Spend", value: formatCurrency(c.totalSpend), delta: d.totalSpend.percentage },
+    { label: "Conversions", value: formatNum(c.totalConversions), delta: d.totalConversions.percentage },
+    { label: "CPA", value: formatCurrency(c.avgCpa), delta: d.avgCpa.percentage, invert: true },
+    { label: "CTR", value: `${c.avgCtr}%`, delta: d.avgCtr.percentage },
     { label: "Clicks", value: formatNum(c.totalClicks), delta: d.totalClicks.percentage },
     { label: "Impressions", value: formatNum(c.totalImpressions), delta: d.totalImpressions.percentage },
     { label: "CPC", value: formatCurrency(c.avgCpc), delta: d.avgCpc.percentage, invert: true },
@@ -316,7 +267,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
     .sort((a, b) => b.spend - a.spend)
     .map((p) => ({
       value: p.spend,
-      color: PLATFORM_COLORS[p.platform] || "#888",
+      color: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT,
       label: PLATFORM_LABELS[p.platform] || p.platform,
     }));
 
@@ -330,156 +281,127 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
     <div className="space-y-8">
       {/* Executive Summary */}
       <section>
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-primary to-primary/70 flex items-center justify-center text-white shrink-0">
-            <Zap className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-[15px] font-semibold text-ink">Executive Summary</h3>
-            <p className="text-[11px] text-ink-muted">{data.dateRange.start} to {data.dateRange.end}</p>
+        <div className="flex items-center gap-2 mb-3">
+          <BiSolidMagicWand className="w-4 h-4 text-primary shrink-0" />
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-[15px] font-semibold text-ink">Executive summary</h3>
+            <p className="text-[12px] text-ink-muted">{data.dateRange.start} to {data.dateRange.end}</p>
           </div>
         </div>
-        <div className="bg-linear-to-r from-slate-50 to-blue-50/50 rounded-xl p-4 border border-slate-100">
-          <p className="text-[13px] leading-relaxed text-ink/80">{data.narratives.executive}</p>
+        <div className="rounded-xl border border-hairline bg-canvas-soft/50 p-4">
+          <p className="text-[13px] leading-relaxed text-ink-secondary">{data.narratives.executive}</p>
         </div>
       </section>
 
-      {/* Hero KPIs */}
+      {/* KPIs */}
       <section>
-        <div className="grid grid-cols-4 gap-3">
-          {heroKpis.map((kpi) => (
-            <div
+        <div className="grid grid-cols-4 gap-px bg-hairline rounded-xl border border-hairline overflow-hidden">
+          {allKpis.map((kpi) => (
+            <button
               key={kpi.label}
+              type="button"
+              aria-label={`Ask the AI assistant about ${kpi.label}`}
               className={cn(
-                "bg-white rounded-xl border border-hairline p-4 hover:shadow-sm transition-shadow group relative",
-                interactive && "cursor-pointer hover:border-primary/30"
+                "text-left bg-white p-4 group relative transition-colors",
+                interactive && "cursor-pointer hover:bg-canvas-soft/60"
               )}
               onClick={() => attachContext({ metric: kpi.label, value: parseFloat(String(kpi.value).replace(/[$,%KM]/g, "")) })}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-md bg-primary/8 flex items-center justify-center text-primary">
-                  {kpi.icon}
-                </div>
-                <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">{kpi.label}</p>
-              </div>
-              <p className="text-xl font-bold text-ink tabular-nums">{kpi.value}</p>
+              <p className="text-[12px] font-medium text-ink-muted">{kpi.label}</p>
+              <p className="text-lg font-semibold text-ink tabular-nums mt-1">{kpi.value}</p>
               <div className="mt-1.5">
                 <DeltaBadge value={kpi.delta} invert={kpi.invert} />
               </div>
               {interactive && (
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <MessageCircle className="w-3.5 h-3.5 text-primary/50" />
-                </div>
+                <BiMessageRounded className="absolute top-2.5 right-2.5 w-3.5 h-3.5 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity" />
               )}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-4 gap-3 mt-2">
-          {secondaryKpis.map((kpi) => (
-            <div
-              key={kpi.label}
-              className={cn(
-                "bg-canvas-soft/60 rounded-lg px-3 py-2.5 flex items-center justify-between",
-                interactive && "cursor-pointer hover:bg-primary/5"
-              )}
-              onClick={() => attachContext({ metric: kpi.label, value: parseFloat(String(kpi.value).replace(/[$,%KM]/g, "")) })}
-            >
-              <div>
-                <p className="text-[10px] font-medium text-ink-muted uppercase tracking-wider">{kpi.label}</p>
-                <p className="text-sm font-semibold text-ink tabular-nums mt-0.5">{kpi.value}</p>
-              </div>
-              <DeltaBadge value={kpi.delta} invert={kpi.invert} />
-            </div>
+            </button>
           ))}
         </div>
       </section>
 
       {/* Performance Trends with Sparklines */}
       <section>
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-500 to-violet-400 flex items-center justify-center text-white shrink-0">
-            <TrendingUp className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-[15px] font-semibold text-ink">Performance Trends</h3>
-          </div>
+        <div className="flex items-center gap-2 mb-3">
+          <BiTrendingUp className="w-4 h-4 text-ink-muted shrink-0" />
+          <h3 className="text-[15px] font-semibold text-ink">Performance trends</h3>
         </div>
         <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.trends}</p>
 
         <div className="grid grid-cols-2 gap-3 mb-3">
-          <div className="bg-white rounded-xl border border-hairline p-4">
-            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1">Daily Spend Trend</p>
-            <p className="text-sm font-bold text-ink mb-2 tabular-nums">Avg. {formatCurrency(data.trendSummary.avgDailySpend)}/day</p>
-            <SparklineChart data={trendSpendData} height={56} color="#2563eb" />
-          </div>
-          <div className="bg-white rounded-xl border border-hairline p-4">
-            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1">Daily Conversions Trend</p>
-            <p className="text-sm font-bold text-ink mb-2 tabular-nums">{formatNum(c.totalConversions)} total</p>
-            <SparklineChart data={trendConvData} height={56} color="#16a34a" />
-          </div>
+          <Panel className="p-4">
+            <p className="text-[12px] font-medium text-ink-muted mb-1">Daily spend trend</p>
+            <p className="text-sm font-semibold text-ink mb-2 tabular-nums">Avg. {formatCurrency(data.trendSummary.avgDailySpend)}/day</p>
+            <SparklineChart data={trendSpendData} height={56} color="var(--chart-1)" />
+          </Panel>
+          <Panel className="p-4">
+            <p className="text-[12px] font-medium text-ink-muted mb-1">Daily conversions trend</p>
+            <p className="text-sm font-semibold text-ink mb-2 tabular-nums">{formatNum(c.totalConversions)} total</p>
+            <SparklineChart data={trendConvData} height={56} color="var(--chart-2)" />
+          </Panel>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div className="rounded-xl bg-linear-to-br from-emerald-50 to-emerald-100/50 border border-emerald-100 p-3">
-            <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Best Day</p>
-            <p className="text-sm font-bold text-ink mt-1">{data.trendSummary.bestDay.date}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-hairline rounded-xl border border-hairline overflow-hidden">
+          <div className="bg-white p-3">
+            <p className="text-[12px] font-medium text-ink-muted">Best day</p>
+            <p className="text-sm font-semibold text-ink mt-1">{data.trendSummary.bestDay.date}</p>
             <p className="text-[11px] text-emerald-700 font-medium">{data.trendSummary.bestDay.conversions} conv.</p>
           </div>
-          <div className="rounded-xl bg-linear-to-br from-red-50 to-red-100/50 border border-red-100 p-3">
-            <p className="text-[10px] font-semibold text-red-600 uppercase tracking-wider">Worst Day</p>
-            <p className="text-sm font-bold text-ink mt-1">{data.trendSummary.worstDay.date}</p>
-            <p className="text-[11px] text-red-700 font-medium">{data.trendSummary.worstDay.conversions} conv.</p>
+          <div className="bg-white p-3">
+            <p className="text-[12px] font-medium text-ink-muted">Worst day</p>
+            <p className="text-sm font-semibold text-ink mt-1">{data.trendSummary.worstDay.date}</p>
+            <p className="text-[11px] text-red-600 font-medium">{data.trendSummary.worstDay.conversions} conv.</p>
           </div>
-          <div className="rounded-xl bg-linear-to-br from-blue-50 to-blue-100/50 border border-blue-100 p-3">
-            <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">Avg Daily Spend</p>
-            <p className="text-sm font-bold text-ink mt-1">{formatCurrency(data.trendSummary.avgDailySpend)}</p>
+          <div className="bg-white p-3">
+            <p className="text-[12px] font-medium text-ink-muted">Avg daily spend</p>
+            <p className="text-sm font-semibold text-ink mt-1">{formatCurrency(data.trendSummary.avgDailySpend)}</p>
           </div>
-          <div className="rounded-xl bg-linear-to-br from-amber-50 to-amber-100/50 border border-amber-100 p-3">
-            <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Volatility</p>
-            <p className="text-sm font-bold text-ink mt-1">{(data.trendSummary.spendVolatility * 100).toFixed(1)}%</p>
+          <div className="bg-white p-3">
+            <p className="text-[12px] font-medium text-ink-muted">Volatility</p>
+            <p className="text-sm font-semibold text-ink mt-1">{(data.trendSummary.spendVolatility * 100).toFixed(1)}%</p>
           </div>
         </div>
       </section>
 
       {/* Platform Breakdown */}
       <section>
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white shrink-0">
-            <Activity className="w-4 h-4" />
-          </div>
-          <h3 className="text-[15px] font-semibold text-ink">Platform Breakdown</h3>
+        <div className="flex items-center gap-2 mb-3">
+          <BiPulse className="w-4 h-4 text-ink-muted shrink-0" />
+          <h3 className="text-[15px] font-semibold text-ink">Platform breakdown</h3>
         </div>
         <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.platforms}</p>
 
         <div className="grid grid-cols-2 gap-5">
-          <div className="bg-white rounded-xl border border-hairline p-4">
-            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Spend Distribution</p>
+          <Panel className="p-4">
+            <p className="text-[12px] font-medium text-ink-muted mb-3">Spend distribution</p>
             <DonutChart
               segments={platformDonutSegments}
               centerLabel="Total"
               centerValue={formatCurrency(c.totalSpend)}
             />
-          </div>
-          <div className="bg-white rounded-xl border border-hairline p-4">
-            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Conversions by Platform</p>
+          </Panel>
+          <Panel className="p-4">
+            <p className="text-[12px] font-medium text-ink-muted mb-3">Conversions by platform</p>
             <HorizontalBarChart
               items={data.platformBreakdown.sort((a, b) => b.conversions - a.conversions).map((p) => ({
                 label: PLATFORM_LABELS[p.platform] || p.platform,
                 value: p.conversions,
-                color: PLATFORM_COLORS[p.platform] || "#888",
+                color: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT,
                 formatted: `${formatNum(p.conversions)} at ${formatCurrency(p.cpa)} CPA`,
               }))}
               maxValue={Math.max(...data.platformBreakdown.map((p) => p.conversions))}
             />
-          </div>
+          </Panel>
         </div>
 
         <div className="grid gap-2 mt-3" style={{ gridTemplateColumns: `repeat(${data.platformBreakdown.length}, 1fr)` }}>
           {data.platformBreakdown.sort((a, b) => b.spend - a.spend).map((p) => (
-            <div
+            <button
               key={p.platform}
+              type="button"
+              aria-label={`Ask the AI assistant about ${PLATFORM_LABELS[p.platform] || p.platform}`}
               className={cn(
-                "bg-canvas-soft/60 rounded-xl p-3 group relative",
+                "text-left w-full bg-canvas-soft/60 rounded-xl p-3 group relative",
                 interactive && "cursor-pointer hover:bg-primary/5 hover:ring-1 hover:ring-primary/20"
               )}
               onClick={() => attachContext({ platform: p.platform as Platform })}
@@ -488,103 +410,96 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                 <span className="w-3 h-3 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] }} />
                 <span className="text-[12px] font-semibold text-ink">{PLATFORM_LABELS[p.platform] || p.platform}</span>
                 {interactive && (
-                  <MessageCircle className="w-3 h-3 text-primary/40 opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
+                  <BiMessageRounded className="w-3 h-3 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
                 )}
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                 <div>
-                  <p className="text-[9px] text-ink-muted uppercase">CTR</p>
+                  <p className="text-[11px] text-ink-muted">CTR</p>
                   <p className="text-[13px] font-semibold text-ink tabular-nums">{p.ctr}%</p>
                 </div>
                 <div>
-                  <p className="text-[9px] text-ink-muted uppercase">CPA</p>
+                  <p className="text-[11px] text-ink-muted">CPA</p>
                   <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(p.cpa)}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] text-ink-muted uppercase">CPC</p>
+                  <p className="text-[11px] text-ink-muted">CPC</p>
                   <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(p.cpc)}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] text-ink-muted uppercase">Spend</p>
+                  <p className="text-[11px] text-ink-muted">Spend</p>
                   <p className="text-[13px] font-semibold text-ink tabular-nums">{p.pctOfSpend}%</p>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </section>
 
       {/* Funnel Analysis */}
       <section>
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-500 to-purple-400 flex items-center justify-center text-white shrink-0">
-            <ArrowRight className="w-4 h-4" />
-          </div>
-          <h3 className="text-[15px] font-semibold text-ink">Funnel Analysis</h3>
+        <div className="flex items-center gap-2 mb-3">
+          <BiFilterAlt className="w-4 h-4 text-ink-muted shrink-0" />
+          <h3 className="text-[15px] font-semibold text-ink">Funnel analysis</h3>
         </div>
         <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.funnel}</p>
         {data.funnel.overall.length >= 2 && (
-          <div className="bg-white rounded-xl border border-hairline p-5">
+          <Panel className="p-5">
             <FunnelVisualization stages={data.funnel.overall} />
-          </div>
+          </Panel>
         )}
       </section>
 
       {/* Campaign Performance */}
       <section>
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-emerald-500 to-teal-400 flex items-center justify-center text-white shrink-0">
-            <Target className="w-4 h-4" />
-          </div>
-          <h3 className="text-[15px] font-semibold text-ink">Campaign Performance</h3>
+        <div className="flex items-center gap-2 mb-3">
+          <BiBroadcast className="w-4 h-4 text-ink-muted shrink-0" />
+          <h3 className="text-[15px] font-semibold text-ink">Campaign performance</h3>
         </div>
         <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.campaigns}</p>
 
         {topCampaigns.length > 0 && (
           <div className="mb-4">
-            <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Top Performers
+            <p className="text-[12px] font-medium text-ink-muted mb-2.5 flex items-center gap-1.5">
+              <BiTrendingUp className="w-3.5 h-3.5 text-emerald-600" /> Top performers
             </p>
             <div className="space-y-2">
               {topCampaigns.map((camp, i) => (
-                <div
+                <button
                   key={camp.campaignName}
+                  type="button"
+                  aria-label={`Ask the AI assistant about campaign ${camp.campaignName}`}
                   className={cn(
-                    "bg-white rounded-xl border border-hairline p-3 flex items-center gap-3 group",
+                    "text-left w-full bg-white rounded-xl border border-hairline p-3 flex items-center gap-3 group",
                     interactive && "cursor-pointer hover:border-primary/30 hover:shadow-sm"
                   )}
                   onClick={() => attachContext({ campaignName: camp.campaignName, platform: camp.platform as Platform })}
                 >
-                  <div className={cn(
-                    "w-7 h-7 rounded-lg flex items-center justify-center text-[12px] font-bold text-white shrink-0",
-                    i === 0 ? "bg-emerald-500" : i === 1 ? "bg-emerald-400" : "bg-emerald-300"
-                  )}>
-                    {i + 1}
-                  </div>
+                  <span className="w-6 text-center text-[13px] font-semibold text-ink-muted tabular-nums shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-medium text-ink truncate">{camp.campaignName}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <Badge variant="secondary" className="text-[9px] capitalize">{camp.platform}</Badge>
+                      <Badge variant="secondary" className="text-[11px] capitalize">{camp.platform}</Badge>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right">
-                      <p className="text-[10px] text-ink-muted">Conv.</p>
-                      <p className="text-[13px] font-bold text-ink tabular-nums">{camp.conversions}</p>
+                      <p className="text-[11px] text-ink-muted">Conv.</p>
+                      <p className="text-[13px] font-semibold text-ink tabular-nums">{camp.conversions}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] text-ink-muted">CPA</p>
+                      <p className="text-[11px] text-ink-muted">CPA</p>
                       <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(camp.cpa)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] text-ink-muted">Spend</p>
+                      <p className="text-[11px] text-ink-muted">Spend</p>
                       <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(camp.spend)}</p>
                     </div>
                     {interactive && (
-                      <MessageCircle className="w-3.5 h-3.5 text-primary/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <BiMessageRounded className="w-3.5 h-3.5 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity" />
                     )}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -592,35 +507,37 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
 
         {worstCampaigns.length > 0 && (
           <div>
-            <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <TrendingDown className="w-3.5 h-3.5 text-amber-500" /> Needs Attention (Low CTR)
+            <p className="text-[12px] font-medium text-ink-muted mb-2.5 flex items-center gap-1.5">
+              <BiTrendingDown className="w-3.5 h-3.5 text-amber-600" /> Needs attention (low CTR)
             </p>
             <div className="space-y-2">
               {worstCampaigns.map((camp) => (
-                <div
+                <button
                   key={camp.campaignName}
+                  type="button"
+                  aria-label={`Ask the AI assistant about campaign ${camp.campaignName}`}
                   className={cn(
-                    "bg-amber-50/50 rounded-xl border border-amber-100 p-3 flex items-center gap-3",
+                    "text-left w-full bg-amber-50/50 rounded-xl border border-amber-100 p-3 flex items-center gap-3",
                     interactive && "cursor-pointer hover:border-amber-300 hover:shadow-sm"
                   )}
                   onClick={() => attachContext({ campaignName: camp.campaignName, platform: camp.platform as Platform, metric: "CTR" })}
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-medium text-ink truncate">{camp.campaignName}</p>
-                    <Badge variant="secondary" className="text-[9px] capitalize mt-0.5">{camp.platform}</Badge>
+                    <Badge variant="secondary" className="text-[11px] capitalize mt-0.5">{camp.platform}</Badge>
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right">
-                      <p className="text-[10px] text-ink-muted">CTR</p>
-                      <p className="text-[13px] font-bold text-amber-600 tabular-nums">{camp.ctr}%</p>
+                      <p className="text-[11px] text-ink-muted">CTR</p>
+                      <p className="text-[13px] font-semibold text-amber-600 tabular-nums">{camp.ctr}%</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] text-ink-muted">CPA</p>
+                      <p className="text-[11px] text-ink-muted">CPA</p>
                       <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(camp.cpa)}</p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-ink-faint" />
+                    <BiChevronRight className="w-4 h-4 text-ink-faint" />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -629,15 +546,13 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
 
       {/* Health Score */}
       <section>
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-pink-500 to-rose-400 flex items-center justify-center text-white shrink-0">
-            <Activity className="w-4 h-4" />
-          </div>
-          <h3 className="text-[15px] font-semibold text-ink">Account Health</h3>
+        <div className="flex items-center gap-2 mb-3">
+          <BiPulse className="w-4 h-4 text-ink-muted shrink-0" />
+          <h3 className="text-[15px] font-semibold text-ink">Account health</h3>
         </div>
         <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.health}</p>
 
-        <div className="bg-white rounded-xl border border-hairline p-5">
+        <Panel className="p-5">
           <div className="flex items-start gap-6 mb-5">
             <HealthGauge score={data.healthScore.overallScore} grade={data.healthScore.grade} />
             <div className="flex-1 pt-2">
@@ -659,61 +574,59 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                   </div>
                   <div className="h-2 bg-white rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
+                      className="h-full rounded-full transition-[width] duration-300 ease-out"
                       style={{ width: `${sub.score}%`, backgroundColor: color }}
                     />
                   </div>
-                  <p className="text-[10px] text-ink-muted mt-1.5 line-clamp-2">{sub.description}</p>
+                  <p className="text-[11px] text-ink-muted mt-1.5 line-clamp-2">{sub.description}</p>
                 </div>
               );
             })}
           </div>
-        </div>
+        </Panel>
       </section>
 
       {/* Creative Performance */}
       {data.creatives && data.creatives.totalCreatives > 0 && (
         <section>
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-fuchsia-500 to-pink-400 flex items-center justify-center text-white shrink-0">
-              <Image className="w-4 h-4" />
-            </div>
-            <h3 className="text-[15px] font-semibold text-ink">Creative Performance</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <BiImage className="w-4 h-4 text-ink-muted shrink-0" />
+            <h3 className="text-[15px] font-semibold text-ink">Creative performance</h3>
           </div>
           <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.creatives}</p>
 
           {/* Creative KPI Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <div className="bg-white rounded-xl border border-hairline p-4">
-              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Total Creatives</p>
-              <p className="text-xl font-bold text-ink tabular-nums mt-1">{data.creatives.totalCreatives}</p>
-              <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-ink-muted">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />{data.creatives.activeCount} active
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 ml-1" />{data.creatives.fatiguedCount} fatigued
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-hairline rounded-xl border border-hairline overflow-hidden mb-4">
+            <div className="bg-white p-4">
+              <p className="text-[12px] font-medium text-ink-muted">Total creatives</p>
+              <p className="text-lg font-semibold text-ink tabular-nums mt-1">{data.creatives.totalCreatives}</p>
+              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-ink-muted">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />{data.creatives.activeCount} active
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 ml-1" />{data.creatives.fatiguedCount} fatigued
               </div>
             </div>
-            <div className="bg-white rounded-xl border border-hairline p-4">
-              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Avg CTR</p>
-              <p className="text-xl font-bold text-ink tabular-nums mt-1">{data.creatives.avgCtr}%</p>
+            <div className="bg-white p-4">
+              <p className="text-[12px] font-medium text-ink-muted">Avg CTR</p>
+              <p className="text-lg font-semibold text-ink tabular-nums mt-1">{data.creatives.avgCtr}%</p>
             </div>
-            <div className="bg-white rounded-xl border border-hairline p-4">
-              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Avg CPA</p>
-              <p className="text-xl font-bold text-ink tabular-nums mt-1">${data.creatives.avgCpa}</p>
+            <div className="bg-white p-4">
+              <p className="text-[12px] font-medium text-ink-muted">Avg CPA</p>
+              <p className="text-lg font-semibold text-ink tabular-nums mt-1">${data.creatives.avgCpa}</p>
             </div>
-            <div className={cn("bg-white rounded-xl border p-4", data.creatives.fatiguedCount > 0 ? "border-amber-200" : "border-hairline")}>
-              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Fatigued</p>
-              <p className={cn("text-xl font-bold tabular-nums mt-1", data.creatives.fatiguedCount > 0 ? "text-amber-600" : "text-ink")}>{data.creatives.fatiguedCount}</p>
-              {data.creatives.fatiguedCount > 0 && <p className="text-[10px] text-amber-500 mt-0.5">needs refresh</p>}
+            <div className="bg-white p-4">
+              <p className="text-[12px] font-medium text-ink-muted">Fatigued</p>
+              <p className={cn("text-lg font-semibold tabular-nums mt-1", data.creatives.fatiguedCount > 0 ? "text-amber-600" : "text-ink")}>{data.creatives.fatiguedCount}</p>
+              {data.creatives.fatiguedCount > 0 && <p className="text-[11px] text-amber-600 mt-0.5">needs refresh</p>}
             </div>
           </div>
 
           {/* By Creative Type */}
           {data.creatives.byType.length > 0 && (
-            <div className="bg-white rounded-xl border border-hairline p-4 mb-4">
-              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Performance by Creative Type</p>
+            <Panel className="p-4 mb-4">
+              <p className="text-[12px] font-medium text-ink-muted mb-3">Performance by creative type</p>
               <div className="grid gap-2">
                 {data.creatives.byType.sort((a, b) => b.totalConversions - a.totalConversions).map((t) => {
-                  const TypeIcon = t.type === "video" ? Video : t.type === "carousel" ? Layers : Image;
+                  const TypeIcon = t.type === "video" ? BiVideo : t.type === "carousel" ? BiCarousel : BiImage;
                   return (
                     <div key={t.type} className="flex items-center gap-3 bg-canvas-soft/60 rounded-lg px-3 py-2.5">
                       <div className="w-7 h-7 rounded-md bg-white border border-hairline flex items-center justify-center shrink-0">
@@ -721,23 +634,23 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[12px] font-semibold text-ink capitalize">{t.type}</p>
-                        <p className="text-[10px] text-ink-muted">{t.count} creatives</p>
+                        <p className="text-[11px] text-ink-muted">{t.count} creatives</p>
                       </div>
                       <div className="flex items-center gap-4 shrink-0 text-right">
                         <div>
-                          <p className="text-[9px] text-ink-muted uppercase">CTR</p>
+                          <p className="text-[11px] text-ink-muted">CTR</p>
                           <p className="text-[12px] font-semibold text-ink tabular-nums">{t.avgCtr}%</p>
                         </div>
                         <div>
-                          <p className="text-[9px] text-ink-muted uppercase">CPA</p>
+                          <p className="text-[11px] text-ink-muted">CPA</p>
                           <p className="text-[12px] font-semibold text-ink tabular-nums">${t.avgCpa}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] text-ink-muted uppercase">Conv.</p>
+                          <p className="text-[11px] text-ink-muted">Conv.</p>
                           <p className="text-[12px] font-semibold text-ink tabular-nums">{formatNum(t.totalConversions)}</p>
                         </div>
                         <div>
-                          <p className="text-[9px] text-ink-muted uppercase">Spend</p>
+                          <p className="text-[11px] text-ink-muted">Spend</p>
                           <p className="text-[12px] font-semibold text-ink tabular-nums">{formatCurrency(t.totalSpend)}</p>
                         </div>
                       </div>
@@ -745,46 +658,41 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                   );
                 })}
               </div>
-            </div>
+            </Panel>
           )}
 
           {/* Top Creative Performers */}
           {data.creatives.topPerformers.length > 0 && (
             <div className="mb-4">
-              <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Top Creatives
+              <p className="text-[12px] font-medium text-ink-muted mb-2.5 flex items-center gap-1.5">
+                <BiTrendingUp className="w-3.5 h-3.5 text-emerald-600" /> Top creatives
               </p>
               <div className="space-y-2">
                 {data.creatives.topPerformers.map((cr, i) => (
-                  <div key={cr.headline + i} className="bg-white rounded-xl border border-hairline p-3 flex items-center gap-3">
-                    <div className={cn(
-                      "w-7 h-7 rounded-lg flex items-center justify-center text-[12px] font-bold text-white shrink-0",
-                      i === 0 ? "bg-fuchsia-500" : i === 1 ? "bg-fuchsia-400" : "bg-fuchsia-300"
-                    )}>
-                      {i + 1}
-                    </div>
+                  <Panel key={cr.headline + i} className="p-3 flex items-center gap-3">
+                    <span className="w-6 text-center text-[13px] font-semibold text-ink-muted tabular-nums shrink-0">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium text-ink truncate">{cr.headline}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <Badge variant="secondary" className="text-[9px] capitalize">{cr.platform}</Badge>
-                        <Badge variant="secondary" className="text-[9px] capitalize">{cr.type}</Badge>
+                        <Badge variant="secondary" className="text-[11px] capitalize">{cr.platform}</Badge>
+                        <Badge variant="secondary" className="text-[11px] capitalize">{cr.type}</Badge>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 shrink-0">
                       <div className="text-right">
-                        <p className="text-[10px] text-ink-muted">Conv.</p>
-                        <p className="text-[13px] font-bold text-ink tabular-nums">{cr.conversions}</p>
+                        <p className="text-[11px] text-ink-muted">Conv.</p>
+                        <p className="text-[13px] font-semibold text-ink tabular-nums">{cr.conversions}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] text-ink-muted">CPA</p>
+                        <p className="text-[11px] text-ink-muted">CPA</p>
                         <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(cr.cpa)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] text-ink-muted">CTR</p>
+                        <p className="text-[11px] text-ink-muted">CTR</p>
                         <p className="text-[13px] font-semibold text-ink tabular-nums">{cr.ctr}%</p>
                       </div>
                     </div>
-                  </div>
+                  </Panel>
                 ))}
               </div>
             </div>
@@ -793,8 +701,8 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
           {/* Fatigued Creatives */}
           {data.creatives.fatiguedCreatives.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Creative Fatigue Alert
+              <p className="text-[12px] font-medium text-ink-muted mb-2.5 flex items-center gap-1.5">
+                <BiError className="w-3.5 h-3.5 text-amber-600" /> Creative fatigue alert
               </p>
               <div className="space-y-2">
                 {data.creatives.fatiguedCreatives.map((f, i) => (
@@ -802,21 +710,21 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium text-ink truncate">{f.headline}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <Badge variant="secondary" className="text-[9px] capitalize">{f.platform}</Badge>
-                        <span className="text-[10px] text-amber-600 font-medium">{f.daysRunning} days running</span>
+                        <Badge variant="secondary" className="text-[11px] capitalize">{f.platform}</Badge>
+                        <span className="text-[11px] text-amber-600 font-medium">{f.daysRunning} days running</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 shrink-0">
                       <div className="text-right">
-                        <p className="text-[10px] text-ink-muted">Fatigue</p>
-                        <p className="text-[13px] font-bold text-amber-600 tabular-nums">{f.fatigueScore.toFixed(0)}</p>
+                        <p className="text-[11px] text-ink-muted">Fatigue</p>
+                        <p className="text-[13px] font-semibold text-amber-600 tabular-nums">{f.fatigueScore.toFixed(0)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] text-ink-muted">CTR</p>
+                        <p className="text-[11px] text-ink-muted">CTR</p>
                         <p className="text-[13px] font-semibold text-ink tabular-nums">{f.ctr}%</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] text-ink-muted">CPA</p>
+                        <p className="text-[11px] text-ink-muted">CPA</p>
                         <p className="text-[13px] font-semibold text-ink tabular-nums">${f.cpa}</p>
                       </div>
                     </div>
@@ -831,25 +739,23 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
       {/* Budget Optimizer */}
       {data.optimizer && data.optimizer.platforms.length > 0 && (
         <section>
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-cyan-500 to-blue-400 flex items-center justify-center text-white shrink-0">
-              <PieChart className="w-4 h-4" />
-            </div>
-            <h3 className="text-[15px] font-semibold text-ink">Budget Optimization</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <BiSliderAlt className="w-4 h-4 text-ink-muted shrink-0" />
+            <h3 className="text-[15px] font-semibold text-ink">Budget optimization</h3>
           </div>
           <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.optimizer}</p>
 
           {/* Allocation comparison */}
-          <div className="bg-white rounded-xl border border-hairline p-5 mb-4">
+          <Panel className="p-5 mb-4">
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Current Allocation</p>
+                <p className="text-[12px] font-medium text-ink-muted mb-3">Current allocation</p>
                 <div className="space-y-2">
                   {data.optimizer.platforms.map((p) => (
                     <div key={`cur-${p.platform}`}>
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] || "#888" }} />
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT }} />
                           <span className="text-[12px] font-medium text-ink capitalize">{p.platform}</span>
                         </div>
                         <span className="text-[12px] font-semibold text-ink tabular-nums">{p.currentAllocation}%</span>
@@ -857,7 +763,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                       <div className="h-2 bg-canvas-soft rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full"
-                          style={{ width: `${p.currentAllocation}%`, backgroundColor: PLATFORM_COLORS[p.platform] || "#888", opacity: 0.7 }}
+                          style={{ width: `${p.currentAllocation}%`, backgroundColor: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT, opacity: 0.7 }}
                         />
                       </div>
                     </div>
@@ -865,7 +771,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                 </div>
               </div>
               <div>
-                <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Recommended Allocation</p>
+                <p className="text-[12px] font-medium text-ink-muted mb-3">Recommended allocation</p>
                 <div className="space-y-2">
                   {data.optimizer.platforms.map((p) => {
                     const recommended = data.optimizer.recommendedAllocation[p.platform] ?? p.currentAllocation;
@@ -874,13 +780,13 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                       <div key={`rec-${p.platform}`}>
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] || "#888" }} />
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT }} />
                             <span className="text-[12px] font-medium text-ink capitalize">{p.platform}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className="text-[12px] font-semibold text-ink tabular-nums">{recommended.toFixed(1)}%</span>
                             {diff !== 0 && (
-                              <span className={cn("text-[10px] font-medium", diff > 0 ? "text-emerald-600" : "text-red-500")}>
+                              <span className={cn("text-[11px] font-medium", diff > 0 ? "text-emerald-600" : "text-red-500")}>
                                 {diff > 0 ? "+" : ""}{diff.toFixed(1)}%
                               </span>
                             )}
@@ -889,7 +795,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                         <div className="h-2 bg-canvas-soft rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full"
-                            style={{ width: `${recommended}%`, backgroundColor: PLATFORM_COLORS[p.platform] || "#888" }}
+                            style={{ width: `${recommended}%`, backgroundColor: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT }}
                           />
                         </div>
                       </div>
@@ -898,22 +804,17 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                 </div>
               </div>
             </div>
-          </div>
+          </Panel>
 
           {/* Platform Efficiency Scores */}
-          <div className="bg-white rounded-xl border border-hairline p-4 mb-4">
-            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-3">Channel Efficiency Ranking</p>
+          <Panel className="p-4 mb-4">
+            <p className="text-[12px] font-medium text-ink-muted mb-3">Channel efficiency ranking</p>
             <div className="space-y-2.5">
               {data.optimizer.platforms.map((p, i) => {
                 const color = getScoreColor(p.efficiencyScore);
                 return (
                   <div key={p.platform} className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold text-white shrink-0",
-                      i === 0 ? "bg-cyan-500" : i === 1 ? "bg-cyan-400" : "bg-cyan-300"
-                    )}>
-                      {i + 1}
-                    </div>
+                    <span className="w-6 text-center text-[13px] font-semibold text-ink-muted tabular-nums shrink-0">{i + 1}</span>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[12px] font-medium text-ink capitalize">{p.platform}</span>
@@ -925,11 +826,11 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                     </div>
                     <div className="flex items-center gap-3 shrink-0 text-right">
                       <div>
-                        <p className="text-[9px] text-ink-muted uppercase">CPA</p>
+                        <p className="text-[11px] text-ink-muted">CPA</p>
                         <p className="text-[12px] font-semibold text-ink tabular-nums">{formatCurrency(p.cpa)}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] text-ink-muted uppercase">Trend</p>
+                        <p className="text-[11px] text-ink-muted">Trend</p>
                         <p className={cn("text-[12px] font-semibold tabular-nums", p.recentCpaTrend <= 0 ? "text-emerald-600" : "text-red-500")}>
                           {p.recentCpaTrend > 0 ? "+" : ""}{p.recentCpaTrend}%
                         </p>
@@ -939,23 +840,23 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                 );
               })}
             </div>
-          </div>
+          </Panel>
 
           {/* Projected Impact */}
           {(data.optimizer.projectedImpact.additionalConversions > 0 || data.optimizer.projectedImpact.cpaReduction > 0) && (
-            <div className="bg-linear-to-r from-cyan-50 to-blue-50/50 rounded-xl p-4 border border-cyan-100">
-              <p className="text-[11px] font-semibold text-cyan-700 uppercase tracking-wider mb-2">Projected Impact of Reallocation</p>
+            <div className="rounded-xl border border-hairline bg-emerald-50/40 p-4">
+              <p className="text-[12px] font-medium text-emerald-800 mb-2">Projected impact of reallocation</p>
               <div className="flex items-center gap-6">
                 {data.optimizer.projectedImpact.additionalConversions > 0 && (
                   <div>
-                    <p className="text-lg font-bold text-cyan-700">+{data.optimizer.projectedImpact.additionalConversions}</p>
-                    <p className="text-[10px] text-cyan-600">additional conversions</p>
+                    <p className="text-lg font-semibold text-emerald-700">+{data.optimizer.projectedImpact.additionalConversions}</p>
+                    <p className="text-[11px] text-emerald-700">additional conversions</p>
                   </div>
                 )}
                 {data.optimizer.projectedImpact.cpaReduction > 0 && (
                   <div>
-                    <p className="text-lg font-bold text-cyan-700">-{data.optimizer.projectedImpact.cpaReduction}%</p>
-                    <p className="text-[10px] text-cyan-600">CPA reduction</p>
+                    <p className="text-lg font-semibold text-emerald-700">-{data.optimizer.projectedImpact.cpaReduction}%</p>
+                    <p className="text-[11px] text-emerald-700">CPA reduction</p>
                   </div>
                 )}
               </div>
@@ -966,14 +867,12 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
 
       {/* Recommendations */}
       <section>
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-amber-500 to-orange-400 flex items-center justify-center text-white shrink-0">
-            <Lightbulb className="w-4 h-4" />
-          </div>
+        <div className="flex items-center gap-2 mb-3">
+          <BiBulb className="w-4 h-4 text-primary shrink-0" />
           <h3 className="text-[15px] font-semibold text-ink">Recommendations</h3>
         </div>
-        <div className="bg-linear-to-r from-amber-50 to-orange-50/50 rounded-xl p-4 border border-amber-100">
-          <p className="text-[13px] leading-relaxed text-ink/80">{data.narratives.recommendations}</p>
+        <div className="rounded-xl border border-hairline bg-canvas-soft/50 p-4">
+          <p className="text-[13px] leading-relaxed text-ink-secondary">{data.narratives.recommendations}</p>
         </div>
       </section>
     </div>

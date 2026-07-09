@@ -6,30 +6,24 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { isAgencyRole } from "@/lib/auth/roles";
 import { useCreatives } from "@/hooks/use-metrics";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { Panel } from "@/components/ui/panel";
 import {
-  Image,
-  Video,
-  Layers,
-  AlertTriangle,
-  MessageCircle,
-  ArrowUpDown,
-  TrendingDown,
-  Sparkles,
-} from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { BiImage, BiVideo, BiCarousel, BiError, BiMessageRounded, BiSort, BiTrendingDown, BiSolidMagicWand } from "react-icons/bi";
 import { CreativeGenerator } from "@/components/dashboard/creative-generator";
+import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
 import type { AdCreativeRow, Platform, CreativeStatus } from "@/lib/types/database";
 
-const PLATFORM_DOTS: Record<Platform, string> = {
-  google: "#4285F4",
-  meta: "#0668E1",
-  tiktok: "#121212",
-};
-
 const CREATIVE_TYPE_ICONS: Record<string, React.ReactNode> = {
-  image: <Image className="w-3 h-3" />,
-  video: <Video className="w-3 h-3" />,
-  carousel: <Layers className="w-3 h-3" />,
+  image: <BiImage className="w-3 h-3" />,
+  video: <BiVideo className="w-3 h-3" />,
+  carousel: <BiCarousel className="w-3 h-3" />,
 };
 
 const STATUS_STYLES: Record<CreativeStatus, { bg: string; text: string; label: string }> = {
@@ -53,13 +47,13 @@ function FatigueBar({ daysRunning }: { daysRunning: number }) {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-hairline rounded-full overflow-hidden">
         <div
           className={cn("h-full rounded-full transition-all", color)}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-[10px] text-ink-muted tabular-nums whitespace-nowrap">
+      <span className="text-[11px] text-ink-muted tabular-nums whitespace-nowrap">
         {daysRunning}d
       </span>
     </div>
@@ -79,7 +73,7 @@ function SummaryCards({ creatives }: { creatives: AdCreativeRow[] }) {
   const fatiguedCount = creatives.filter((c) => c.status === "fatigued").length;
 
   const cards = [
-    { label: "Total Creatives", value: String(total), sub: null },
+    { label: "Total creatives", value: String(total), sub: null },
     { label: "Avg CTR", value: `${avgCtr.toFixed(2)}%`, sub: null },
     { label: "Avg CPA", value: `$${avgCpa.toFixed(2)}`, sub: null },
     {
@@ -93,14 +87,14 @@ function SummaryCards({ creatives }: { creatives: AdCreativeRow[] }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {cards.map((card) => (
-        <div
+        <Panel
           key={card.label}
           className={cn(
-            "bg-white rounded-xl border border-hairline p-4",
+            "p-4",
             "warn" in card && card.warn && "border-amber-200",
           )}
         >
-          <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">
+          <p className="text-[12px] font-medium text-ink-muted">
             {card.label}
           </p>
           <p
@@ -112,9 +106,9 @@ function SummaryCards({ creatives }: { creatives: AdCreativeRow[] }) {
             {card.value}
           </p>
           {card.sub && (
-            <p className="text-[10px] text-amber-500 mt-0.5">{card.sub}</p>
+            <p className="text-[11px] text-amber-700 mt-0.5">{card.sub}</p>
           )}
-        </div>
+        </Panel>
       ))}
     </div>
   );
@@ -131,9 +125,9 @@ function CreativeCard({
   const typeIcon = CREATIVE_TYPE_ICONS[creative.creative_type];
 
   return (
-    <div className="bg-white rounded-xl border border-hairline overflow-hidden group hover:shadow-md transition-shadow duration-200">
+    <Panel className="overflow-hidden group hover:shadow-md transition-shadow duration-200">
       {/* Thumbnail */}
-      <div className="relative aspect-[4/3] bg-gray-50 overflow-hidden">
+      <div className="relative aspect-[4/3] bg-canvas-soft overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={creative.thumbnail_url}
@@ -141,11 +135,11 @@ function CreativeCard({
           className="w-full h-full object-cover"
           loading="lazy"
         />
-        <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-medium backdrop-blur-sm">
+        <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-ink/80 text-white text-[11px] font-medium">
           {typeIcon}
           <span className="capitalize">{creative.creative_type}</span>
         </div>
-        <div className={cn("absolute top-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-medium", status.bg, status.text)}>
+        <div className={cn("absolute top-2 right-2 px-1.5 py-0.5 rounded text-[11px] font-medium", status.bg, status.text)}>
           {status.label}
         </div>
       </div>
@@ -166,7 +160,7 @@ function CreativeCard({
         <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
           <span
             className="w-2 h-2 rounded-full shrink-0"
-            style={{ backgroundColor: PLATFORM_DOTS[creative.platform] }}
+            style={{ backgroundColor: PLATFORM_COLORS[creative.platform] }}
           />
           <span className="capitalize">{creative.platform}</span>
         </div>
@@ -182,9 +176,9 @@ function CreativeCard({
         {/* Fatigue bar */}
         {Number(creative.days_running) > 14 && (
           <div>
-            <p className="text-[10px] text-ink-muted mb-0.5 flex items-center gap-1">
+            <p className="text-[11px] text-ink-muted mb-0.5 flex items-center gap-1">
               {creative.status === "fatigued" && (
-                <AlertTriangle className="w-2.5 h-2.5 text-amber-500" />
+                <BiError className="w-2.5 h-2.5 text-amber-500" />
               )}
               Creative age
             </p>
@@ -200,18 +194,18 @@ function CreativeCard({
           }}
           className="flex items-center gap-1.5 w-full px-2.5 py-1.5 rounded-md text-[11px] font-medium text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
         >
-          <MessageCircle className="w-3 h-3" />
+          <BiMessageRounded className="w-3 h-3" />
           Ask AI about this creative
         </button>
       </div>
-    </div>
+    </Panel>
   );
 }
 
 function MetricCell({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] text-ink-muted">{label}</p>
+      <p className="text-[11px] text-ink-muted">{label}</p>
       <p className="text-[12px] font-medium text-ink tabular-nums">{value}</p>
     </div>
   );
@@ -240,9 +234,9 @@ export function CreativeGallery() {
 
   if (!clientId) {
     return (
-      <div className="bg-white rounded-xl border border-hairline p-8 text-center text-ink-muted text-sm">
+      <Panel className="p-8 text-center text-ink-muted text-sm">
         Select a client to view creatives
-      </div>
+      </Panel>
     );
   }
 
@@ -285,64 +279,76 @@ export function CreativeGallery() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-ink">Creative Gallery</h2>
+          <h2 className="text-lg font-semibold text-ink">Creative gallery</h2>
           <span className="text-[11px] text-ink-muted bg-canvas-soft px-2 py-0.5 rounded-md font-medium">
             {allCreatives.length}
           </span>
           {canGenerate && (
             <button
               onClick={() => setGeneratorOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-primary hover:bg-primary/90 transition-colors shadow-sm"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              Generate Variants
+              <BiSolidMagicWand className="w-3.5 h-3.5" />
+              Generate variants
             </button>
           )}
         </div>
 
         {/* Filters */}
         <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={platformFilter}
-            onChange={(e) => setPlatformFilter(e.target.value as Platform | "")}
-            className="text-xs border border-hairline rounded-md px-2.5 py-1.5 bg-white text-ink focus:outline-none focus:ring-1 focus:ring-primary/30"
+          <Select
+            value={platformFilter || "all"}
+            onValueChange={(v) => setPlatformFilter(v === "all" ? "" : (v as Platform))}
           >
-            <option value="">All Platforms</option>
-            <option value="google">Google</option>
-            <option value="meta">Meta</option>
-            <option value="tiktok">TikTok</option>
-          </select>
+            <SelectTrigger aria-label="Filter by platform" className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All platforms</SelectItem>
+              <SelectItem value="google">Google</SelectItem>
+              <SelectItem value="meta">Meta</SelectItem>
+              <SelectItem value="tiktok">TikTok</SelectItem>
+            </SelectContent>
+          </Select>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as CreativeStatus | "")}
-            className="text-xs border border-hairline rounded-md px-2.5 py-1.5 bg-white text-ink focus:outline-none focus:ring-1 focus:ring-primary/30"
+          <Select
+            value={statusFilter || "all"}
+            onValueChange={(v) => setStatusFilter(v === "all" ? "" : (v as CreativeStatus))}
           >
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="fatigued">Fatigued</option>
-            <option value="paused">Paused</option>
-          </select>
+            <SelectTrigger aria-label="Filter by status" className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="fatigued">Fatigued</SelectItem>
+              <SelectItem value="paused">Paused</SelectItem>
+            </SelectContent>
+          </Select>
 
-          <select
+          <Select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortKey)}
-            className="text-xs border border-hairline rounded-md px-2.5 py-1.5 bg-white text-ink focus:outline-none focus:ring-1 focus:ring-primary/30"
+            onValueChange={(v) => { if (v) setSortBy(v as SortKey); }}
           >
-            <option value="spend">Sort: Spend</option>
-            <option value="ctr">Sort: CTR</option>
-            <option value="cpa">Sort: CPA</option>
-            <option value="conversions">Sort: Conversions</option>
-            <option value="impressions">Sort: Impressions</option>
-          </select>
+            <SelectTrigger aria-label="Sort creatives" className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="spend">Sort: Spend</SelectItem>
+              <SelectItem value="ctr">Sort: CTR</SelectItem>
+              <SelectItem value="cpa">Sort: CPA</SelectItem>
+              <SelectItem value="conversions">Sort: Conversions</SelectItem>
+              <SelectItem value="impressions">Sort: Impressions</SelectItem>
+            </SelectContent>
+          </Select>
 
           <button
             onClick={toggleSortOrder}
             className="flex items-center gap-1 text-xs border border-hairline rounded-md px-2 py-1.5 bg-white text-ink-muted hover:text-ink transition-colors"
             title={sortOrder === "desc" ? "Descending" : "Ascending"}
           >
-            <ArrowUpDown className="w-3 h-3" />
-            {sortOrder === "desc" ? "High-Low" : "Low-High"}
+            <BiSort className="w-3 h-3" />
+            {sortOrder === "desc" ? "High to low" : "Low to high"}
           </button>
         </div>
       </div>
@@ -353,7 +359,7 @@ export function CreativeGallery() {
       {/* Fatigue warning banner */}
       {fatiguedCreatives.length > 0 && !statusFilter && (
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <TrendingDown className="w-4 h-4 text-amber-600 shrink-0" />
+          <BiTrendingDown className="w-4 h-4 text-amber-600 shrink-0" />
           <div className="flex-1">
             <p className="text-[13px] font-medium text-amber-800">
               {fatiguedCreatives.length} creative{fatiguedCreatives.length > 1 ? "s" : ""} showing fatigue
@@ -373,15 +379,15 @@ export function CreativeGallery() {
 
       {/* Gallery grid */}
       {allCreatives.length === 0 ? (
-        <div className="bg-white rounded-xl border border-hairline p-12 text-center">
-          <Image className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
+        <Panel className="p-12 text-center">
+          <BiImage className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
           <p className="text-sm text-ink-muted">No creatives found</p>
           <p className="text-xs text-ink-muted/60 mt-1">
             {platformFilter || statusFilter
               ? "Try adjusting your filters"
               : "Seed demo data to populate creatives"}
           </p>
-        </div>
+        </Panel>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {allCreatives.map((creative) => (

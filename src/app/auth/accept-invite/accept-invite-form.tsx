@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { BiRefresh, BiCheckCircle, BiError } from "react-icons/bi";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { LogoMark } from "@/components/brand/logo";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -143,12 +144,12 @@ export function AcceptInviteForm() {
   return (
     <div className="w-full max-w-sm">
       {/* Brand */}
-      <div className="mb-8 flex flex-col items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary">
-          <Zap className="h-5 w-5 text-white" />
-        </div>
+      <div className="mb-8 flex flex-col items-center gap-4">
+        <LogoMark size={40} />
         <div className="text-center">
-          <h1 className="text-xl font-bold tracking-tight text-ink">AdPulse</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-ink">
+            Ad<span className="text-ink-secondary">Pulse</span>
+          </h1>
           <p className="mt-1 text-sm text-ink-muted">Set up your account</p>
         </div>
       </div>
@@ -156,14 +157,14 @@ export function AcceptInviteForm() {
       <div className="rounded-xl border border-hairline bg-white p-6 shadow-(--shadow-elevated)">
         {phase === "verifying" && (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <Loader2 className="h-6 w-6 animate-spin text-ink-muted" />
+            <BiRefresh className="h-6 w-6 animate-spin text-ink-muted" />
             <p className="text-sm text-ink-muted">Verifying your invite…</p>
           </div>
         )}
 
         {phase === "error" && (
           <div className="flex flex-col items-center gap-3 py-4 text-center">
-            <AlertTriangle className="h-8 w-8 text-destructive" />
+            <BiError className="h-8 w-8 text-destructive" />
             <div>
               <p className="text-sm font-medium text-ink">Invite unavailable</p>
               <p className="mt-1 text-sm text-ink-muted">{errorMessage}</p>
@@ -176,7 +177,7 @@ export function AcceptInviteForm() {
 
         {phase === "success" && (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+            <BiCheckCircle className="h-8 w-8 text-emerald-600" />
             <div>
               <p className="text-sm font-medium text-ink">You&apos;re all set</p>
               <p className="mt-1 text-sm text-ink-muted">Taking you to your workspace…</p>
@@ -240,7 +241,7 @@ export function AcceptInviteForm() {
             <Button type="submit" size="lg" className="w-full" disabled={submitting}>
               {submitting ? (
                 <>
-                  <Loader2 className="animate-spin" />
+                  <BiRefresh className="animate-spin" />
                   Setting password…
                 </>
               ) : (

@@ -12,11 +12,20 @@ import {
   useDeleteReportSchedule,
   useSendReportNow,
 } from "@/hooks/use-metrics";
+import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -25,17 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import {
-  FileText,
-  Clock,
-  Plus,
-  Trash2,
-  Send,
-  X,
-  Calendar,
-  Loader2,
-  Mail,
-} from "lucide-react";
+import { BiFile, BiTime, BiPlus, BiTrash, BiSend, BiX, BiCalendar, BiRefresh, BiEnvelope, BiPencil } from "react-icons/bi";
 import { format, parseISO } from "date-fns";
 import type { ReportScheduleRow, ReportScheduleInsert, ScheduleFrequency, DateRangeType } from "@/lib/types/database";
 
@@ -143,24 +142,23 @@ function ScheduleForm({
   const showDayOfMonth = form.frequency === "monthly" || form.frequency === "quarterly";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-2xl border border-hairline shadow-xl w-full max-w-[560px] max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-hairline">
-          <h2 className="text-[15px] font-semibold text-ink">
-            {initial ? "Edit Schedule" : "Schedule New Report"}
-          </h2>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink"><X className="w-4 h-4" /></button>
-        </div>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {initial ? "Edit schedule" : "Schedule new report"}
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="max-h-[80vh] overflow-y-auto space-y-4">
           <div>
-            <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Schedule Name</label>
+            <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Schedule name</label>
             <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Weekly Client Report" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Frequency</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Frequency</label>
               <Select value={form.frequency} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, frequency: v as ScheduleFrequency })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -169,14 +167,14 @@ function ScheduleForm({
               </Select>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Time of Day</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Time of day</label>
               <Input type="time" value={form.time_of_day} onChange={(e) => setForm((f) => ({ ...f, time_of_day: e.target.value }))} className="h-9" />
             </div>
           </div>
 
           {showDayOfWeek && (
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Day of Week</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Day of week</label>
               <Select value={String(form.day_of_week ?? 1)} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, day_of_week: parseInt(v) })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -188,7 +186,7 @@ function ScheduleForm({
 
           {showDayOfMonth && (
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Day of Month</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Day of month</label>
               <Input
                 type="number"
                 min={1}
@@ -203,7 +201,7 @@ function ScheduleForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Report Date Range</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Report date range</label>
               <Select value={form.date_range_type} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, date_range_type: v as DateRangeType })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -213,19 +211,19 @@ function ScheduleForm({
             </div>
             {form.date_range_type === "custom" && (
               <div>
-                <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Custom Days Back</label>
+                <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Custom days back</label>
                 <Input type="number" min={1} value={form.custom_days ?? 30} onChange={(e) => setForm((f) => ({ ...f, custom_days: parseInt(e.target.value) || 30 }))} className="h-9" />
               </div>
             )}
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Recipients</label>
+            <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Recipients</label>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {form.recipients.map((email) => (
                 <span key={email} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas-soft text-[12px] text-ink">
                   {email}
-                  <button onClick={() => removeEmail(email)} className="text-ink-muted hover:text-ink"><X className="w-3 h-3" /></button>
+                  <button onClick={() => removeEmail(email)} className="text-ink-muted hover:text-ink"><BiX className="w-3 h-3" /></button>
                 </span>
               ))}
             </div>
@@ -242,13 +240,13 @@ function ScheduleForm({
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Email Subject</label>
+            <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Email subject</label>
             <Input value={form.subject_template} onChange={(e) => setForm((f) => ({ ...f, subject_template: e.target.value }))} />
             <p className="text-[11px] text-ink-muted mt-1">Use {"{{clientName}}"} and {"{{dateRange}}"} as placeholders</p>
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Email Message (optional)</label>
+            <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Email message (optional)</label>
             <Textarea
               value={form.message_template}
               onChange={(e) => setForm((f) => ({ ...f, message_template: e.target.value }))}
@@ -274,15 +272,15 @@ function ScheduleForm({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-hairline">
+        <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
           <Button size="sm" onClick={handleSubmit} disabled={isBusy || !form.name || form.recipients.length === 0}>
-            {isBusy ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
-            {initial ? "Save Changes" : "Create Schedule"}
+            {isBusy ? <BiRefresh className="w-4 h-4 animate-spin mr-1.5" /> : null}
+            {initial ? "Save changes" : "Create schedule"}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -321,7 +319,7 @@ export function ReportsView() {
               tab === "reports" ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
             )}
           >
-            Generated Reports
+            Generated reports
           </button>
           <button
             onClick={() => setTab("schedules")}
@@ -329,7 +327,7 @@ export function ReportsView() {
               tab === "schedules" ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
             )}
           >
-            Scheduled Deliveries
+            Scheduled deliveries
           </button>
         </div>
       )}
@@ -339,15 +337,15 @@ export function ReportsView() {
           {reportsLoading && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
           {!reportsLoading && (!reports || reports.length === 0) && (
             <div className="text-center py-12">
-              <FileText className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
+              <BiFile className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
               <p className="text-[13px] text-ink-muted">No reports generated yet.</p>
               <p className="text-[12px] text-ink-muted mt-1">Use the Export Report button on the dashboard to generate one.</p>
             </div>
           )}
           {reports?.map((report) => (
-            <div key={report.id} className="bg-white rounded-xl border border-hairline p-4 flex items-center gap-4">
+            <Panel key={report.id} className="p-4 flex items-center gap-4">
               <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <FileText className="w-4 h-4 text-primary" />
+                <BiFile className="w-4 h-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="text-[14px] font-medium text-ink truncate">{report.title}</h4>
@@ -356,7 +354,7 @@ export function ReportsView() {
                   {" "}&middot;{" "}Generated {format(parseISO(report.created_at), "MMM d, yyyy")}
                 </p>
               </div>
-            </div>
+            </Panel>
           ))}
         </div>
       )}
@@ -366,7 +364,7 @@ export function ReportsView() {
           <div className="flex items-center justify-between">
             <p className="text-[13px] text-ink-muted">{schedules?.length || 0} schedule{schedules?.length !== 1 ? "s" : ""}</p>
             <Button size="sm" onClick={() => { setEditingSchedule(undefined); setShowForm(true); }} className="gap-1.5">
-              <Plus className="w-3.5 h-3.5" /> Schedule New Report
+              <BiPlus className="w-3.5 h-3.5" /> Schedule new report
             </Button>
           </div>
 
@@ -374,23 +372,23 @@ export function ReportsView() {
 
           {!schedulesLoading && (!schedules || schedules.length === 0) && (
             <div className="text-center py-12">
-              <Clock className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
+              <BiTime className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
               <p className="text-[13px] text-ink-muted">No scheduled deliveries yet.</p>
               <p className="text-[12px] text-ink-muted mt-1">Set up automated report emails for your clients.</p>
             </div>
           )}
 
           {schedules?.map((schedule) => (
-            <div key={schedule.id} className="bg-white rounded-xl border border-hairline p-4 flex items-start gap-4">
+            <Panel key={schedule.id} className="p-4 flex items-start gap-4">
               <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                <Mail className="w-4 h-4 text-primary" />
+                <BiEnvelope className="w-4 h-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h4 className="text-[14px] font-medium text-ink truncate">{schedule.name}</h4>
-                  <Badge variant="outline" className="text-[10px] capitalize">{schedule.frequency}</Badge>
-                  {!schedule.enabled && <Badge variant="outline" className="text-[10px]">Paused</Badge>}
-                  {schedule.require_approval && <Badge variant="outline" className="text-[10px] border-amber-200 text-amber-700">Approval Required</Badge>}
+                  <Badge variant="outline" className="text-[11px] capitalize">{schedule.frequency}</Badge>
+                  {!schedule.enabled && <Badge variant="outline" className="text-[11px]">Paused</Badge>}
+                  {schedule.require_approval && <Badge variant="outline" className="text-[11px] border-amber-200 text-amber-700">Approval Required</Badge>}
                 </div>
                 <p className="text-[12px] text-ink-muted">
                   {DATE_RANGE_LABELS[schedule.date_range_type]}
@@ -403,7 +401,7 @@ export function ReportsView() {
                     : ""}
                 </p>
                 <p className="text-[11px] text-ink-muted mt-0.5">
-                  <Calendar className="w-3 h-3 inline mr-1" />
+                  <BiCalendar className="w-3 h-3 inline mr-1" />
                   {schedule.recipients.length} recipient{schedule.recipients.length !== 1 ? "s" : ""}
                   {schedule.last_sent_at
                     ? ` · Last sent ${format(parseISO(schedule.last_sent_at), "MMM d, HH:mm")}`
@@ -411,12 +409,11 @@ export function ReportsView() {
                 </p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  onClick={() => updateSchedule.mutate({ id: schedule.id, enabled: !schedule.enabled })}
-                  className={cn("w-8 h-5 rounded-full transition-colors relative", schedule.enabled ? "bg-primary" : "bg-ink-muted/30")}
-                >
-                  <span className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform", schedule.enabled ? "left-3.5" : "left-0.5")} />
-                </button>
+                <Switch
+                  checked={schedule.enabled}
+                  onCheckedChange={(v) => updateSchedule.mutate({ id: schedule.id, enabled: v })}
+                  aria-label={schedule.enabled ? `Disable schedule ${schedule.name}` : `Enable schedule ${schedule.name}`}
+                />
                 <Button
                   variant="outline"
                   size="icon"
@@ -424,28 +421,31 @@ export function ReportsView() {
                   onClick={() => sendNow.mutate(schedule.id)}
                   disabled={sendNow.isPending}
                   title="Send now"
+                  aria-label={`Send ${schedule.name} now`}
                 >
-                  {sendNow.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  {sendNow.isPending ? <BiRefresh className="w-3.5 h-3.5 animate-spin" /> : <BiSend className="w-3.5 h-3.5" />}
                 </Button>
                 <button
                   onClick={() => { setEditingSchedule(schedule); setShowForm(true); }}
+                  aria-label={`Edit schedule ${schedule.name}`}
                   className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-canvas-soft"
                 >
-                  <FileText className="w-3.5 h-3.5" />
+                  <BiPencil className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => deleteSchedule.mutate(schedule.id)}
+                  aria-label={`Delete schedule ${schedule.name}`}
                   className="p-1.5 rounded-md text-ink-muted hover:text-red-600 hover:bg-red-50"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <BiTrash className="w-3.5 h-3.5" />
                 </button>
               </div>
-            </div>
+            </Panel>
           ))}
 
           {sendNow.isSuccess && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[13px] text-emerald-800">
-              Report sent successfully (mock). Check server console for email details.
+              Report sent to the scheduled recipients.
             </div>
           )}
         </div>

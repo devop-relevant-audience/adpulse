@@ -13,9 +13,18 @@ import {
   useCampaigns,
 } from "@/hooks/use-metrics";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -32,18 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import {
-  Bell,
-  Plus,
-  Trash2,
-  Play,
-  X,
-  AlertTriangle,
-  Info,
-  Check,
-  Eye,
-  Loader2,
-} from "lucide-react";
+import { BiBell, BiPlus, BiTrash, BiPlay, BiX, BiError, BiInfoCircle, BiCheck, BiPencil, BiRefresh } from "react-icons/bi";
 import { format, parseISO } from "date-fns";
 import type { AlertRuleRow, AlertRuleInsert, AlertSeverity, Platform } from "@/lib/types/database";
 
@@ -67,7 +65,7 @@ function SeverityBadge({ severity }: { severity: AlertSeverity }) {
   const c = SEVERITY_CONFIG[severity];
   return (
     <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border", c.bg, c.border, c.text)}>
-      {severity === "info" ? <Info className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+      {severity === "info" ? <BiInfoCircle className="w-3 h-3" /> : <BiError className="w-3 h-3" />}
       {severity}
     </span>
   );
@@ -149,24 +147,23 @@ function AlertRuleForm({
   const isBusy = createRule.isPending || updateRule.isPending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-2xl border border-hairline shadow-xl w-full max-w-[560px] max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-hairline">
-          <h2 className="text-[15px] font-semibold text-ink">
-            {initial ? "Edit Alert Rule" : "Create Alert Rule"}
-          </h2>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink"><X className="w-4 h-4" /></button>
-        </div>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {initial ? "Edit alert rule" : "Create alert rule"}
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="max-h-[80vh] overflow-y-auto space-y-4">
           <div>
-            <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Name</label>
+            <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Name</label>
             <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. High CPA Alert" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Metric</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Metric</label>
               <Select value={form.metric} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, metric: v as typeof f.metric })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -175,7 +172,7 @@ function AlertRuleForm({
               </Select>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Condition</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Condition</label>
               <Select value={form.condition} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, condition: v as typeof f.condition })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -187,11 +184,11 @@ function AlertRuleForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Threshold</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Threshold</label>
               <Input type="number" step="any" value={form.threshold} onChange={(e) => setForm((f) => ({ ...f, threshold: parseFloat(e.target.value) || 0 }))} />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Evaluation Window</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Evaluation window</label>
               <Select value={form.evaluation_window} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, evaluation_window: v as "daily" | "weekly" })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -204,7 +201,7 @@ function AlertRuleForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Platform (optional)</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Platform (optional)</label>
               <Select value={form.platform || "all"} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, platform: v === "all" ? null : v as Platform })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -216,7 +213,7 @@ function AlertRuleForm({
               </Select>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Campaign (optional)</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Campaign (optional)</label>
               <Select value={form.campaign_id || "all"} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, campaign_id: v === "all" ? null : v })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -229,7 +226,7 @@ function AlertRuleForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Severity</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Severity</label>
               <Select value={form.severity} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, severity: v as AlertSeverity })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -240,7 +237,7 @@ function AlertRuleForm({
               </Select>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Delivery Frequency</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Delivery frequency</label>
               <Select value={form.frequency} onValueChange={(v) => { if (v) setForm((f) => ({ ...f, frequency: v as typeof f.frequency })); }}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -253,12 +250,12 @@ function AlertRuleForm({
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Recipients</label>
+            <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Recipients</label>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {form.recipients.map((email) => (
                 <span key={email} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-canvas-soft text-[12px] text-ink">
                   {email}
-                  <button onClick={() => removeEmail(email)} className="text-ink-muted hover:text-ink"><X className="w-3 h-3" /></button>
+                  <button onClick={() => removeEmail(email)} className="text-ink-muted hover:text-ink"><BiX className="w-3 h-3" /></button>
                 </span>
               ))}
             </div>
@@ -306,15 +303,15 @@ function AlertRuleForm({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-hairline">
+        <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
           <Button size="sm" onClick={handleSubmit} disabled={isBusy || !form.name || form.recipients.length === 0}>
-            {isBusy ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
-            {initial ? "Save Changes" : "Create Rule"}
+            {isBusy ? <BiRefresh className="w-4 h-4 animate-spin mr-1.5" /> : null}
+            {initial ? "Save changes" : "Create rule"}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -332,13 +329,13 @@ function RulesTab({ clientId }: { clientId: string }) {
       <div className="flex items-center justify-between">
         <p className="text-[13px] text-ink-muted">{rules?.length || 0} rule{rules?.length !== 1 ? "s" : ""} configured</p>
         <Button size="sm" onClick={() => { setEditingRule(undefined); setShowForm(true); }} className="gap-1.5">
-          <Plus className="w-3.5 h-3.5" /> Create Rule
+          <BiPlus className="w-3.5 h-3.5" /> Create rule
         </Button>
       </div>
 
       {(!rules || rules.length === 0) && (
         <div className="text-center py-12">
-          <Bell className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
+          <BiBell className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
           <p className="text-[13px] text-ink-muted">No alert rules configured yet.</p>
           <p className="text-[12px] text-ink-muted mt-1">Create a rule to get notified when metrics change.</p>
         </div>
@@ -346,12 +343,12 @@ function RulesTab({ clientId }: { clientId: string }) {
 
       <div className="space-y-3">
         {rules?.map((rule) => (
-          <div key={rule.id} className="bg-white rounded-xl border border-hairline p-4 flex items-start gap-4">
+          <Panel key={rule.id} className="p-4 flex items-start gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1.5">
                 <h4 className="text-[14px] font-medium text-ink truncate">{rule.name}</h4>
                 <SeverityBadge severity={rule.severity} />
-                {!rule.enabled && <Badge variant="outline" className="text-[10px]">Paused</Badge>}
+                {!rule.enabled && <Badge variant="outline" className="text-[11px]">Paused</Badge>}
               </div>
               <p className="text-[12px] text-ink-muted">
                 {METRIC_LABELS[rule.metric]} {CONDITION_LABELS[rule.condition]} {rule.threshold}
@@ -365,20 +362,19 @@ function RulesTab({ clientId }: { clientId: string }) {
               </p>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => updateRule.mutate({ id: rule.id, enabled: !rule.enabled })}
-                className={cn("w-8 h-5 rounded-full transition-colors relative", rule.enabled ? "bg-primary" : "bg-ink-muted/30")}
-              >
-                <span className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform", rule.enabled ? "left-3.5" : "left-0.5")} />
-              </button>
-              <button onClick={() => { setEditingRule(rule); setShowForm(true); }} className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-canvas-soft">
-                <Eye className="w-3.5 h-3.5" />
+              <Switch
+                checked={rule.enabled}
+                onCheckedChange={(checked) => updateRule.mutate({ id: rule.id, enabled: checked })}
+                aria-label={rule.enabled ? "Disable rule" : "Enable rule"}
+              />
+              <button onClick={() => { setEditingRule(rule); setShowForm(true); }} title="Edit rule" className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-canvas-soft">
+                <BiPencil className="w-3.5 h-3.5" />
               </button>
               <button onClick={() => deleteRule.mutate(rule.id)} className="p-1.5 rounded-md text-ink-muted hover:text-red-600 hover:bg-red-50">
-                <Trash2 className="w-3.5 h-3.5" />
+                <BiTrash className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
+          </Panel>
         ))}
       </div>
 
@@ -417,8 +413,8 @@ function HistoryTab({ clientId }: { clientId: string }) {
           disabled={evaluate.isPending}
           className="gap-1.5"
         >
-          {evaluate.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-          Run Check Now
+          {evaluate.isPending ? <BiRefresh className="w-3.5 h-3.5 animate-spin" /> : <BiPlay className="w-3.5 h-3.5" />}
+          Run check now
         </Button>
       </div>
 
@@ -434,22 +430,22 @@ function HistoryTab({ clientId }: { clientId: string }) {
 
       {(!history || history.length === 0) ? (
         <div className="text-center py-12">
-          <Check className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+          <BiCheck className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
           <p className="text-[13px] text-ink-muted">No alerts have been triggered yet.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-hairline overflow-hidden">
+        <Panel className="overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-hairline">
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9 pl-4">Date</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9">Rule</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9">Metric</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9 text-right">Actual</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9 text-right">Threshold</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9">Severity</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9">Status</TableHead>
-                <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9 pr-4">Actions</TableHead>
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9 pl-4">Date</TableHead>
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9">Rule</TableHead>
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9">Metric</TableHead>
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9 text-right">Actual</TableHead>
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9 text-right">Threshold</TableHead>
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9">Severity</TableHead>
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9">Status</TableHead>
+                <TableHead className="text-[11px] font-medium text-ink-muted h-9 pr-4">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -501,7 +497,7 @@ function HistoryTab({ clientId }: { clientId: string }) {
               })}
             </TableBody>
           </Table>
-        </div>
+        </Panel>
       )}
     </div>
   );
@@ -523,7 +519,7 @@ export function AlertsManager() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold tracking-[-0.5px] text-ink">Alerts & Notifications</h1>
+        <h1 className="text-xl font-semibold tracking-[-0.5px] text-ink">Alerts & notifications</h1>
         <p className="text-[13px] text-ink-muted mt-0.5">Configure metric-based alerts with email notifications</p>
       </div>
 

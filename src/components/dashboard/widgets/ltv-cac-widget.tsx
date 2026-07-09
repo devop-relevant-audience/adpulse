@@ -1,23 +1,19 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { BiError } from "react-icons/bi";
 import { useCohortAnalysis } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/dashboard/metrics";
+import { PLATFORM_LABELS_SHORT as PLATFORM_LABELS } from "@/lib/dashboard/chart-theme";
 import type { Platform } from "@/lib/types/database";
 
+// Neutral chart series ramp (blue, teal, violet) — distinguishable and on-brand.
 const PLATFORM_COLORS: Record<Platform, string> = {
-  google: "#4285f4",
-  meta: "#0866ff",
-  tiktok: "#121212",
-};
-
-const PLATFORM_LABELS: Record<Platform, string> = {
-  google: "Google",
-  meta: "Meta",
-  tiktok: "TikTok",
+  google: "var(--chart-1)",
+  meta: "var(--chart-2)",
+  tiktok: "var(--chart-3)",
 };
 
 export function LtvCacWidget() {
@@ -72,8 +68,8 @@ export function LtvCacWidget() {
         </div>
       ))}
       {leadersDiffer && (
-        <p className="flex items-start gap-1 text-[10px] text-amber-600 mt-1 leading-snug">
-          <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
+        <p className="flex items-start gap-1 text-[11px] text-amber-600 mt-1 leading-snug">
+          <BiError className="w-3 h-3 shrink-0 mt-px" />
           {PLATFORM_LABELS[byDay0Roas[0].platform]} leads Day-0 ROAS, but {PLATFORM_LABELS[byLtvCac[0].platform]} wins LTV:CAC.
         </p>
       )}

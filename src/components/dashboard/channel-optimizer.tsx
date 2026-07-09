@@ -4,8 +4,17 @@ import { useState } from "react";
 import { useOptimizer } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/ui/panel";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Lightbulb, TrendingUp, TrendingDown } from "lucide-react";
+import { BiRightArrowAlt, BiBulb, BiTrendingUp, BiTrendingDown, BiError } from "react-icons/bi";
 import {
   ResponsiveContainer,
   PieChart,
@@ -13,20 +22,14 @@ import {
   Cell,
   Tooltip,
 } from "recharts";
+import {
+  PLATFORM_COLORS,
+  PLATFORM_LABELS,
+  STATUS_COLORS,
+  CHART_GRID,
+} from "@/lib/dashboard/chart-theme";
 import type { Platform } from "@/lib/types/database";
 import type { ChannelMixAnalysis } from "@/lib/data/optimizer";
-
-const PLATFORM_COLORS: Record<Platform, string> = {
-  google: "#4285F4",
-  meta: "#0668E1",
-  tiktok: "#121212",
-};
-
-const PLATFORM_LABELS: Record<Platform, string> = {
-  google: "Google Ads",
-  meta: "Meta Ads",
-  tiktok: "TikTok Ads",
-};
 
 function formatCurrency(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
@@ -42,7 +45,7 @@ function AllocationDonut({ title, allocation, totalSpend }: {
   const data = Object.entries(allocation).map(([platform, pct]) => ({
     name: PLATFORM_LABELS[platform as Platform] || platform,
     value: pct,
-    color: PLATFORM_COLORS[platform as Platform] || "#888",
+    color: PLATFORM_COLORS[platform as Platform] || "#6b6b6b",
     spend: (pct / 100) * totalSpend,
   }));
 
@@ -68,7 +71,7 @@ function AllocationDonut({ title, allocation, totalSpend }: {
           <Tooltip
             contentStyle={{
               backgroundColor: "white",
-              border: "1px solid #e6e6e6",
+              border: `1px solid ${CHART_GRID}`,
               borderRadius: "10px",
               fontSize: "12px",
               boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
@@ -92,65 +95,63 @@ function AllocationDonut({ title, allocation, totalSpend }: {
 
 function EfficiencyTable({ analysis }: { analysis: ChannelMixAnalysis }) {
   return (
-    <div className="bg-white rounded-xl border border-hairline overflow-hidden">
+    <Panel className="overflow-hidden">
       <div className="px-5 py-3 border-b border-hairline">
-        <h3 className="text-sm font-semibold text-ink">Platform Efficiency Comparison</h3>
+        <h3 className="text-sm font-semibold text-ink">Platform efficiency comparison</h3>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-hairline bg-canvas-soft/50">
-              <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider">Platform</th>
-              <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">Spend</th>
-              <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">Conversions</th>
-              <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">CPA</th>
-              <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">CTR</th>
-              <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">CPA Trend</th>
-              <th className="px-5 py-2.5 text-[11px] font-medium text-ink-muted uppercase tracking-wider text-right">Efficiency</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-hairline/60">
-            {analysis.platforms.map((p) => (
-              <tr key={p.platform} className="hover:bg-canvas-soft/30 transition-colors">
-                <td className="px-5 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] }} />
-                    <span className="text-[13px] font-medium text-ink">{PLATFORM_LABELS[p.platform]}</span>
-                    <span className="text-[10px] text-ink-faint">#{p.efficiencyRank}</span>
+      <Table>
+        <TableHeader>
+          <TableRow className="border-hairline bg-canvas-soft/50 hover:bg-canvas-soft/50">
+            <TableHead className="px-5 h-9 text-[11px] font-medium text-ink-muted">Platform</TableHead>
+            <TableHead className="px-5 h-9 text-[11px] font-medium text-ink-muted text-right">Spend</TableHead>
+            <TableHead className="px-5 h-9 text-[11px] font-medium text-ink-muted text-right">Conversions</TableHead>
+            <TableHead className="px-5 h-9 text-[11px] font-medium text-ink-muted text-right">CPA</TableHead>
+            <TableHead className="px-5 h-9 text-[11px] font-medium text-ink-muted text-right">CTR</TableHead>
+            <TableHead className="px-5 h-9 text-[11px] font-medium text-ink-muted text-right">CPA trend</TableHead>
+            <TableHead className="px-5 h-9 text-[11px] font-medium text-ink-muted text-right">Efficiency</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {analysis.platforms.map((p) => (
+            <TableRow key={p.platform} className="border-hairline/60 hover:bg-canvas-soft/30">
+              <TableCell className="px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] }} />
+                  <span className="text-[13px] font-medium text-ink">{PLATFORM_LABELS[p.platform]}</span>
+                  <span className="text-[11px] text-ink-muted">#{p.efficiencyRank}</span>
+                </div>
+              </TableCell>
+              <TableCell className="px-5 py-3 text-right text-[13px] tabular-nums text-ink">{formatCurrency(p.totalSpend)}</TableCell>
+              <TableCell className="px-5 py-3 text-right text-[13px] tabular-nums text-ink">{p.totalConversions.toLocaleString()}</TableCell>
+              <TableCell className="px-5 py-3 text-right text-[13px] tabular-nums font-medium text-ink">{formatCurrency(p.cpa)}</TableCell>
+              <TableCell className="px-5 py-3 text-right text-[13px] tabular-nums text-ink">{p.ctr}%</TableCell>
+              <TableCell className="px-5 py-3 text-right">
+                <span className={cn("inline-flex items-center justify-end gap-0.5 text-[12px] font-medium tabular-nums",
+                  p.recentCpaTrend <= 0 ? "text-emerald-600" : "text-red-500"
+                )}>
+                  {p.recentCpaTrend <= 0 ? <BiTrendingDown className="w-3 h-3" /> : <BiTrendingUp className="w-3 h-3" />}
+                  {Math.abs(p.recentCpaTrend)}%
+                </span>
+              </TableCell>
+              <TableCell className="px-5 py-3 text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <div className="w-16 h-1.5 bg-canvas-soft rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${p.efficiencyScore}%`,
+                        backgroundColor: p.efficiencyScore >= 60 ? STATUS_COLORS.good : p.efficiencyScore >= 40 ? STATUS_COLORS.warning : STATUS_COLORS.bad,
+                      }}
+                    />
                   </div>
-                </td>
-                <td className="px-5 py-3 text-right text-[13px] tabular-nums text-ink">{formatCurrency(p.totalSpend)}</td>
-                <td className="px-5 py-3 text-right text-[13px] tabular-nums text-ink">{p.totalConversions.toLocaleString()}</td>
-                <td className="px-5 py-3 text-right text-[13px] tabular-nums font-medium text-ink">{formatCurrency(p.cpa)}</td>
-                <td className="px-5 py-3 text-right text-[13px] tabular-nums text-ink">{p.ctr}%</td>
-                <td className="px-5 py-3 text-right">
-                  <span className={cn("inline-flex items-center gap-0.5 text-[12px] font-medium tabular-nums",
-                    p.recentCpaTrend <= 0 ? "text-emerald-600" : "text-red-500"
-                  )}>
-                    {p.recentCpaTrend <= 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
-                    {Math.abs(p.recentCpaTrend)}%
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <div className="w-16 h-1.5 bg-canvas-soft rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${p.efficiencyScore}%`,
-                          backgroundColor: p.efficiencyScore >= 60 ? "#16a34a" : p.efficiencyScore >= 40 ? "#f59e0b" : "#ef4444",
-                        }}
-                      />
-                    </div>
-                    <span className="text-[12px] font-medium text-ink tabular-nums w-8 text-right">{p.efficiencyScore}</span>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                  <span className="text-[12px] font-medium text-ink tabular-nums w-8 text-right">{p.efficiencyScore}</span>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Panel>
   );
 }
 
@@ -159,7 +160,7 @@ function RecommendationCard({ analysis, reallocationMultiplier }: { analysis: Ch
     return (
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
         <div className="flex items-start gap-3">
-          <Lightbulb className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <BiBulb className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <div>
             <p className="text-[13px] font-medium text-emerald-800">Your channel mix is well-balanced</p>
             <p className="text-[12px] text-emerald-700 mt-1">All platforms are performing within similar efficiency ranges. No reallocation recommended.</p>
@@ -176,13 +177,13 @@ function RecommendationCard({ analysis, reallocationMultiplier }: { analysis: Ch
         return (
           <div key={i} className="bg-blue-50 border border-blue-200 rounded-xl p-5">
             <div className="flex items-start gap-3">
-              <Lightbulb className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+              <BiBulb className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[13px] font-medium text-blue-800">
                     Shift {Math.round(suggestion.shiftPercent * reallocationMultiplier)}% from {PLATFORM_LABELS[suggestion.from]} to {PLATFORM_LABELS[suggestion.to]}
                   </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-blue-500" />
+                  <BiRightArrowAlt className="w-3.5 h-3.5 text-blue-600" />
                   <span className="text-[12px] text-blue-600 font-medium">
                     +{adjustedConversions} conversions
                   </span>
@@ -202,7 +203,7 @@ export function ChannelOptimizer() {
   const dateRange = useAppStore((s) => s.dateRange);
   const [reallocationMultiplier, setReallocationMultiplier] = useState(1);
 
-  const { data: analysis, isLoading } = useOptimizer({
+  const { data: analysis, isLoading, error } = useOptimizer({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -214,6 +215,17 @@ export function ChannelOptimizer() {
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-[200px] w-full" />
         <Skeleton className="h-[200px] w-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center">
+        <BiError className="w-8 h-8 text-destructive mx-auto mb-2" />
+        <p className="text-[13px] text-destructive">
+          {error instanceof Error ? error.message : "Failed to load optimizer data"}
+        </p>
       </div>
     );
   }
@@ -231,36 +243,36 @@ export function ChannelOptimizer() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-ink">Channel Mix Optimizer</h2>
+        <h2 className="text-lg font-semibold text-ink">Channel mix optimizer</h2>
         <p className="text-sm text-ink-muted mt-0.5">
           Analyze cross-platform efficiency and optimize budget allocation based on marginal CPA.
         </p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl border border-hairline p-4">
-          <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">Total Spend</p>
+        <Panel className="p-4">
+          <p className="text-[12px] font-medium text-ink-muted">Total spend</p>
           <p className="text-xl font-semibold text-ink mt-1 tabular-nums">{formatCurrency(analysis.totalSpend)}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-hairline p-4">
-          <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">Total Conversions</p>
+        </Panel>
+        <Panel className="p-4">
+          <p className="text-[12px] font-medium text-ink-muted">Total conversions</p>
           <p className="text-xl font-semibold text-ink mt-1 tabular-nums">{analysis.totalConversions.toLocaleString()}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-hairline p-4">
-          <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">Projected +Conversions</p>
+        </Panel>
+        <Panel className="p-4">
+          <p className="text-[12px] font-medium text-ink-muted">Projected +conversions</p>
           <p className="text-xl font-semibold text-emerald-600 mt-1 tabular-nums">
             +{Math.round(analysis.projectedImpact.additionalConversions * reallocationMultiplier)}
           </p>
-        </div>
-        <div className="bg-white rounded-xl border border-hairline p-4">
-          <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">CPA Reduction</p>
+        </Panel>
+        <Panel className="p-4">
+          <p className="text-[12px] font-medium text-ink-muted">CPA reduction</p>
           <p className="text-xl font-semibold text-emerald-600 mt-1 tabular-nums">
             -{(analysis.projectedImpact.cpaReduction * reallocationMultiplier).toFixed(1)}%
           </p>
-        </div>
+        </Panel>
       </div>
 
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AllocationDonut title="Current Allocation" allocation={analysis.currentAllocation} totalSpend={analysis.totalSpend} />
           <AllocationDonut title="Recommended Allocation" allocation={adjustedAllocation} totalSpend={analysis.totalSpend} />
@@ -268,26 +280,28 @@ export function ChannelOptimizer() {
 
         {analysis.suggestions.length > 0 && (
           <div className="mt-6 pt-4 border-t border-hairline">
-            <label className="text-[12px] font-medium text-ink-muted">
-              Reallocation Intensity
+            <label htmlFor="reallocation-intensity" className="text-[12px] font-medium text-ink-muted">
+              Reallocation intensity
             </label>
             <div className="flex items-center gap-3 mt-2">
-              <span className="text-[11px] text-ink-faint">Conservative</span>
+              <span className="text-[11px] text-ink-muted">Conservative</span>
               <input
+                id="reallocation-intensity"
                 type="range"
                 min={0.25}
                 max={2}
                 step={0.25}
                 value={reallocationMultiplier}
                 onChange={(e) => setReallocationMultiplier(Number(e.target.value))}
+                aria-valuetext={`${reallocationMultiplier}x`}
                 className="flex-1 accent-primary h-1.5"
               />
-              <span className="text-[11px] text-ink-faint">Aggressive</span>
+              <span className="text-[11px] text-ink-muted">Aggressive</span>
               <span className="text-[12px] font-medium text-ink tabular-nums w-10 text-right">{reallocationMultiplier}x</span>
             </div>
           </div>
         )}
-      </div>
+      </Panel>
 
       <RecommendationCard analysis={analysis} reallocationMultiplier={reallocationMultiplier} />
       <EfficiencyTable analysis={analysis} />

@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getMetrics, compareMetrics, listCampaigns, getDailyTrend, detectAnomalies, getFunnelData, getCreatives, getCreativeFatigueAnalysis } from '@/lib/data/queries';
 import { getChannelMixAnalysis } from '@/lib/data/optimizer';
 import { calculateHealthScore } from '@/lib/data/health-score';
+import { addMessage, createSession, getMessages, getSession } from '@/lib/data/chat';
+import type { ChatSessionSummary } from '@/lib/data/chat';
 import { requireClientAccess, requireUser } from '@/lib/auth/guard';
 import type { Platform } from '@/lib/types/database';
 import { format, subDays } from 'date-fns';
@@ -13,8 +15,8 @@ const MODEL = 'google/gemini-3-flash-preview';
 const chatSchema = z.object({
 	message: z.string().min(1),
 	clientId: z.string().uuid(),
+	sessionId: z.string().uuid().optional(),
 	referenceContext: z.any().nullable().optional(),
-	history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string() })).optional(),
 });
 
 const TOOL_DEFINITIONS = [
@@ -380,15 +382,35 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: 'Invalid request', details: parsed.error.flatten() }, { status: 400 });
 		}
 
-		const { message, clientId, referenceContext, history } = parsed.data;
+		const { message, clientId, sessionId, referenceContext } = parsed.data;
 
 		// Authorize the target client BEFORE opening the SSE stream.
 		const access = await requireClientAccess(gate.ctx, clientId);
 		if (!access.ok) return access.response;
 
+		// Resolve the chat session. The session is bound to the already-authorized
+		// clientId so a caller cannot reach another client's session.
+		let session: ChatSessionSummary;
+		if (sessionId) {
+			const existing = await getSession(sessionId);
+			if (!existing || existing.clientId !== clientId) {
+				return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+			}
+			session = existing;
+		} else {
+			const title = message.trim().slice(0, 80) || 'New chat';
+			session = await createSession(clientId, title);
+		}
+
+		// Load prior conversation history from the DB BEFORE inserting the new
+		// message, then persist the incoming user message.
+		const prior = await getMessages(session.id);
+		const history = prior.map((m) => ({ role: m.role, content: m.content }));
+		await addMessage(session.id, 'user', message, referenceContext ?? null);
+
 		const apiKey = process.env.OPENROUTER_API_KEY;
 		if (!apiKey) {
-			return handleWithoutAI(message, clientId, referenceContext);
+			return handleWithoutAI(session.id, clientId, referenceContext);
 		}
 
 		const today = format(new Date(), 'yyyy-MM-dd');
@@ -432,12 +454,16 @@ IMPORTANT RULES:
 		if (!streamResponse.ok) {
 			const errorText = await streamResponse.text();
 			console.error('OpenRouter streaming error:', errorText);
-			return handleWithoutAI(message, clientId, referenceContext);
+			return handleWithoutAI(session.id, clientId, referenceContext);
 		}
 
+		const resolvedSessionId = session.id;
 		const encoder = new TextEncoder();
 		const stream = new ReadableStream({
 			async start(controller) {
+				// Tell the client its (possibly newly created) session id first.
+				controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sessionId: resolvedSessionId })}\n\n`));
+
 				const reader = streamResponse.body?.getReader();
 				if (!reader) {
 					controller.close();
@@ -446,6 +472,22 @@ IMPORTANT RULES:
 
 				const decoder = new TextDecoder();
 				let buffer = '';
+				let assistantText = '';
+				let persisted = false;
+
+				// Persist the assistant reply exactly once. Runs from the finally
+				// block so partial output survives a client abort or stream error.
+				const persistAssistant = async () => {
+					if (persisted) return;
+					persisted = true;
+					if (assistantText.length > 0) {
+						try {
+							await addMessage(resolvedSessionId, 'assistant', assistantText, null);
+						} catch (error) {
+							console.error('Failed to persist assistant message:', error);
+						}
+					}
+				};
 
 				try {
 					while (true) {
@@ -467,6 +509,7 @@ IMPORTANT RULES:
 									const parsed = JSON.parse(data);
 									const content = parsed.choices?.[0]?.delta?.content;
 									if (content) {
+										assistantText += content;
 										controller.enqueue(
 											encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
 										);
@@ -480,6 +523,7 @@ IMPORTANT RULES:
 				} catch (error) {
 					console.error('Stream processing error:', error);
 				} finally {
+					await persistAssistant();
 					controller.close();
 				}
 			},
@@ -499,7 +543,8 @@ IMPORTANT RULES:
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function handleWithoutAI(_message: string, clientId: string, _referenceContext: unknown) {
+async function handleWithoutAI(sessionId: string, clientId: string, _referenceContext: unknown) {
+	let responseText: string;
 	try {
 		const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -522,12 +567,12 @@ async function handleWithoutAI(_message: string, clientId: string, _referenceCon
 		response += `- Conversions: ${comparison.current.totalConversions.toLocaleString()} (${comparison.deltas.totalConversions.percentage > 0 ? '+' : ''}${comparison.deltas.totalConversions.percentage}%)\n`;
 		response += `\n${campaigns.length} active campaigns across ${new Set(campaigns.map((c) => c.platform)).size} platforms.\n`;
 		response += `\n_Note: For full AI analysis, add an OpenRouter API key to your environment._`;
-
-		return NextResponse.json({ response });
+		responseText = response;
 	} catch {
-		return NextResponse.json({
-			response:
-				"I'm running in basic mode (no API key configured). Please add OPENROUTER_API_KEY to your environment for full AI capabilities.",
-		});
+		responseText =
+			"I'm running in basic mode (no API key configured). Please add OPENROUTER_API_KEY to your environment for full AI capabilities.";
 	}
+
+	await addMessage(sessionId, 'assistant', responseText, null);
+	return NextResponse.json({ response: responseText, sessionId });
 }

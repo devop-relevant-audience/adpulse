@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { GripVertical, Settings2, X, AlertTriangle } from "lucide-react";
+import { BiMove, BiCog, BiX, BiError } from "react-icons/bi";
 import { cn } from "@/lib/utils";
+import { Panel } from "@/components/ui/panel";
 import { getWidget } from "@/lib/dashboard/widget-registry";
 import type { WidgetInstance } from "@/lib/dashboard/types";
 
@@ -22,7 +23,7 @@ class WidgetErrorBoundary extends React.Component<
       return (
         <div className="h-full grid place-items-center text-center px-3">
           <div className="text-ink-muted">
-            <AlertTriangle className="w-4 h-4 mx-auto mb-1 text-amber-500" />
+            <BiError className="w-4 h-4 mx-auto mb-1 text-amber-500" />
             <p className="text-xs">This widget failed to render</p>
           </div>
         </div>
@@ -44,9 +45,9 @@ export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: Widge
 
   if (!def) {
     return (
-      <div className="h-full w-full bg-white rounded-xl border border-hairline grid place-items-center text-xs text-ink-muted">
+      <Panel className="h-full w-full grid place-items-center text-xs text-ink-muted">
         Unknown widget: {instance.type}
-      </div>
+      </Panel>
     );
   }
 
@@ -54,15 +55,15 @@ export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: Widge
   const Render = def.Render;
 
   return (
-    <div className="h-full w-full bg-white rounded-xl border border-hairline flex flex-col overflow-hidden group/widget">
+    <Panel className="h-full w-full flex flex-col overflow-hidden group/widget">
       <div
         className={cn(
           "flex items-center gap-1.5 px-3 h-8 shrink-0 border-b border-hairline/60",
           editMode && "widget-drag-handle cursor-grab active:cursor-grabbing bg-canvas-soft/40"
         )}
       >
-        {editMode && <GripVertical className="w-3.5 h-3.5 text-ink-faint shrink-0" />}
-        <span className="text-[11px] font-semibold text-ink-secondary uppercase tracking-wide truncate flex-1">
+        {editMode && <BiMove className="w-3.5 h-3.5 text-ink-faint shrink-0" />}
+        <span className="text-[12px] font-medium text-ink-secondary truncate flex-1">
           {title}
         </span>
         {editMode && (
@@ -74,7 +75,7 @@ export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: Widge
                 onClick={() => onConfigure(instance.i)}
                 className="p-1 rounded hover:bg-canvas-soft text-ink-muted hover:text-ink transition-colors"
               >
-                <Settings2 className="w-3.5 h-3.5" />
+                <BiCog className="w-3.5 h-3.5" />
               </button>
             )}
             <button
@@ -83,7 +84,7 @@ export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: Widge
               onClick={() => onRemove(instance.i)}
               className="p-1 rounded hover:bg-red-50 text-ink-muted hover:text-red-600 transition-colors"
             >
-              <X className="w-3.5 h-3.5" />
+              <BiX className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -93,6 +94,6 @@ export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: Widge
           <Render config={instance.config} instanceId={instance.i} />
         </WidgetErrorBoundary>
       </div>
-    </div>
+    </Panel>
   );
 }

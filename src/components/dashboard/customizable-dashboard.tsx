@@ -11,7 +11,7 @@ import {
   type Layout,
   type ResponsiveLayouts,
 } from "react-grid-layout";
-import { Pencil, Plus, Check, X, RotateCcw, LayoutDashboard } from "lucide-react";
+import { BiPencil, BiPlus, BiCheck, BiX, BiReset, BiGridAlt } from "react-icons/bi";
 import { useAppStore } from "@/store/app-store";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { isAgencyRole } from "@/lib/auth/roles";
@@ -110,7 +110,7 @@ export function CustomizableDashboard() {
     <div className={cn(editMode && "dash-editing")}>
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
-          <LayoutDashboard className="w-4 h-4 text-ink-muted shrink-0" />
+          <BiGridAlt className="w-4 h-4 text-ink-muted shrink-0" />
           <h2 className="text-lg font-semibold text-ink truncate">{config.name}</h2>
           {editMode && (
             <span className="text-[11px] font-medium text-primary bg-primary/8 px-2 py-0.5 rounded-full">
@@ -123,7 +123,7 @@ export function CustomizableDashboard() {
           {editMode ? (
             <>
               <Button variant="outline" size="sm" onClick={() => setCatalogOpen(true)}>
-                <Plus className="w-4 h-4" /> Add widget
+                <BiPlus className="w-4 h-4" /> Add widget
               </Button>
               <Button
                 variant="ghost"
@@ -131,19 +131,26 @@ export function CustomizableDashboard() {
                 onClick={() => beginEdit(buildDefaultDashboard(config.name))}
                 title="Reset to the default layout"
               >
-                <RotateCcw className="w-4 h-4" /> Reset
+                <BiReset className="w-4 h-4" /> Reset
               </Button>
               <Button variant="ghost" size="sm" onClick={cancelEdit}>
-                <X className="w-4 h-4" /> Cancel
+                <BiX className="w-4 h-4" /> Cancel
               </Button>
               <Button size="sm" onClick={handleSave} disabled={!isDirty || saveDashboard.isPending}>
-                <Check className="w-4 h-4" /> {saveDashboard.isPending ? "Saving…" : "Save"}
+                <BiCheck className="w-4 h-4" /> {saveDashboard.isPending ? "Saving…" : "Save"}
               </Button>
+              {saveDashboard.isError && (
+                <span role="alert" className="text-[12px] text-destructive">
+                  {saveDashboard.error instanceof Error
+                    ? saveDashboard.error.message
+                    : "Failed to save layout"}
+                </span>
+              )}
             </>
           ) : (
             canEdit && (
               <Button variant="outline" size="sm" onClick={() => beginEdit(config)}>
-                <Pencil className="w-4 h-4" /> Customize
+                <BiPencil className="w-4 h-4" /> Customize
               </Button>
             )
           )}
@@ -152,7 +159,7 @@ export function CustomizableDashboard() {
 
       {config.widgets.length === 0 ? (
         <div className="border border-dashed border-hairline rounded-xl py-16 grid place-items-center text-center">
-          <LayoutDashboard className="w-8 h-8 text-ink-faint mb-3" />
+          <BiGridAlt className="w-8 h-8 text-ink-faint mb-3" />
           <p className="text-sm font-medium text-ink">This dashboard is empty</p>
           <p className="text-xs text-ink-muted mt-1 mb-4">
             {editMode
@@ -163,12 +170,12 @@ export function CustomizableDashboard() {
           </p>
           {editMode ? (
             <Button size="sm" onClick={() => setCatalogOpen(true)}>
-              <Plus className="w-4 h-4" /> Add widget
+              <BiPlus className="w-4 h-4" /> Add widget
             </Button>
           ) : (
             canEdit && (
               <Button size="sm" onClick={() => beginEdit(config)}>
-                <Pencil className="w-4 h-4" /> Customize
+                <BiPencil className="w-4 h-4" /> Customize
               </Button>
             )
           )}

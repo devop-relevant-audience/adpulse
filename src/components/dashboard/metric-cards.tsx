@@ -1,10 +1,11 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { Panel } from "@/components/ui/panel";
 import { useComparison } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { format, subDays } from "date-fns";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { BiTrendingUp, BiTrendingDown, BiMessageRounded } from "react-icons/bi";
 import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
@@ -28,9 +29,11 @@ function MetricCard({ label, value, delta, previousValue, invertDeltaColor = fal
   return (
     <button
       onClick={onAskAi}
-      className="bg-white rounded-xl border border-hairline p-5 text-left hover:border-primary/30 hover:shadow-sm transition-all group cursor-pointer"
+      aria-label={`Ask the AI assistant about ${label}`}
+      className="relative bg-white rounded-xl border border-hairline p-5 text-left hover:border-primary/30 transition-colors group cursor-pointer"
     >
-      <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider mb-2">{label}</p>
+      <BiMessageRounded className="absolute top-3 right-3 w-3.5 h-3.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+      <p className="text-[12px] font-medium text-ink-muted mb-2">{label}</p>
       <p className="text-xl font-semibold tracking-tight text-ink leading-none truncate">{value}</p>
       <div className="flex items-center gap-2 mt-2.5">
         {!isNeutral && (
@@ -40,7 +43,7 @@ function MetricCard({ label, value, delta, previousValue, invertDeltaColor = fal
               isGood ? "text-emerald-700 bg-emerald-50" : "text-red-600 bg-red-50"
             )}
           >
-            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            {isPositive ? <BiTrendingUp className="w-3 h-3" /> : <BiTrendingDown className="w-3 h-3" />}
             {Math.abs(delta).toFixed(1)}%
           </span>
         )}
@@ -90,11 +93,11 @@ export function MetricCards() {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border border-hairline p-5 space-y-2">
+          <Panel key={i} className="p-5 space-y-2">
             <Skeleton className="h-3 w-14" />
             <Skeleton className="h-6 w-20" />
             <Skeleton className="h-3 w-16" />
-          </div>
+          </Panel>
         ))}
       </div>
     );

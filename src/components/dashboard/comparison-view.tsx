@@ -27,15 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import {
-  TrendingUp,
-  TrendingDown,
-  Loader2,
-  Minus,
-  ArrowUp,
-  ArrowDown,
-  MessageSquare,
-} from "lucide-react";
+import { BiTrendingUp, BiTrendingDown, BiRefresh, BiMinus, BiUpArrowAlt, BiDownArrowAlt, BiMessageRounded } from "react-icons/bi";
 import { format, subDays, parseISO } from "date-fns";
 import {
   ResponsiveContainer,
@@ -46,12 +38,12 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from "recharts";
 import ReactMarkdown from "react-markdown";
 import type { Platform } from "@/lib/types/database";
-
-const CAMPAIGN_COLORS = ["#0075de", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6"];
+import { Panel } from "@/components/ui/panel";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { SERIES_PALETTE, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/dashboard/chart-theme";
 
 function formatNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -66,13 +58,13 @@ function formatCurrency(n: number): string {
 }
 
 function DeltaBadge({ value, invert = false }: { value: number; invert?: boolean }) {
-  if (value === 0) return <span className="inline-flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded text-ink-muted bg-canvas-soft"><Minus className="w-3 h-3" />0%</span>;
+  if (value === 0) return <span className="inline-flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded text-ink-muted bg-canvas-soft"><BiMinus className="w-3 h-3" />0%</span>;
   const isGood = invert ? value < 0 : value >= 0;
   return (
     <span className={cn("inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded",
       isGood ? "text-emerald-700 bg-emerald-50" : "text-red-600 bg-red-50"
     )}>
-      {value >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+      {value >= 0 ? <BiUpArrowAlt className="w-3 h-3" /> : <BiDownArrowAlt className="w-3 h-3" />}
       {value >= 0 ? "+" : ""}{value.toFixed(1)}%
     </span>
   );
@@ -166,8 +158,8 @@ function CampaignSelector({
 
   return (
     <div className="min-w-0">
-      <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
-        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CAMPAIGN_COLORS[index] }} />
+      <label className="text-[12px] font-medium text-ink-muted flex items-center gap-1.5 mb-1.5">
+        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: SERIES_PALETTE[index] }} />
         Campaign {index + 1}
       </label>
       <Select value={selected || "none"} onValueChange={(v) => { if (v && v !== "none") onChange(v); }}>
@@ -201,32 +193,30 @@ function OverallWinnerBanner({ campaigns }: { campaigns: CampaignComparisonData[
   const winCount = wins[overallWinnerId] || 0;
 
   return (
-    <div className="bg-white rounded-xl border border-hairline overflow-hidden">
-      <div className="flex items-stretch">
-        <div className="w-1.5 shrink-0" style={{ backgroundColor: CAMPAIGN_COLORS[winnerIdx] }} />
-        <div className="flex-1 px-5 py-4 flex items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="text-[15px] font-semibold text-ink">{winner.campaignName}</h3>
-              <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Overall Winner</span>
-            </div>
-            <p className="text-[12px] text-ink-muted">
-              Leads in {winCount} of {totalMetrics} key metrics &middot; {winner.platform} &middot; {formatCurrency(winner.avgCpa)} CPA &middot; {winner.avgCtr}% CTR &middot; {formatNum(winner.totalConversions)} conversions
-            </p>
+    <div className="bg-emerald-50/40 rounded-xl border border-hairline overflow-hidden">
+      <div className="flex items-center gap-4 px-5 py-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: SERIES_PALETTE[winnerIdx] }} />
+            <h3 className="text-[15px] font-semibold text-ink">{winner.campaignName}</h3>
+            <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Overall winner</span>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {campaigns.map((c, idx) => {
-              const w = wins[c.campaignId] || 0;
-              const isWinner = c.campaignId === overallWinnerId;
-              return (
-                <div key={c.campaignId} className={cn("flex flex-col items-center rounded-lg px-3 py-2 min-w-[56px]", isWinner ? "bg-emerald-50" : "bg-canvas-soft")}>
-                  <span className="w-2 h-2 rounded-full mb-1" style={{ backgroundColor: CAMPAIGN_COLORS[idx] }} />
-                  <span className={cn("text-[15px] font-bold tabular-nums", isWinner ? "text-emerald-700" : "text-ink-muted")}>{w}</span>
-                  <span className="text-[9px] text-ink-muted uppercase font-medium">wins</span>
-                </div>
-              );
-            })}
-          </div>
+          <p className="text-[12px] text-ink-muted">
+            Leads in {winCount} of {totalMetrics} key metrics &middot; {winner.platform} &middot; {formatCurrency(winner.avgCpa)} CPA &middot; {winner.avgCtr}% CTR &middot; {formatNum(winner.totalConversions)} conversions
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {campaigns.map((c, idx) => {
+            const w = wins[c.campaignId] || 0;
+            const isWinner = c.campaignId === overallWinnerId;
+            return (
+              <div key={c.campaignId} className={cn("flex flex-col items-center rounded-lg px-3 py-2 min-w-[56px]", isWinner ? "bg-emerald-50" : "bg-canvas-soft")}>
+                <span className="w-2 h-2 rounded-full mb-1" style={{ backgroundColor: SERIES_PALETTE[idx] }} />
+                <span className={cn("text-[15px] font-bold tabular-nums", isWinner ? "text-emerald-700" : "text-ink-muted")}>{w}</span>
+                <span className="text-[11px] text-ink-muted">wins</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -297,16 +287,16 @@ function AISummaryCard({ campaigns }: { campaigns: CampaignComparisonData[] }) {
   const displayText = aiText || fallbackText;
 
   return (
-    <div className="bg-white rounded-xl border border-hairline overflow-hidden">
+    <Panel className="overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-hairline">
-        <h3 className="text-sm font-semibold text-ink">Comparison Insight</h3>
+        <h3 className="text-sm font-semibold text-ink">Comparison insight</h3>
         <button
           onClick={fetchAISummary}
           disabled={loading}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
         >
-          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          {aiText ? "Regenerate AI Analysis" : "Get AI Analysis"}
+          {loading && <BiRefresh className="w-3.5 h-3.5 animate-spin" />}
+          {aiText ? "Regenerate AI analysis" : "Get AI analysis"}
         </button>
       </div>
       <div className="px-5 py-4">
@@ -318,7 +308,7 @@ function AISummaryCard({ campaigns }: { campaigns: CampaignComparisonData[] }) {
           </div>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -382,11 +372,11 @@ function CampaignComparisonTab({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-hairline p-5">
+      <Panel className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-ink">Select Campaigns to Compare</h3>
+          <h3 className="text-sm font-semibold text-ink">Select campaigns to compare</h3>
           {selectedIds.length < 4 && campaigns && campaigns.length > selectedIds.length && (
-            <button onClick={addCampaign} className="text-[12px] text-primary font-medium hover:underline">+ Add campaign</button>
+            <button onClick={addCampaign} className="text-[12px] text-primary font-medium hover:underline rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50">+ Add campaign</button>
           )}
         </div>
         <div className={cn("grid gap-3", selectedIds.length <= 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4")}>
@@ -400,7 +390,7 @@ function CampaignComparisonTab({ clientId }: { clientId: string }) {
             />
           ))}
         </div>
-      </div>
+      </Panel>
 
       {compLoading && activeIds.length >= 2 && <Skeleton className="h-[400px] w-full" />}
 
@@ -410,15 +400,15 @@ function CampaignComparisonTab({ clientId }: { clientId: string }) {
 
           <AISummaryCard campaigns={campaignList} />
 
-          <div className="bg-white rounded-xl border border-hairline">
+          <Panel>
             <div className="flex items-center justify-between px-5 pt-4 pb-2">
-              <h3 className="text-sm font-semibold text-ink">Daily Trends</h3>
+              <h3 className="text-sm font-semibold text-ink">Daily trends</h3>
               <div className="flex gap-1">
                 {(["spend", "conversions"] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => setChartMetric(m)}
-                    className={cn("px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors",
+                    className={cn("px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                       chartMetric === m ? "bg-primary/10 text-primary" : "text-ink-muted hover:text-ink hover:bg-canvas-soft"
                     )}
                   >
@@ -427,20 +417,24 @@ function CampaignComparisonTab({ clientId }: { clientId: string }) {
                 ))}
               </div>
             </div>
-            <div className="px-2 pb-3">
+            <div
+              className="px-2 pb-3"
+              role="img"
+              aria-label={`Daily ${chartMetric} trends comparing the selected campaigns`}
+            >
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={chartData}>
                   <defs>
                     {campaignList.map((c, idx) => (
                       <linearGradient key={`grad-${c.campaignId}`} id={`cmp-grad-${c.campaignId}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={CAMPAIGN_COLORS[idx]} stopOpacity={idx === 0 ? 0.1 : 0} />
-                        <stop offset="100%" stopColor={CAMPAIGN_COLORS[idx]} stopOpacity={0} />
+                        <stop offset="0%" stopColor={SERIES_PALETTE[idx]} stopOpacity={idx === 0 ? 0.1 : 0} />
+                        <stop offset="100%" stopColor={SERIES_PALETTE[idx]} stopOpacity={0} />
                       </linearGradient>
                     ))}
                   </defs>
-                  <CartesianGrid stroke="#f0f0f0" strokeDasharray="none" vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={(v) => format(parseISO(v), "MMM d")} tick={{ fontSize: 10, fill: "#a39e98" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#a39e98" }} axisLine={false} tickLine={false} width={55} tickFormatter={(v) => chartMetric === "spend" ? formatCurrency(v) : formatNum(v)} />
+                  <CartesianGrid stroke={CHART_GRID} strokeDasharray="none" vertical={false} />
+                  <XAxis dataKey="date" tickFormatter={(v) => format(parseISO(v), "MMM d")} tick={{ fontSize: 10, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} width={55} tickFormatter={(v) => chartMetric === "spend" ? formatCurrency(v) : formatNum(v)} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "white", border: "1px solid #e6e6e6", borderRadius: "10px", fontSize: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "10px 14px" }}
                     labelFormatter={(v) => format(parseISO(v as string), "EEE, MMM d, yyyy")}
@@ -452,9 +446,9 @@ function CampaignComparisonTab({ clientId }: { clientId: string }) {
                   />
                   {campaignList.map((c, idx) => (
                     idx === 0 ? (
-                      <Area key={c.campaignId} type="monotone" dataKey={`${c.campaignId}_${chartMetric}`} stroke={CAMPAIGN_COLORS[idx]} strokeWidth={2} fill={`url(#cmp-grad-${c.campaignId})`} dot={false} activeDot={{ r: 4, fill: CAMPAIGN_COLORS[idx], stroke: "white", strokeWidth: 2 }} name={`${c.campaignId}_${chartMetric}`} />
+                      <Area key={c.campaignId} type="monotone" dataKey={`${c.campaignId}_${chartMetric}`} stroke={SERIES_PALETTE[idx]} strokeWidth={2} fill={`url(#cmp-grad-${c.campaignId})`} dot={false} activeDot={{ r: 4, fill: SERIES_PALETTE[idx], stroke: "white", strokeWidth: 2 }} name={`${c.campaignId}_${chartMetric}`} />
                     ) : (
-                      <Line key={c.campaignId} type="monotone" dataKey={`${c.campaignId}_${chartMetric}`} stroke={CAMPAIGN_COLORS[idx]} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: CAMPAIGN_COLORS[idx], stroke: "white", strokeWidth: 2 }} name={`${c.campaignId}_${chartMetric}`} />
+                      <Line key={c.campaignId} type="monotone" dataKey={`${c.campaignId}_${chartMetric}`} stroke={SERIES_PALETTE[idx]} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: SERIES_PALETTE[idx], stroke: "white", strokeWidth: 2 }} name={`${c.campaignId}_${chartMetric}`} />
                     )
                   ))}
                 </ComposedChart>
@@ -463,12 +457,12 @@ function CampaignComparisonTab({ clientId }: { clientId: string }) {
             <div className="flex items-center justify-center gap-4 pb-3 text-[11px]">
               {campaignList.map((c, idx) => (
                 <div key={c.campaignId} className="flex items-center gap-1.5">
-                  <span className="w-3 h-0.5 rounded" style={{ backgroundColor: CAMPAIGN_COLORS[idx] }} />
+                  <span className="w-3 h-0.5 rounded" style={{ backgroundColor: SERIES_PALETTE[idx] }} />
                   <span className="text-ink-muted">{c.campaignName}</span>
                 </div>
               ))}
             </div>
-          </div>
+          </Panel>
 
           <ComparisonTable campaigns={campaignList} />
 
@@ -507,7 +501,7 @@ function AskAICampaignButton({ campaigns }: { campaigns: CampaignComparisonData[
         onClick={handleClick}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
       >
-        <MessageSquare className="w-3.5 h-3.5" />
+        <BiMessageRounded className="w-3.5 h-3.5" />
         Ask AI about this comparison
       </button>
     </div>
@@ -534,24 +528,24 @@ function ComparisonTable({ campaigns }: { campaigns: CampaignComparisonData[] })
   }
 
   return (
-    <div className="bg-white rounded-xl border border-hairline overflow-hidden">
+    <Panel className="overflow-hidden">
       <div className="px-5 py-3.5 border-b border-hairline">
-        <h3 className="text-sm font-semibold text-ink">Metric Breakdown</h3>
+        <h3 className="text-sm font-semibold text-ink">Metric breakdown</h3>
       </div>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-hairline">
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9 pl-5 w-[100px]">Metric</TableHead>
+              <TableHead className="text-[11px] font-medium text-ink-muted h-9 pl-5 w-[100px]">Metric</TableHead>
               {campaigns.map((c, idx) => (
-                <TableHead key={c.campaignId} className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9">
+                <TableHead key={c.campaignId} className="text-[11px] font-medium text-ink-muted h-9">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CAMPAIGN_COLORS[idx] }} />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: SERIES_PALETTE[idx] }} />
                     {c.campaignName}
                   </div>
                 </TableHead>
               ))}
-              <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted h-9 pr-5 w-[90px]">Best</TableHead>
+              <TableHead className="text-[11px] font-medium text-ink-muted h-9 pr-5 w-[90px]">Best</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -573,7 +567,7 @@ function ComparisonTable({ campaigns }: { campaigns: CampaignComparisonData[] })
                         <div className="flex flex-col gap-0.5">
                           <span className={cn("text-[13px] tabular-nums", isBest ? "text-emerald-700 font-semibold" : "text-ink")}>{m.format(val)}</span>
                           {m.key !== "totalSpend" && delta !== 0 && (
-                            <span className={cn("text-[10px] tabular-nums",
+                            <span className={cn("text-[11px] tabular-nums",
                               (m.best === "high" ? delta >= 0 : delta <= 0) ? "text-emerald-600" : "text-red-500"
                             )}>
                               {delta > 0 ? "+" : ""}{delta.toFixed(1)}% vs best
@@ -585,7 +579,7 @@ function ComparisonTable({ campaigns }: { campaigns: CampaignComparisonData[] })
                   })}
                   <TableCell className="pr-5">
                     {winnerCampaign && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ backgroundColor: `${CAMPAIGN_COLORS[winnerIdx]}15`, color: CAMPAIGN_COLORS[winnerIdx] }}>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold" style={{ backgroundColor: `${SERIES_PALETTE[winnerIdx]}15`, color: SERIES_PALETTE[winnerIdx] }}>
                         {winnerCampaign.campaignName.length > 14 ? winnerCampaign.campaignName.slice(0, 14) + "…" : winnerCampaign.campaignName}
                       </span>
                     )}
@@ -596,7 +590,7 @@ function ComparisonTable({ campaigns }: { campaigns: CampaignComparisonData[] })
           </TableBody>
         </Table>
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -650,33 +644,33 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-hairline p-5">
-        <h3 className="text-sm font-semibold text-ink mb-4">Select Periods</h3>
+      <Panel className="p-5">
+        <h3 className="text-sm font-semibold text-ink mb-4">Select periods</h3>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_auto] gap-4 items-end">
           <div>
-            <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#0075de]" />Period A (Current)
+            <label className="text-[12px] font-medium text-ink-muted flex items-center gap-1.5 mb-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#0075de]" />Period A (current)
             </label>
             <div className="grid grid-cols-2 gap-2">
-              <input type="date" value={periodA.start} onChange={(e) => setPeriodA((p) => ({ ...p, start: e.target.value }))} className="h-9 px-2.5 text-[13px] border border-hairline rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" />
-              <input type="date" value={periodA.end} onChange={(e) => setPeriodA((p) => ({ ...p, end: e.target.value }))} className="h-9 px-2.5 text-[13px] border border-hairline rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" />
+              <input type="date" aria-label="Period A start date" value={periodA.start} onChange={(e) => setPeriodA((p) => ({ ...p, start: e.target.value }))} className="h-9 px-2.5 text-[13px] border border-hairline rounded-lg bg-white focus-visible:ring-3 focus-visible:ring-ring/50 focus:border-primary outline-none" />
+              <input type="date" aria-label="Period A end date" value={periodA.end} onChange={(e) => setPeriodA((p) => ({ ...p, end: e.target.value }))} className="h-9 px-2.5 text-[13px] border border-hairline rounded-lg bg-white focus-visible:ring-3 focus-visible:ring-ring/50 focus:border-primary outline-none" />
             </div>
           </div>
           <div>
-            <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#16a34a]" />Period B (Previous)
+            <label className="text-[12px] font-medium text-ink-muted flex items-center gap-1.5 mb-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#16a34a]" />Period B (previous)
             </label>
             <div className="grid grid-cols-2 gap-2">
-              <input type="date" value={periodB.start} onChange={(e) => setPeriodB((p) => ({ ...p, start: e.target.value }))} className="h-9 px-2.5 text-[13px] border border-hairline rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" />
-              <input type="date" value={periodB.end} onChange={(e) => setPeriodB((p) => ({ ...p, end: e.target.value }))} className="h-9 px-2.5 text-[13px] border border-hairline rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" />
+              <input type="date" aria-label="Period B start date" value={periodB.start} onChange={(e) => setPeriodB((p) => ({ ...p, start: e.target.value }))} className="h-9 px-2.5 text-[13px] border border-hairline rounded-lg bg-white focus-visible:ring-3 focus-visible:ring-ring/50 focus:border-primary outline-none" />
+              <input type="date" aria-label="Period B end date" value={periodB.end} onChange={(e) => setPeriodB((p) => ({ ...p, end: e.target.value }))} className="h-9 px-2.5 text-[13px] border border-hairline rounded-lg bg-white focus-visible:ring-3 focus-visible:ring-ring/50 focus:border-primary outline-none" />
             </div>
           </div>
           <div>
-            <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1.5">Platform</label>
+            <label className="text-[12px] font-medium text-ink-muted block mb-1.5">Platform</label>
             <Select value={platformFilter} onValueChange={(v) => { if (v) setPlatformFilter(v as Platform | "all"); }}>
               <SelectTrigger className="h-9 min-w-[140px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Platforms</SelectItem>
+                <SelectItem value="all">All platforms</SelectItem>
                 <SelectItem value="google">Google Ads</SelectItem>
                 <SelectItem value="meta">Meta Ads</SelectItem>
                 <SelectItem value="tiktok">TikTok Ads</SelectItem>
@@ -684,7 +678,7 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
             </Select>
           </div>
         </div>
-      </div>
+      </Panel>
 
       {isLoading && <Skeleton className="h-[400px] w-full" />}
 
@@ -695,8 +689,8 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
               const isGood = card.invert ? card.delta < 0 : card.delta > 0;
               const isNeutral = card.delta === 0;
               return (
-                <div key={card.label} className="bg-white rounded-xl border border-hairline p-4">
-                  <p className="text-[11px] font-medium text-ink-muted uppercase tracking-wider mb-2">{card.label}</p>
+                <Panel key={card.label} className="p-4">
+                  <p className="text-[12px] font-medium text-ink-muted mb-2">{card.label}</p>
                   <p className="text-xl font-semibold text-ink tabular-nums leading-none mb-1">{card.a}</p>
                   <div className="flex items-center gap-2 mt-2">
                     <DeltaBadge value={card.delta} invert={card.invert} />
@@ -706,24 +700,24 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
                     <span className="tabular-nums font-medium text-ink-secondary">{card.b}</span>
                     {!isNeutral && (
                       <span className={cn("ml-auto", isGood ? "text-emerald-600" : "text-red-500")}>
-                        {isGood ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                        {isGood ? <BiTrendingUp className="w-3.5 h-3.5" /> : <BiTrendingDown className="w-3.5 h-3.5" />}
                       </span>
                     )}
                   </div>
-                </div>
+                </Panel>
               );
             })}
           </div>
 
-          <div className="bg-white rounded-xl border border-hairline">
+          <Panel>
             <div className="flex items-center justify-between px-5 pt-4 pb-2">
-              <h3 className="text-sm font-semibold text-ink">Trend Overlay</h3>
+              <h3 className="text-sm font-semibold text-ink">Trend overlay</h3>
               <div className="flex gap-1">
                 {(["spend", "conversions"] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => setChartMetric(m)}
-                    className={cn("px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors",
+                    className={cn("px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                       chartMetric === m ? "bg-primary/10 text-primary" : "text-ink-muted hover:text-ink hover:bg-canvas-soft"
                     )}
                   >
@@ -732,7 +726,11 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
                 ))}
               </div>
             </div>
-            <div className="px-2 pb-3">
+            <div
+              className="px-2 pb-3"
+              role="img"
+              aria-label={`${chartMetric} trend overlay comparing Period A and Period B`}
+            >
               <ResponsiveContainer width="100%" height={280}>
                 <ComposedChart data={chartData}>
                   <defs>
@@ -741,11 +739,10 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
                       <stop offset="100%" stopColor="#0075de" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="#f0f0f0" strokeDasharray="none" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#a39e98" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#a39e98" }} axisLine={false} tickLine={false} width={55} tickFormatter={(v) => chartMetric === "spend" ? formatCurrency(v) : formatNum(v)} />
+                  <CartesianGrid stroke={CHART_GRID} strokeDasharray="none" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} width={55} tickFormatter={(v) => chartMetric === "spend" ? formatCurrency(v) : formatNum(v)} />
                   <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #e6e6e6", borderRadius: "10px", fontSize: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "10px 14px" }} />
-                  <Legend verticalAlign="top" height={0} wrapperStyle={{ display: "none" }} />
                   <Area type="monotone" dataKey="periodA" stroke="#0075de" strokeWidth={2} fill="url(#period-a-grad)" dot={false} activeDot={{ r: 4, fill: "#0075de", stroke: "white", strokeWidth: 2 }} name="Period A" connectNulls />
                   <Line type="monotone" dataKey="periodB" stroke="#16a34a" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 4, fill: "#16a34a", stroke: "white", strokeWidth: 2 }} name="Period B" connectNulls />
                 </ComposedChart>
@@ -755,15 +752,15 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
               <div className="flex items-center gap-1.5">
                 <span className="w-4 h-0.5 bg-[#0075de] rounded" />
                 <span className="text-ink-muted">Period A</span>
-                <span className="text-[10px] text-ink-muted/60">({format(parseISO(periodA.start), "MMM d")} – {format(parseISO(periodA.end), "MMM d")})</span>
+                <span className="text-[11px] text-ink-muted">({format(parseISO(periodA.start), "MMM d")} – {format(parseISO(periodA.end), "MMM d")})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-4 border-t-2 border-dashed border-[#16a34a]" />
                 <span className="text-ink-muted">Period B</span>
-                <span className="text-[10px] text-ink-muted/60">({format(parseISO(periodB.start), "MMM d")} – {format(parseISO(periodB.end), "MMM d")})</span>
+                <span className="text-[11px] text-ink-muted">({format(parseISO(periodB.start), "MMM d")} – {format(parseISO(periodB.end), "MMM d")})</span>
               </div>
             </div>
-          </div>
+          </Panel>
 
           <AskAIPeriodButton comparison={comparison} periodA={periodA} periodB={periodB} />
         </>
@@ -809,7 +806,7 @@ function AskAIPeriodButton({ comparison, periodA, periodB }: {
         onClick={handleClick}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
       >
-        <MessageSquare className="w-3.5 h-3.5" />
+        <BiMessageRounded className="w-3.5 h-3.5" />
         Ask AI about this comparison
       </button>
     </div>
@@ -831,26 +828,18 @@ export function ComparisonView() {
         <p className="text-[13px] text-ink-muted mt-0.5">Side-by-side campaign and period comparison</p>
       </div>
 
-      <div className="flex items-center gap-1 bg-canvas-soft rounded-lg p-1 w-fit">
-        <button
-          onClick={() => setTab("campaigns")}
-          className={cn("px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors",
-            tab === "campaigns" ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-          )}
-        >
-          Campaigns
-        </button>
-        <button
-          onClick={() => setTab("periods")}
-          className={cn("px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors",
-            tab === "periods" ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-          )}
-        >
-          Periods
-        </button>
-      </div>
-
-      {tab === "campaigns" ? <CampaignComparisonTab clientId={clientId} /> : <PeriodComparisonTab clientId={clientId} />}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "campaigns" | "periods")}>
+        <TabsList>
+          <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+          <TabsTrigger value="periods">Periods</TabsTrigger>
+        </TabsList>
+        <TabsContent value="campaigns">
+          <CampaignComparisonTab clientId={clientId} />
+        </TabsContent>
+        <TabsContent value="periods">
+          <PeriodComparisonTab clientId={clientId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Link2, Loader2, Copy, Check, Shield } from "lucide-react";
+import { BiLink, BiRefresh, BiCopy, BiCheck, BiShield } from "react-icons/bi";
 import type { ReportData } from "@/lib/report/builder";
 import { useAppStore } from "@/store/app-store";
 
@@ -63,7 +63,8 @@ export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
         const data = await res.json();
         const msg = data.error || "Failed to create share link";
         if (msg.includes("row-level security") || msg.includes("policy")) {
-          throw new Error("Database write permissions not configured. Please set SUPABASE_SERVICE_ROLE_KEY in .env.local to enable sharing.");
+          console.error("Share link creation failed — database write permissions not configured (set SUPABASE_SERVICE_ROLE_KEY):", msg);
+          throw new Error("Sharing is temporarily unavailable. Please try again later.");
         }
         throw new Error(msg);
       }
@@ -89,7 +90,7 @@ export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
       <DialogContent className="max-w-md bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Link2 className="w-4 h-4 text-primary" />
+            <BiLink className="w-4 h-4 text-primary" />
             Share Report
           </DialogTitle>
         </DialogHeader>
@@ -97,7 +98,7 @@ export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
         <div className="space-y-4">
           <div className="bg-canvas-soft/80 rounded-lg p-3">
             <p className="text-[12px] text-ink-muted">
-              <Shield className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+              <BiShield className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
               This will create a password-protected link that only shows data for{" "}
               <strong className="text-ink">{reportData.clientName}</strong>. Recipients will need the password to view.
             </p>
@@ -121,7 +122,7 @@ export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
               </div>
 
               {error && (
-                <p className="text-[12px] text-red-600">{error}</p>
+                <p role="alert" aria-live="polite" className="text-[12px] text-red-600">{error}</p>
               )}
 
               <Button
@@ -130,9 +131,9 @@ export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
                 className="w-full gap-2 bg-primary hover:bg-primary/90 text-white"
               >
                 {isCreating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <BiRefresh className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Link2 className="w-4 h-4" />
+                  <BiLink className="w-4 h-4" />
                 )}
                 {isCreating ? "Creating link..." : "Create Share Link"}
               </Button>
@@ -154,11 +155,15 @@ export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
                     variant="outline"
                     size="icon"
                     onClick={handleCopy}
+                    aria-label={copied ? "Link copied to clipboard" : "Copy share link"}
                     className="shrink-0"
                   >
-                    {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                    {copied ? <BiCheck className="w-4 h-4 text-emerald-600" /> : <BiCopy className="w-4 h-4" />}
                   </Button>
                 </div>
+                <span role="status" aria-live="polite" className="sr-only">
+                  {copied ? "Link copied to clipboard" : ""}
+                </span>
               </div>
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">

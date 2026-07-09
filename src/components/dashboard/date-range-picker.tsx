@@ -8,9 +8,9 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
-import { Calendar, X } from "lucide-react";
+import { Panel } from "@/components/ui/panel";
+import { BiCalendar, BiX } from "react-icons/bi";
 
 const PRESETS = [
   { label: "Last 7 days", id: "last-7", getRange: (today: Date) => ({ start: format(subDays(today, 7), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }) },
@@ -80,7 +80,7 @@ export function DateRangePicker() {
           onValueChange={(value) => { if (value) handlePresetChange(value); }}
         >
           <SelectTrigger className="h-8 w-auto min-w-[140px] max-w-[240px] bg-white border-hairline rounded-lg text-[13px] gap-1.5 px-3">
-            <Calendar className="w-3.5 h-3.5 text-ink-muted shrink-0" />
+            <BiCalendar className="w-3.5 h-3.5 text-ink-muted shrink-0" />
             <span className="truncate">{displayLabel}</span>
           </SelectTrigger>
           <SelectContent>
@@ -97,16 +97,16 @@ export function DateRangePicker() {
       </div>
 
       {showCustom && (
-        <div className="absolute top-full left-0 mt-2 bg-white border border-hairline rounded-xl shadow-(--shadow-elevated) p-4 z-50 w-[320px]">
+        <Panel className="absolute top-full left-0 mt-2 shadow-(--shadow-elevated) p-4 z-50 w-[320px]">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-[13px] font-semibold text-ink">Custom Date Range</h4>
+            <h4 className="text-[13px] font-semibold text-ink">Custom date range</h4>
             <button onClick={() => setShowCustom(false)} className="text-ink-muted hover:text-ink">
-              <X className="w-4 h-4" />
+              <BiX className="w-4 h-4" />
             </button>
           </div>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1">Start</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1">Start</label>
               <input
                 type="date"
                 value={customStart}
@@ -115,7 +115,7 @@ export function DateRangePicker() {
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-ink-muted uppercase tracking-wider block mb-1">End</label>
+              <label className="text-[12px] font-medium text-ink-muted block mb-1">End</label>
               <input
                 type="date"
                 value={customEnd}
@@ -130,9 +130,9 @@ export function DateRangePicker() {
             disabled={!customStart || !customEnd || customStart > customEnd}
             className="w-full h-8 bg-primary text-white text-[13px] font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Apply Range
+            Apply range
           </button>
-        </div>
+        </Panel>
       )}
     </div>
   );

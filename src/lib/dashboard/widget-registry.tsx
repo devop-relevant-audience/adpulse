@@ -1,18 +1,6 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
-import {
-  Hash,
-  LineChart,
-  PieChart,
-  StickyNote,
-  Table2,
-  HeartPulse,
-  Filter,
-  DollarSign,
-  GitBranch,
-  Users,
-} from "lucide-react";
+import { BiHash, BiLineChart, BiBarChartAlt2, BiNote, BiTable, BiPulse, BiFilterAlt, BiDollar, BiGitBranch, BiGroup } from "react-icons/bi";
 import type {
   WidgetType,
   WidgetRenderProps,
@@ -38,7 +26,7 @@ export interface WidgetDefinition {
   type: WidgetType;
   title: string;
   description: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   category: WidgetCategory;
   defaultSize: { w: number; h: number; minW: number; minH: number };
   defaultConfig: Record<string, unknown>;
@@ -56,7 +44,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "kpi",
     title: "KPI Stat",
     description: "A single headline metric with period-over-period change.",
-    icon: Hash,
+    icon: BiHash,
     category: "metrics",
     defaultSize: { w: 3, h: 3, minW: 2, minH: 3 },
     defaultConfig: { metric: "spend" },
@@ -74,7 +62,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "trend",
     title: "Trend Chart",
     description: "Daily line chart for one or more metrics over the date range.",
-    icon: LineChart,
+    icon: BiLineChart,
     category: "charts",
     defaultSize: { w: 8, h: 9, minW: 4, minH: 6 },
     defaultConfig: { metrics: ["spend", "conversions"] },
@@ -85,7 +73,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "platform-breakdown",
     title: "Platform Breakdown",
     description: "Spend or conversions split across Google, Meta and TikTok.",
-    icon: PieChart,
+    icon: BiBarChartAlt2,
     category: "charts",
     defaultSize: { w: 4, h: 7, minW: 3, minH: 5 },
     defaultConfig: { metric: "spend" },
@@ -95,7 +83,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "note",
     title: "Note",
     description: "Freeform Markdown text — context, goals, reminders.",
-    icon: StickyNote,
+    icon: BiNote,
     category: "other",
     defaultSize: { w: 4, h: 4, minW: 2, minH: 2 },
     defaultConfig: { text: "" },
@@ -106,7 +94,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "campaign-table",
     title: "Campaign Table",
     description: "Top campaigns by spend/conversions with CTR and CPA.",
-    icon: Table2,
+    icon: BiTable,
     category: "metrics",
     defaultSize: { w: 6, h: 8, minW: 4, minH: 5 },
     defaultConfig: { limit: 8, sortBy: "spend" },
@@ -117,7 +105,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "health-gauge",
     title: "Health Score",
     description: "Overall account health gauge, grade and top fixes.",
-    icon: HeartPulse,
+    icon: BiPulse,
     category: "metrics",
     defaultSize: { w: 4, h: 8, minW: 3, minH: 6 },
     defaultConfig: {},
@@ -127,7 +115,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "funnel",
     title: "Conversion Funnel",
     description: "Impressions → clicks → conversions with step rates.",
-    icon: Filter,
+    icon: BiFilterAlt,
     category: "charts",
     defaultSize: { w: 6, h: 7, minW: 4, minH: 5 },
     defaultConfig: {},
@@ -137,7 +125,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "revenue-roas",
     title: "Revenue & ROAS",
     description: "Blended ROAS, real revenue and AOV (deduplicated).",
-    icon: DollarSign,
+    icon: BiDollar,
     category: "attribution",
     defaultSize: { w: 3, h: 3, minW: 3, minH: 3 },
     defaultConfig: {},
@@ -147,7 +135,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "attribution-mini",
     title: "Attribution Models",
     description: "First-touch vs last-touch credit across platforms.",
-    icon: GitBranch,
+    icon: BiGitBranch,
     category: "attribution",
     defaultSize: { w: 6, h: 8, minW: 4, minH: 6 },
     defaultConfig: { modelA: "first_touch", modelB: "last_touch" },
@@ -157,7 +145,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     type: "ltv-cac",
     title: "LTV : CAC",
     description: "Lifetime value vs acquisition cost by channel.",
-    icon: Users,
+    icon: BiGroup,
     category: "attribution",
     defaultSize: { w: 6, h: 7, minW: 4, minH: 5 },
     defaultConfig: {},

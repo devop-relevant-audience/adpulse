@@ -63,7 +63,7 @@ export function WidgetConfigDialog({
                   type="button"
                   onClick={() => onResize(p.w)}
                   className={cn(
-                    "flex-1 text-xs py-1.5 rounded-md border transition-colors",
+                    "flex-1 text-xs py-1.5 rounded-md border transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                     currentWidth === p.w
                       ? "border-primary bg-primary/8 text-primary font-medium"
                       : "border-hairline text-ink-muted hover:text-ink"

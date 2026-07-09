@@ -41,7 +41,7 @@ export function WidgetCatalogDialog({ open, onOpenChange, onAdd }: WidgetCatalog
         <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-1">
           {grouped.map((g) => (
             <div key={g.cat}>
-              <p className="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-2">
+              <p className="text-[12px] font-medium text-ink-muted mb-2">
                 {CATEGORY_LABELS[g.cat]}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
