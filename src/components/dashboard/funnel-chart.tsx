@@ -5,6 +5,7 @@ import { useFunnel } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Panel } from "@/components/ui/panel";
+import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { BiRightArrowAlt, BiTrendingDown } from "react-icons/bi";
 import { PLATFORM_COLORS, PLATFORM_LABELS, SERIES_PALETTE } from "@/lib/dashboard/chart-theme";
@@ -360,7 +361,7 @@ export function FunnelChart() {
   const platform = useAppStore((s) => s.selectedPlatform);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
-  const { data: funnelData, isLoading } = useFunnel({
+  const { data: funnelData, isLoading, isError, refetch } = useFunnel({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -373,6 +374,20 @@ export function FunnelChart() {
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-[250px] w-full" />
         <Skeleton className="h-[200px] w-full" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold text-ink">Conversion funnel</h2>
+          <p className="text-sm text-ink-muted mt-0.5">
+            Track how users move through the funnel from impressions to conversions across platforms.
+          </p>
+        </div>
+        <QueryError onRetry={() => refetch()} message="Couldn't load funnel data" />
       </div>
     );
   }

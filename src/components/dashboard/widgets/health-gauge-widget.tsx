@@ -3,6 +3,7 @@
 import { useHealthScore } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { BiSolidMagicWand } from "react-icons/bi";
 import type { HealthScoreResult } from "@/lib/data/health-score";
@@ -71,7 +72,7 @@ export function HealthGaugeWidget() {
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
 
-  const { data: healthData, isLoading } = useHealthScore({
+  const { data: healthData, isLoading, isError, refetch } = useHealthScore({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -86,6 +87,7 @@ export function HealthGaugeWidget() {
     );
   }
 
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!healthData) return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
 
   const topRecommendations = healthData.recommendations.slice(0, 2);

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { formatCurrency, formatNumber } from "@/lib/dashboard/metrics";
 import {
   Select,
@@ -90,7 +91,7 @@ export function CampaignTableWidget({ config }: WidgetRenderProps) {
   const limit = readLimit(config);
   const sortBy = readSortBy(config);
 
-  const { data, isLoading } = useMetrics({
+  const { data, isLoading, isError, refetch } = useMetrics({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -112,6 +113,7 @@ export function CampaignTableWidget({ config }: WidgetRenderProps) {
     );
   }
 
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (campaigns.length === 0)
     return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
 

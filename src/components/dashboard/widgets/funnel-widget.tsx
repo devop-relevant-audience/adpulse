@@ -3,6 +3,7 @@
 import { useFunnel } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { formatNumber } from "@/lib/dashboard/metrics";
 
 const STAGE_COLORS = ["#6366f1", "#f59e0b", "#10b981"];
@@ -12,7 +13,7 @@ export function FunnelWidget() {
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
 
-  const { data: funnelData, isLoading } = useFunnel({
+  const { data: funnelData, isLoading, isError, refetch } = useFunnel({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -28,6 +29,8 @@ export function FunnelWidget() {
       </div>
     );
   }
+
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
 
   const stages = funnelData?.overall ?? [];
   if (stages.length === 0)

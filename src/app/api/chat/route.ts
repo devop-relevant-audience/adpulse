@@ -6,6 +6,9 @@ import { calculateHealthScore } from '@/lib/data/health-score';
 import { addMessage, createSession, getMessages, getSession } from '@/lib/data/chat';
 import type { ChatSessionSummary } from '@/lib/data/chat';
 import { requireClientAccess, requireUser } from '@/lib/auth/guard';
+import { withRoute } from '@/lib/http/with-route';
+import { logger } from '@/lib/log';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import type { Platform } from '@/lib/types/database';
 import { format, subDays } from 'date-fns';
 
@@ -370,11 +373,20 @@ async function resolveToolCalls(
 	return messages;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute('chat.POST', async (request: NextRequest) => {
 	const gate = await requireUser();
 	if (!gate.ok) return gate.response;
 
-	try {
+	// Throttle per authenticated user (fall back to IP) before any OpenRouter or
+	// DB work. Fails open when Upstash isn't configured.
+	const rl = await checkRateLimit(gate.ctx.userId || getClientIp(request), {
+		prefix: 'chat',
+		limit: 30,
+		windowSeconds: 60,
+	});
+	if (!rl.ok) return rateLimitResponse(rl);
+
+	{
 		const body = await request.json();
 		const parsed = chatSchema.safeParse(body);
 
@@ -453,7 +465,10 @@ IMPORTANT RULES:
 
 		if (!streamResponse.ok) {
 			const errorText = await streamResponse.text();
-			console.error('OpenRouter streaming error:', errorText);
+			logger.error('OpenRouter streaming error', undefined, {
+				route: 'chat.POST',
+				detail: errorText,
+			});
 			return handleWithoutAI(session.id, clientId, referenceContext);
 		}
 
@@ -484,7 +499,10 @@ IMPORTANT RULES:
 						try {
 							await addMessage(resolvedSessionId, 'assistant', assistantText, null);
 						} catch (error) {
-							console.error('Failed to persist assistant message:', error);
+							logger.error('Failed to persist assistant message', error, {
+								route: 'chat.POST',
+								sessionId: resolvedSessionId,
+							});
 						}
 					}
 				};
@@ -521,7 +539,7 @@ IMPORTANT RULES:
 						}
 					}
 				} catch (error) {
-					console.error('Stream processing error:', error);
+					logger.error('Stream processing error', error, { route: 'chat.POST' });
 				} finally {
 					await persistAssistant();
 					controller.close();
@@ -536,11 +554,8 @@ IMPORTANT RULES:
 				Connection: 'keep-alive',
 			},
 		});
-	} catch (error) {
-		console.error('Chat error:', error);
-		return NextResponse.json({ error: 'Failed to process chat message' }, { status: 500 });
 	}
-}
+});
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function handleWithoutAI(sessionId: string, clientId: string, _referenceContext: unknown) {

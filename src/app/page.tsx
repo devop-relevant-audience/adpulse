@@ -24,6 +24,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { AccountNotProvisioned } from "@/components/layout/account-not-provisioned";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Panel } from "@/components/ui/panel";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 function DashboardSkeleton() {
   return (
@@ -115,6 +116,7 @@ export default function DashboardPage() {
 
 function MainDashboard() {
   const clientId = useAppStore((s) => s.selectedClientId);
+  const activeView = useAppStore((s) => s.activeView);
   const setSelectedClientId = useAppStore((s) => s.setSelectedClientId);
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { isLoading: userLoading, error: userError } = useCurrentUser();
@@ -165,7 +167,9 @@ function MainDashboard() {
         {clientsLoading || !isReady ? (
           <DashboardSkeleton />
         ) : (
-          <ActiveView />
+          <ErrorBoundary resetKey={activeView}>
+            <ActiveView />
+          </ErrorBoundary>
         )}
       </div>
     </AppShell>

@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteSession, getMessages, getSession } from "@/lib/data/chat";
 import { requireClientAccess, requireUser } from "@/lib/auth/guard";
+import { withRoute } from "@/lib/http/with-route";
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const gate = await requireUser();
-  if (!gate.ok) return gate.response;
+export const GET = withRoute(
+  "chat.sessions.[id].GET",
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const gate = await requireUser();
+    if (!gate.ok) return gate.response;
 
-  try {
     const { id } = await params;
 
     const session = await getSession(id);
@@ -21,20 +20,15 @@ export async function GET(
     if (!access.ok) return access.response;
 
     return NextResponse.json({ session, messages: await getMessages(id) });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch chat session";
-    return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+);
 
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const gate = await requireUser();
-  if (!gate.ok) return gate.response;
+export const DELETE = withRoute(
+  "chat.sessions.[id].DELETE",
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const gate = await requireUser();
+    if (!gate.ok) return gate.response;
 
-  try {
     const { id } = await params;
 
     const session = await getSession(id);
@@ -48,8 +42,5 @@ export async function DELETE(
     await deleteSession(id);
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to delete chat session";
-    return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+);

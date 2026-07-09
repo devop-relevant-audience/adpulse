@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { clients, reportSchedules } from "@/lib/db/schema";
 import { keysToCamel, keysToSnake } from "@/lib/db/case";
 import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
+import { withRoute } from "@/lib/http/with-route";
 import { sendMockEmail } from "@/lib/mock-email";
 import type { ReportScheduleRow } from "@/lib/types/database";
 import { format, subDays, subMonths, startOfMonth, endOfMonth, subQuarters, startOfQuarter, endOfQuarter } from "date-fns";
@@ -53,123 +54,103 @@ function getDateRangeForType(type: string, customDays?: number | null): { start:
   }
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withRoute("report-schedules.GET", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const { searchParams } = request.nextUrl;
-    const clientId = searchParams.get("clientId");
+  const { searchParams } = request.nextUrl;
+  const clientId = searchParams.get("clientId");
 
-    if (!clientId) {
-      return NextResponse.json({ error: "clientId required" }, { status: 400 });
-    }
-
-    const rows = await db
-      .select()
-      .from(reportSchedules)
-      .where(eq(reportSchedules.clientId, clientId))
-      .orderBy(desc(reportSchedules.createdAt));
-
-    return NextResponse.json(rows.map(keysToSnake));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch schedules";
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (!clientId) {
+    return NextResponse.json({ error: "clientId required" }, { status: 400 });
   }
-}
 
-export async function POST(request: NextRequest) {
+  const rows = await db
+    .select()
+    .from(reportSchedules)
+    .where(eq(reportSchedules.clientId, clientId))
+    .orderBy(desc(reportSchedules.createdAt));
+
+  return NextResponse.json(rows.map(keysToSnake));
+});
+
+export const POST = withRoute("report-schedules.POST", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const { searchParams } = request.nextUrl;
-    const action = searchParams.get("action");
+  const { searchParams } = request.nextUrl;
+  const action = searchParams.get("action");
 
-    if (action === "send-now") {
-      return handleSendNow(request);
-    }
-
-    const body = await request.json();
-    const parsed = scheduleSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid parameters", details: parsed.error.flatten() },
-        { status: 400 }
-      );
-    }
-
-    const [row] = await db
-      .insert(reportSchedules)
-      .values(keysToCamel(parsed.data) as typeof reportSchedules.$inferInsert)
-      .returning();
-
-    return NextResponse.json(keysToSnake(row), { status: 201 });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create schedule";
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (action === "send-now") {
+    return handleSendNow(request);
   }
-}
 
-export async function PATCH(request: NextRequest) {
+  const body = await request.json();
+  const parsed = scheduleSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid parameters", details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const [row] = await db
+    .insert(reportSchedules)
+    .values(keysToCamel(parsed.data) as typeof reportSchedules.$inferInsert)
+    .returning();
+
+  return NextResponse.json(keysToSnake(row), { status: 201 });
+});
+
+export const PATCH = withRoute("report-schedules.PATCH", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const body = await request.json();
-    const { id, ...updates } = body;
+  const body = await request.json();
+  const { id, ...updates } = body;
 
-    if (!id) {
-      return NextResponse.json({ error: "id required" }, { status: 400 });
-    }
-
-    const [row] = await db
-      .update(reportSchedules)
-      .set(
-        keysToCamel({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        }) as Partial<typeof reportSchedules.$inferInsert>
-      )
-      .where(eq(reportSchedules.id, id))
-      .returning();
-
-    return NextResponse.json(keysToSnake(row));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update schedule";
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (!id) {
+    return NextResponse.json({ error: "id required" }, { status: 400 });
   }
-}
 
-export async function DELETE(request: NextRequest) {
+  const [row] = await db
+    .update(reportSchedules)
+    .set(
+      keysToCamel({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      }) as Partial<typeof reportSchedules.$inferInsert>
+    )
+    .where(eq(reportSchedules.id, id))
+    .returning();
+
+  return NextResponse.json(keysToSnake(row));
+});
+
+export const DELETE = withRoute("report-schedules.DELETE", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const { searchParams } = request.nextUrl;
-    const id = searchParams.get("id");
+  const { searchParams } = request.nextUrl;
+  const id = searchParams.get("id");
 
-    if (!id) {
-      return NextResponse.json({ error: "id required" }, { status: 400 });
-    }
-
-    await db.delete(reportSchedules).where(eq(reportSchedules.id, id));
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to delete schedule";
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (!id) {
+    return NextResponse.json({ error: "id required" }, { status: 400 });
   }
-}
+
+  await db.delete(reportSchedules).where(eq(reportSchedules.id, id));
+
+  return NextResponse.json({ success: true });
+});
 
 async function handleSendNow(request: NextRequest) {
   const { searchParams } = request.nextUrl;

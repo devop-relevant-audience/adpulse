@@ -4,6 +4,7 @@ import { useHealthScore } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Panel } from "@/components/ui/panel";
+import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { BiBulb, BiTrendingUp, BiTrendingDown, BiDollar, BiPointer, BiShow, BiLineChart, BiCalendar, BiSolidMagicWand } from "react-icons/bi";
 import type { HealthScoreResult } from "@/lib/data/health-score";
@@ -122,7 +123,7 @@ export function HealthScore() {
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
 
-  const { data: healthData, isLoading } = useHealthScore({
+  const { data: healthData, isLoading, isError, refetch } = useHealthScore({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -136,6 +137,18 @@ export function HealthScore() {
           <Skeleton className="h-[300px] w-full" />
           <Skeleton className="h-[300px] w-full lg:col-span-2" />
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold text-ink">Account health score</h2>
+          <p className="text-sm text-ink-muted mt-0.5">Composite performance score across 5 key dimensions, weighted by impact.</p>
+        </div>
+        <QueryError onRetry={() => refetch()} message="Couldn't load health score" />
       </div>
     );
   }

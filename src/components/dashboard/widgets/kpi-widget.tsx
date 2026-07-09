@@ -5,6 +5,7 @@ import { BiTrendingUp, BiTrendingDown } from "react-icons/bi";
 import { useComparison } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import {
   METRIC_OPTIONS,
@@ -40,7 +41,7 @@ export function KpiWidget({ config }: WidgetRenderProps) {
   const previousEnd = format(subDays(new Date(dateRange.start), 1), "yyyy-MM-dd");
   const previousStart = format(subDays(new Date(dateRange.start), daysDiff + 1), "yyyy-MM-dd");
 
-  const { data: comparison, isLoading } = useComparison({
+  const { data: comparison, isLoading, isError, refetch } = useComparison({
     clientId,
     currentStart: dateRange.start,
     currentEnd: dateRange.end,
@@ -58,6 +59,7 @@ export function KpiWidget({ config }: WidgetRenderProps) {
       </div>
     );
   }
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!comparison) return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
 
   const value = comparison.current[metric.summaryKey];

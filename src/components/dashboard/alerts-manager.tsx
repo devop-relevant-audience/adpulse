@@ -14,6 +14,7 @@ import {
 } from "@/hooks/use-metrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Panel } from "@/components/ui/panel";
+import { QueryError } from "@/components/ui/query-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -316,13 +317,14 @@ function AlertRuleForm({
 }
 
 function RulesTab({ clientId }: { clientId: string }) {
-  const { data: rules, isLoading } = useAlertRules(clientId);
+  const { data: rules, isLoading, isError, refetch } = useAlertRules(clientId);
   const updateRule = useUpdateAlertRule();
   const deleteRule = useDeleteAlertRule();
   const [showForm, setShowForm] = useState(false);
   const [editingRule, setEditingRule] = useState<AlertRuleRow | undefined>();
 
   if (isLoading) return <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>;
+  if (isError) return <QueryError onRetry={() => refetch()} message="Couldn't load alert rules" />;
 
   return (
     <div className="space-y-4">
@@ -396,11 +398,12 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
 };
 
 function HistoryTab({ clientId }: { clientId: string }) {
-  const { data: history, isLoading } = useAlertHistory(clientId);
+  const { data: history, isLoading, isError, refetch } = useAlertHistory(clientId);
   const evaluate = useEvaluateAlerts();
   const updateHistory = useUpdateAlertHistory();
 
   if (isLoading) return <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>;
+  if (isError) return <QueryError onRetry={() => refetch()} message="Couldn't load alert history" />;
 
   return (
     <div className="space-y-4">

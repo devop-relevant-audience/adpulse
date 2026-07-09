@@ -4,6 +4,7 @@ import { BiError } from "react-icons/bi";
 import { useCohortAnalysis } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/dashboard/metrics";
 import { PLATFORM_LABELS_SHORT as PLATFORM_LABELS } from "@/lib/dashboard/chart-theme";
@@ -21,7 +22,7 @@ export function LtvCacWidget() {
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
 
-  const { data, isLoading } = useCohortAnalysis({
+  const { data, isLoading, isError, refetch } = useCohortAnalysis({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -29,6 +30,7 @@ export function LtvCacWidget() {
   });
 
   if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!data || data.cohorts.length === 0)
     return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
 

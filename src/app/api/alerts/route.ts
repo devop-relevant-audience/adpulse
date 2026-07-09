@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { alertHistory, alertRules } from "@/lib/db/schema";
 import { keysToCamel, keysToSnake } from "@/lib/db/case";
 import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
+import { withRoute } from "@/lib/http/with-route";
+import { logger } from "@/lib/log";
 import { sendMockEmail } from "@/lib/mock-email";
 import type { AlertRuleRow, Platform } from "@/lib/types/database";
 import { format, subDays, subWeeks } from "date-fns";
@@ -28,147 +30,127 @@ const alertRuleSchema = z.object({
   quiet_hours_end: z.string().nullable().optional(),
 });
 
-export async function GET(request: NextRequest) {
+export const GET = withRoute("alerts.GET", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const { searchParams } = request.nextUrl;
-    const clientId = searchParams.get("clientId");
-    const action = searchParams.get("action");
+  const { searchParams } = request.nextUrl;
+  const clientId = searchParams.get("clientId");
+  const action = searchParams.get("action");
 
-    if (!clientId) {
-      return NextResponse.json({ error: "clientId required" }, { status: 400 });
-    }
+  if (!clientId) {
+    return NextResponse.json({ error: "clientId required" }, { status: 400 });
+  }
 
-    if (action === "history") {
-      const rows = await db
-        .select()
-        .from(alertHistory)
-        .where(eq(alertHistory.clientId, clientId))
-        .orderBy(desc(alertHistory.triggeredAt))
-        .limit(100);
-
-      return NextResponse.json(rows.map(keysToSnake));
-    }
-
+  if (action === "history") {
     const rows = await db
       .select()
-      .from(alertRules)
-      .where(eq(alertRules.clientId, clientId))
-      .orderBy(desc(alertRules.createdAt));
+      .from(alertHistory)
+      .where(eq(alertHistory.clientId, clientId))
+      .orderBy(desc(alertHistory.triggeredAt))
+      .limit(100);
 
     return NextResponse.json(rows.map(keysToSnake));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch alerts";
-    return NextResponse.json({ error: message }, { status: 500 });
   }
-}
 
-export async function POST(request: NextRequest) {
+  const rows = await db
+    .select()
+    .from(alertRules)
+    .where(eq(alertRules.clientId, clientId))
+    .orderBy(desc(alertRules.createdAt));
+
+  return NextResponse.json(rows.map(keysToSnake));
+});
+
+export const POST = withRoute("alerts.POST", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const { searchParams } = request.nextUrl;
-    const action = searchParams.get("action");
+  const { searchParams } = request.nextUrl;
+  const action = searchParams.get("action");
 
-    if (action === "evaluate") {
-      return handleEvaluate(request);
-    }
-
-    const body = await request.json();
-    const parsed = alertRuleSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid parameters", details: parsed.error.flatten() },
-        { status: 400 }
-      );
-    }
-
-    const [row] = await db
-      .insert(alertRules)
-      .values(keysToCamel(parsed.data) as typeof alertRules.$inferInsert)
-      .returning();
-
-    return NextResponse.json(keysToSnake(row), { status: 201 });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create alert rule";
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (action === "evaluate") {
+    return handleEvaluate(request);
   }
-}
 
-export async function PATCH(request: NextRequest) {
+  const body = await request.json();
+  const parsed = alertRuleSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid parameters", details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const [row] = await db
+    .insert(alertRules)
+    .values(keysToCamel(parsed.data) as typeof alertRules.$inferInsert)
+    .returning();
+
+  return NextResponse.json(keysToSnake(row), { status: 201 });
+});
+
+export const PATCH = withRoute("alerts.PATCH", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const body = await request.json();
-    const { id, ...updates } = body;
+  const body = await request.json();
+  const { id, ...updates } = body;
 
-    if (!id) {
-      return NextResponse.json({ error: "id required" }, { status: 400 });
-    }
+  if (!id) {
+    return NextResponse.json({ error: "id required" }, { status: 400 });
+  }
 
-    // History rows carry a `status` (and no `rule_id`); rule rows are everything
-    // else. alert_history has no `updated_at` column, so only stamp rule updates.
-    const isHistory = updates.status !== undefined && updates.rule_id === undefined;
+  // History rows carry a `status` (and no `rule_id`); rule rows are everything
+  // else. alert_history has no `updated_at` column, so only stamp rule updates.
+  const isHistory = updates.status !== undefined && updates.rule_id === undefined;
 
-    if (isHistory) {
-      const [row] = await db
-        .update(alertHistory)
-        .set(keysToCamel(updates) as Partial<typeof alertHistory.$inferInsert>)
-        .where(eq(alertHistory.id, id))
-        .returning();
-      return NextResponse.json(keysToSnake(row));
-    }
-
+  if (isHistory) {
     const [row] = await db
-      .update(alertRules)
-      .set(
-        keysToCamel({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        }) as Partial<typeof alertRules.$inferInsert>
-      )
-      .where(eq(alertRules.id, id))
+      .update(alertHistory)
+      .set(keysToCamel(updates) as Partial<typeof alertHistory.$inferInsert>)
+      .where(eq(alertHistory.id, id))
       .returning();
     return NextResponse.json(keysToSnake(row));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update";
-    return NextResponse.json({ error: message }, { status: 500 });
   }
-}
 
-export async function DELETE(request: NextRequest) {
+  const [row] = await db
+    .update(alertRules)
+    .set(
+      keysToCamel({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      }) as Partial<typeof alertRules.$inferInsert>
+    )
+    .where(eq(alertRules.id, id))
+    .returning();
+  return NextResponse.json(keysToSnake(row));
+});
+
+export const DELETE = withRoute("alerts.DELETE", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const { searchParams } = request.nextUrl;
-    const id = searchParams.get("id");
+  const { searchParams } = request.nextUrl;
+  const id = searchParams.get("id");
 
-    if (!id) {
-      return NextResponse.json({ error: "id required" }, { status: 400 });
-    }
-
-    await db.delete(alertRules).where(eq(alertRules.id, id));
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to delete alert rule";
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (!id) {
+    return NextResponse.json({ error: "id required" }, { status: 400 });
   }
-}
+
+  await db.delete(alertRules).where(eq(alertRules.id, id));
+
+  return NextResponse.json({ success: true });
+});
 
 async function handleEvaluate(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -277,7 +259,10 @@ async function handleEvaluate(request: NextRequest) {
           }) as typeof alertHistory.$inferInsert
         );
       } catch (insertError) {
-        console.error("Failed to insert alert history:", insertError);
+        logger.error("Failed to insert alert history", insertError, {
+          route: "alerts.POST",
+          ruleId: rule.id,
+        });
       }
 
       sendMockEmail({

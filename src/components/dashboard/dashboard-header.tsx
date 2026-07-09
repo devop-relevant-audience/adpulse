@@ -8,7 +8,7 @@ import { useClients } from "@/hooks/use-metrics";
 
 export function DashboardHeader() {
   const clientId = useAppStore((s) => s.selectedClientId);
-  const { data: clients } = useClients();
+  const { data: clients, isError, refetch } = useClients();
   const selectedClient = clients?.find((c) => c.id === clientId);
 
   return (
@@ -18,9 +18,22 @@ export function DashboardHeader() {
           <h1 className="text-xl font-semibold tracking-[-0.5px] text-ink">
             {selectedClient ? `${selectedClient.name}` : "Dashboard"}
           </h1>
-          <p className="text-[13px] text-ink-muted mt-0.5">
-            Cross-platform advertising performance
-          </p>
+          {isError ? (
+            <p className="text-[13px] text-destructive mt-0.5">
+              Couldn&apos;t load clients.{" "}
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="font-medium underline rounded outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                Retry
+              </button>
+            </p>
+          ) : (
+            <p className="text-[13px] text-ink-muted mt-0.5">
+              Cross-platform advertising performance
+            </p>
+          )}
         </div>
         <ReportGenerator />
       </div>

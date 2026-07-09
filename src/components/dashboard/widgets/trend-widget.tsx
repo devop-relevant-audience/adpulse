@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { useDailyTrend } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { METRIC_OPTIONS, getMetricOption } from "@/lib/dashboard/metrics";
 import type { WidgetRenderProps, WidgetConfigFormProps } from "@/lib/dashboard/types";
@@ -35,7 +36,7 @@ export function TrendWidget({ config }: WidgetRenderProps) {
 
   const metrics = readMetrics(config).map(getMetricOption);
 
-  const { data, isLoading } = useDailyTrend({
+  const { data, isLoading, isError, refetch } = useDailyTrend({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -43,6 +44,7 @@ export function TrendWidget({ config }: WidgetRenderProps) {
   });
 
   if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!data || data.length === 0)
     return <div className="h-full grid place-items-center text-xs text-ink-muted">No trend data</div>;
 
