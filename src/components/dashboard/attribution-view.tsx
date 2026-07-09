@@ -9,6 +9,7 @@ import {
   type AttributionComparison,
 } from "@/hooks/use-metrics";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { BiBulb, BiCoinStack, BiDollar, BiCart, BiError, BiTrendingUp, BiTrendingDown } from "react-icons/bi";
 import {
@@ -103,7 +104,7 @@ function RevenueRoasTab({ clientId }: { clientId: string }) {
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
 
-  const { data, isLoading } = useRevenueOverview({
+  const { data, isLoading, isError, refetch } = useRevenueOverview({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -121,6 +122,7 @@ function RevenueRoasTab({ clientId }: { clientId: string }) {
     );
   }
 
+  if (isError) return <QueryError onRetry={() => refetch()} message="Couldn't load revenue data" />;
   if (!data) return <EmptyState />;
 
   const chartData = data.platforms.map((p) => ({
@@ -240,7 +242,7 @@ function AttributionModelsTab({ clientId }: { clientId: string }) {
   const platform = useAppStore((s) => s.selectedPlatform);
   const [selectedModel, setSelectedModel] = useState<AttributionModel>("last_touch");
 
-  const { data, isLoading } = useAttributionComparison({
+  const { data, isLoading, isError, refetch } = useAttributionComparison({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -256,6 +258,7 @@ function AttributionModelsTab({ clientId }: { clientId: string }) {
     );
   }
 
+  if (isError) return <QueryError onRetry={() => refetch()} message="Couldn't load attribution data" />;
   if (!data) return <EmptyState />;
 
   const models = MODEL_ORDER
@@ -370,7 +373,7 @@ function CohortsTab({ clientId }: { clientId: string }) {
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
 
-  const { data, isLoading } = useCohortAnalysis({
+  const { data, isLoading, isError, refetch } = useCohortAnalysis({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -401,6 +404,7 @@ function CohortsTab({ clientId }: { clientId: string }) {
     );
   }
 
+  if (isError) return <QueryError onRetry={() => refetch()} message="Couldn't load cohort data" />;
   if (!data) return <EmptyState />;
 
   const byDay0Roas = [...data.cohorts].sort((a, b) => b.day0Roas - a.day0Roas);

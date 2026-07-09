@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { formatCurrency, formatNumber } from "@/lib/dashboard/metrics";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
 import type { WidgetRenderProps } from "@/lib/dashboard/types";
@@ -18,7 +19,7 @@ export function PlatformBreakdownWidget({ config }: WidgetRenderProps) {
     | "spend"
     | "conversions";
 
-  const { data, isLoading } = useMetrics({
+  const { data, isLoading, isError, refetch } = useMetrics({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -39,6 +40,7 @@ export function PlatformBreakdownWidget({ config }: WidgetRenderProps) {
   }, [data, metricKey]);
 
   if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (rows.length === 0)
     return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
 

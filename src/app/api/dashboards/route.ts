@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDashboard, upsertDashboard } from "@/lib/data/dashboards";
 import { DASHBOARD_CONFIG_VERSION } from "@/lib/dashboard/types";
 import { requireAgencyRole, requireClientAccess, requireUser } from "@/lib/auth/guard";
+import { withRoute } from "@/lib/http/with-route";
 
 const gridItemSchema = z.object({
   i: z.string(),
@@ -40,57 +41,47 @@ const putSchema = z.object({
   config: configSchema,
 });
 
-export async function GET(request: NextRequest) {
+export const GET = withRoute("dashboards.GET", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
 
-  try {
-    const { searchParams } = request.nextUrl;
-    const clientId = searchParams.get("clientId");
-    const name = searchParams.get("name") || "Default";
+  const { searchParams } = request.nextUrl;
+  const clientId = searchParams.get("clientId");
+  const name = searchParams.get("name") || "Default";
 
-    const parsed = z.string().uuid().safeParse(clientId);
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Valid clientId is required" }, { status: 400 });
-    }
-
-    const access = await requireClientAccess(gate.ctx, parsed.data);
-    if (!access.ok) return access.response;
-
-    const dashboard = await getDashboard(parsed.data, name);
-    return NextResponse.json(dashboard);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch dashboard";
-    return NextResponse.json({ error: message }, { status: 500 });
+  const parsed = z.string().uuid().safeParse(clientId);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Valid clientId is required" }, { status: 400 });
   }
-}
 
-export async function PUT(request: NextRequest) {
+  const access = await requireClientAccess(gate.ctx, parsed.data);
+  if (!access.ok) return access.response;
+
+  const dashboard = await getDashboard(parsed.data, name);
+  return NextResponse.json(dashboard);
+});
+
+export const PUT = withRoute("dashboards.PUT", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   // Dashboard layouts are per-client shared assets: client users view, agencies edit.
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const body = await request.json().catch(() => null);
-    const parsed = putSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid dashboard payload", details: parsed.error.flatten() },
-        { status: 400 }
-      );
-    }
-
-    const config = {
-      ...parsed.data.config,
-      version: parsed.data.config.version ?? DASHBOARD_CONFIG_VERSION,
-    };
-    // Cast is safe: zod validated the structural shape above.
-    const saved = await upsertDashboard(parsed.data.clientId, config as Parameters<typeof upsertDashboard>[1]);
-    return NextResponse.json(saved);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to save dashboard";
-    return NextResponse.json({ error: message }, { status: 500 });
+  const body = await request.json().catch(() => null);
+  const parsed = putSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid dashboard payload", details: parsed.error.flatten() },
+      { status: 400 }
+    );
   }
-}
+
+  const config = {
+    ...parsed.data.config,
+    version: parsed.data.config.version ?? DASHBOARD_CONFIG_VERSION,
+  };
+  // Cast is safe: zod validated the structural shape above.
+  const saved = await upsertDashboard(parsed.data.clientId, config as Parameters<typeof upsertDashboard>[1]);
+  return NextResponse.json(saved);
+});

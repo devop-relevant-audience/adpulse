@@ -1,7 +1,9 @@
-// Hand-generated from a live introspection of the Supabase Postgres database
-// (`drizzle-kit pull` currently crashes on this project's CHECK constraints due
-// to a drizzle-kit bug — see AGENTS.md). Re-run introspection and regenerate
-// this file after schema changes rather than hand-editing column definitions.
+// Hand-maintained Drizzle model of the Supabase Postgres schema. `drizzle-kit
+// pull`/`generate` are unreliable here (pull crashes on this project's CHECK
+// constraints — see AGENTS.md), so this file is NOT generated. When you change
+// the schema, write an idempotent migration in `drizzle/NNNN_*.sql`, run
+// `npm run db:migrate`, and hand-edit this file (and src/lib/types/database.ts)
+// to match. Keep the index()/uniqueIndex()/check() calls in sync with the SQL.
 import { sql } from "drizzle-orm";
 import {
   pgTable,
@@ -15,6 +17,8 @@ import {
   date,
   timestamp,
   check,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { DashboardLayouts, WidgetInstance } from "@/lib/dashboard/types";
 
@@ -47,6 +51,9 @@ export const campaignPerformance = pgTable(
   },
   (table) => [
     check("campaign_performance_platform_check", sql`(${table.platform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),
+    index("idx_campaign_perf_client_date").on(table.clientId, table.date),
+    index("idx_campaign_perf_campaign").on(table.campaignId),
+    index("idx_campaign_perf_platform").on(table.platform),
   ]
 );
 
@@ -57,7 +64,9 @@ export const campaignBudgets = pgTable("campaign_budgets", {
   monthlyBudget: numeric("monthly_budget", { precision: 12, scale: 2, mode: "number" }).notNull(),
   month: text("month").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_campaign_budgets_client_month").on(table.clientId, table.month),
+]);
 
 export const reports = pgTable("reports", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -73,14 +82,19 @@ export const reports = pgTable("reports", {
   shareToken: text("share_token"),
   sharePasswordHash: text("share_password_hash"),
   shareExpiresAt: timestamp("share_expires_at", { withTimezone: true, mode: "string" }),
-});
+}, (table) => [
+  index("idx_reports_client").on(table.clientId),
+  uniqueIndex("idx_reports_share_token").on(table.shareToken).where(sql`${table.shareToken} IS NOT NULL`),
+]);
 
 export const chatSessions = pgTable("chat_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_chat_sessions_client").on(table.clientId),
+]);
 
 export const chatMessages = pgTable(
   "chat_messages",
@@ -94,6 +108,7 @@ export const chatMessages = pgTable(
   },
   (table) => [
     check("chat_messages_role_check", sql`(${table.role} = ANY (ARRAY['user'::text, 'assistant'::text]))`),
+    index("idx_chat_messages_session").on(table.sessionId),
   ]
 );
 
@@ -127,6 +142,9 @@ export const adCreatives = pgTable(
     check("ad_creatives_platform_check", sql`(${table.platform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),
     check("ad_creatives_creative_type_check", sql`(${table.creativeType} = ANY (ARRAY['image'::text, 'video'::text, 'carousel'::text]))`),
     check("ad_creatives_status_check", sql`(${table.status} = ANY (ARRAY['active'::text, 'fatigued'::text, 'paused'::text]))`),
+    index("idx_ad_creatives_client_campaign").on(table.clientId, table.campaignId),
+    index("idx_ad_creatives_client_platform").on(table.clientId, table.platform),
+    index("idx_ad_creatives_client_status").on(table.clientId, table.status),
   ]
 );
 
@@ -159,6 +177,7 @@ export const alertRules = pgTable(
     check("alert_rules_platform_check", sql`(${table.platform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),
     check("alert_rules_frequency_check", sql`(${table.frequency} = ANY (ARRAY['realtime'::text, 'hourly_digest'::text, 'daily_digest'::text]))`),
     check("alert_rules_severity_check", sql`(${table.severity} = ANY (ARRAY['critical'::text, 'warning'::text, 'info'::text]))`),
+    index("idx_alert_rules_client").on(table.clientId),
   ]
 );
 
@@ -182,6 +201,8 @@ export const alertHistory = pgTable(
   (table) => [
     check("alert_history_severity_check", sql`(${table.severity} = ANY (ARRAY['critical'::text, 'warning'::text, 'info'::text]))`),
     check("alert_history_status_check", sql`(${table.status} = ANY (ARRAY['triggered'::text, 'acknowledged'::text, 'resolved'::text]))`),
+    index("idx_alert_history_client").on(table.clientId),
+    index("idx_alert_history_rule").on(table.ruleId),
   ]
 );
 
@@ -213,6 +234,7 @@ export const reportSchedules = pgTable(
     check("report_schedules_day_of_week_check", sql`((${table.dayOfWeek} >= 0) AND (${table.dayOfWeek} <= 6))`),
     check("report_schedules_day_of_month_check", sql`((${table.dayOfMonth} >= 1) AND (${table.dayOfMonth} <= 31))`),
     check("report_schedules_date_range_type_check", sql`(${table.dateRangeType} = ANY (ARRAY['last_7'::text, 'last_14'::text, 'last_30'::text, 'last_month'::text, 'last_quarter'::text, 'month_to_date'::text, 'custom'::text]))`),
+    index("idx_report_schedules_client").on(table.clientId),
   ]
 );
 
@@ -236,6 +258,7 @@ export const attributionJourneys = pgTable(
   },
   (table) => [
     check("attribution_journeys_converting_platform_check", sql`(${table.convertingPlatform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),
+    index("attribution_journeys_client_date_idx").on(table.clientId, table.conversionDate),
   ]
 );
 
@@ -259,6 +282,7 @@ export const customerCohorts = pgTable(
   },
   (table) => [
     check("customer_cohorts_acquisition_platform_check", sql`(${table.acquisitionPlatform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),
+    index("customer_cohorts_client_idx").on(table.clientId),
   ]
 );
 
@@ -275,7 +299,9 @@ export const dashboards = pgTable("dashboards", {
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("dashboards_client_name_idx").on(table.clientId, table.name),
+]);
 
 // --- Auth & tenancy ---
 // One profile row per Supabase auth user. `id` is the auth.users id; the
@@ -307,5 +333,7 @@ export const clientMembers = pgTable(
   },
   (table) => [
     check("client_members_role_check", sql`(${table.role} = ANY (ARRAY['viewer'::text]))`),
+    index("client_members_client_idx").on(table.clientId),
+    uniqueIndex("client_members_user_client_idx").on(table.userId, table.clientId),
   ]
 );

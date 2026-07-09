@@ -4,6 +4,7 @@ import { BiTrendingUp, BiError } from "react-icons/bi";
 import { useRevenueOverview } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { formatCurrency } from "@/lib/dashboard/metrics";
 
 export function RevenueRoasWidget() {
@@ -11,7 +12,7 @@ export function RevenueRoasWidget() {
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
 
-  const { data, isLoading } = useRevenueOverview({
+  const { data, isLoading, isError, refetch } = useRevenueOverview({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -28,6 +29,7 @@ export function RevenueRoasWidget() {
     );
   }
 
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!data) return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
 
   return (

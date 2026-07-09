@@ -4,6 +4,7 @@ import { usePacing } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Panel } from "@/components/ui/panel";
+import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT, STATUS_COLORS } from "@/lib/dashboard/chart-theme";
@@ -113,7 +114,7 @@ export function CampaignPacing() {
 
   const currentMonth = dateRange.start.substring(0, 7);
 
-  const { data: pacingData, isLoading } = usePacing({
+  const { data: pacingData, isLoading, isError, refetch } = usePacing({
     clientId,
     month: currentMonth,
   });
@@ -123,6 +124,18 @@ export function CampaignPacing() {
       <div className="space-y-4">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-[300px] w-full" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-ink">Campaign pacing</h2>
+          <p className="text-sm text-ink-muted mt-0.5">Budget utilization and spend forecasting for {format(new Date(currentMonth + "-01"), "MMMM yyyy")}.</p>
+        </div>
+        <QueryError onRetry={() => refetch()} message="Couldn't load pacing data" />
       </div>
     );
   }

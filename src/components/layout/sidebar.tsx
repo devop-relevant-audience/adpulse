@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
+import { useParams, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/store/app-store";
 import { useClients } from "@/hooks/use-metrics";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useFilterQuery } from "@/hooks/use-url-filters";
 import { isAgencyRole, isAdminRole, roleLabel } from "@/lib/auth/roles";
 import { signOutAndRedirect } from "@/lib/auth/sign-out";
 import { cn } from "@/lib/utils";
@@ -18,9 +21,18 @@ type NavItem = {
   id: string;
   label: string;
   icon: React.ReactNode;
-  active?: boolean;
-  onClick?: () => void;
 };
+
+/** Extracts the active client + view from `/[clientId]/[view]` and preserves
+ * the current filter query so nav/client links keep date & platform state. */
+function useNavContext() {
+  const params = useParams();
+  const pathname = usePathname();
+  const filterQuery = useFilterQuery();
+  const clientId = typeof params.clientId === "string" ? params.clientId : "";
+  const currentView = pathname.split("/")[2] || VIEWS.dashboard;
+  return { clientId, currentView, filterQuery };
+}
 
 function SeedControl({ collapsed }: { collapsed: boolean }) {
   const [isSeeding, setIsSeeding] = useState(false);
@@ -83,11 +95,10 @@ function SeedControl({ collapsed }: { collapsed: boolean }) {
 
 function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
   const { data: clients } = useClients();
-  const selectedClientId = useAppStore((s) => s.selectedClientId);
-  const setSelectedClientId = useAppStore((s) => s.setSelectedClientId);
+  const { clientId, currentView, filterQuery } = useNavContext();
   const [isOpen, setIsOpen] = useState(false);
 
-  const selectedClient = clients?.find((c) => c.id === selectedClientId);
+  const selectedClient = clients?.find((c) => c.id === clientId);
   // The server already filters clients to those the caller may access. With a
   // single option there's nothing to switch between, so render it as a static
   // label rather than a (misleading) dropdown.
@@ -153,20 +164,18 @@ function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
       {isOpen && clients && clients.length > 0 && (
         <div className="absolute left-3 right-3 top-full mt-1 bg-white border border-hairline rounded-lg shadow-(--shadow-elevated) z-50 py-1 max-h-60 overflow-y-auto">
           {clients.map((client) => (
-            <button
+            <Link
               key={client.id}
-              onClick={() => {
-                setSelectedClientId(client.id);
-                setIsOpen(false);
-              }}
+              href={`/${client.id}/${currentView}${filterQuery}`}
+              onClick={() => setIsOpen(false)}
               className={cn(
                 "flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left hover:bg-canvas-soft transition-colors",
-                client.id === selectedClientId && "bg-primary/5 text-primary"
+                client.id === clientId && "bg-primary/5 text-primary"
               )}
             >
               <div className={cn(
                 "w-6 h-6 rounded-md flex items-center justify-center text-xs font-semibold shrink-0",
-                client.id === selectedClientId ? "bg-primary/10 text-primary" : "bg-canvas-soft text-ink-muted"
+                client.id === clientId ? "bg-primary/10 text-primary" : "bg-canvas-soft text-ink-muted"
               )}>
                 {client.name.charAt(0)}
               </div>
@@ -174,10 +183,10 @@ function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
                 <p className="truncate font-medium">{client.name}</p>
                 <p className="text-[11px] text-ink-muted capitalize">{client.industry}</p>
               </div>
-              {client.id === selectedClientId && (
+              {client.id === clientId && (
                 <BiCheck className="w-4 h-4 text-primary shrink-0" />
               )}
-            </button>
+            </Link>
           ))}
         </div>
       )}
@@ -247,109 +256,25 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const toggleChat = useAppStore((s) => s.toggleChat);
   const isChatOpen = useAppStore((s) => s.isChatOpen);
-  const activeView = useAppStore((s) => s.activeView);
-  const setActiveView = useAppStore((s) => s.setActiveView);
+  const { clientId, currentView, filterQuery } = useNavContext();
   const { data: me } = useCurrentUser();
   const role = me?.profile.role;
   const isAgency = isAgencyRole(role);
   const isAdmin = isAdminRole(role);
 
-  // Alerts is agency-only; Team is agency_admin-only. A user landing on a view
-  // above their role (e.g. persisted deep state) is bounced to the dashboard.
-  useEffect(() => {
-    if (
-      (!isAgency && activeView === VIEWS.alerts) ||
-      (!isAdmin && activeView === VIEWS.team)
-    ) {
-      setActiveView(VIEWS.dashboard);
-    }
-  }, [isAgency, isAdmin, activeView, setActiveView]);
-
   const navItems: NavItem[] = [
-    {
-      id: VIEWS.dashboard,
-      label: "Dashboard",
-      icon: <BiGridAlt className="w-4 h-4" />,
-      active: activeView === VIEWS.dashboard,
-      onClick: () => setActiveView(VIEWS.dashboard),
-    },
-    {
-      id: VIEWS.anomalies,
-      label: "Anomalies",
-      icon: <BiError className="w-4 h-4" />,
-      active: activeView === VIEWS.anomalies,
-      onClick: () => setActiveView(VIEWS.anomalies),
-    },
-    {
-      id: VIEWS.pacing,
-      label: "Pacing",
-      icon: <BiTachometer className="w-4 h-4" />,
-      active: activeView === VIEWS.pacing,
-      onClick: () => setActiveView(VIEWS.pacing),
-    },
-    {
-      id: VIEWS.funnel,
-      label: "Funnel",
-      icon: <BiFilterAlt className="w-4 h-4" />,
-      active: activeView === VIEWS.funnel,
-      onClick: () => setActiveView(VIEWS.funnel),
-    },
-    {
-      id: VIEWS.optimizer,
-      label: "Channel mix",
-      icon: <BiSliderAlt className="w-4 h-4" />,
-      active: activeView === VIEWS.optimizer,
-      onClick: () => setActiveView(VIEWS.optimizer),
-    },
-    {
-      id: VIEWS.attribution,
-      label: "Attribution",
-      icon: <BiCoinStack className="w-4 h-4" />,
-      active: activeView === VIEWS.attribution,
-      onClick: () => setActiveView(VIEWS.attribution),
-    },
-    {
-      id: VIEWS.health,
-      label: "Health score",
-      icon: <BiPulse className="w-4 h-4" />,
-      active: activeView === VIEWS.health,
-      onClick: () => setActiveView(VIEWS.health),
-    },
-    {
-      id: VIEWS.creatives,
-      label: "Creatives",
-      icon: <BiImage className="w-4 h-4" />,
-      active: activeView === VIEWS.creatives,
-      onClick: () => setActiveView(VIEWS.creatives),
-    },
-    {
-      id: VIEWS.compare,
-      label: "Compare",
-      icon: <BiTransferAlt className="w-4 h-4" />,
-      active: activeView === VIEWS.compare,
-      onClick: () => setActiveView(VIEWS.compare),
-    },
-    {
-      id: VIEWS.alerts,
-      label: "Alerts",
-      icon: <BiBell className="w-4 h-4" />,
-      active: activeView === VIEWS.alerts,
-      onClick: () => setActiveView(VIEWS.alerts),
-    },
-    {
-      id: VIEWS.reports,
-      label: "Reports",
-      icon: <BiFile className="w-4 h-4" />,
-      active: activeView === VIEWS.reports,
-      onClick: () => setActiveView(VIEWS.reports),
-    },
-    {
-      id: VIEWS.team,
-      label: "Team",
-      icon: <BiGroup className="w-4 h-4" />,
-      active: activeView === VIEWS.team,
-      onClick: () => setActiveView(VIEWS.team),
-    },
+    { id: VIEWS.dashboard, label: "Dashboard", icon: <BiGridAlt className="w-4 h-4" /> },
+    { id: VIEWS.anomalies, label: "Anomalies", icon: <BiError className="w-4 h-4" /> },
+    { id: VIEWS.pacing, label: "Pacing", icon: <BiTachometer className="w-4 h-4" /> },
+    { id: VIEWS.funnel, label: "Funnel", icon: <BiFilterAlt className="w-4 h-4" /> },
+    { id: VIEWS.optimizer, label: "Channel mix", icon: <BiSliderAlt className="w-4 h-4" /> },
+    { id: VIEWS.attribution, label: "Attribution", icon: <BiCoinStack className="w-4 h-4" /> },
+    { id: VIEWS.health, label: "Health score", icon: <BiPulse className="w-4 h-4" /> },
+    { id: VIEWS.creatives, label: "Creatives", icon: <BiImage className="w-4 h-4" /> },
+    { id: VIEWS.compare, label: "Compare", icon: <BiTransferAlt className="w-4 h-4" /> },
+    { id: VIEWS.alerts, label: "Alerts", icon: <BiBell className="w-4 h-4" /> },
+    { id: VIEWS.reports, label: "Reports", icon: <BiFile className="w-4 h-4" /> },
+    { id: VIEWS.team, label: "Team", icon: <BiGroup className="w-4 h-4" /> },
   ];
 
   return (
@@ -377,22 +302,25 @@ export function Sidebar() {
             if (item.id === VIEWS.team) return isAdmin;
             return true;
           })
-          .map((item) => (
-          <button
-            key={item.id}
-            onClick={item.onClick}
-            className={cn(
-              "flex items-center gap-2.5 w-full rounded-md text-sm transition-colors",
-              collapsed ? "justify-center px-0 py-2.5" : "px-2.5 py-2",
-              item.active
-                ? "bg-primary/8 text-primary font-medium"
-                : "text-ink-muted hover:text-ink hover:bg-canvas-soft"
-            )}
-          >
-            {item.icon}
-            {!collapsed && <span>{item.label}</span>}
-          </button>
-        ))}
+          .map((item) => {
+            const active = item.id === currentView;
+            return (
+              <Link
+                key={item.id}
+                href={`/${clientId}/${item.id}${filterQuery}`}
+                className={cn(
+                  "flex items-center gap-2.5 w-full rounded-md text-sm transition-colors",
+                  collapsed ? "justify-center px-0 py-2.5" : "px-2.5 py-2",
+                  active
+                    ? "bg-primary/8 text-primary font-medium"
+                    : "text-ink-muted hover:text-ink hover:bg-canvas-soft"
+                )}
+              >
+                {item.icon}
+                {!collapsed && <span>{item.label}</span>}
+              </Link>
+            );
+          })}
 
         <button
           onClick={toggleChat}

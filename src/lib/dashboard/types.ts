@@ -67,7 +67,13 @@ export interface WidgetConfigFormProps {
 export const GRID_COLS: Record<Breakpoint, number> = { lg: 12, md: 8, sm: 4 };
 export const GRID_BREAKPOINTS: Record<Breakpoint, number> = { lg: 1024, md: 640, sm: 0 };
 export const GRID_ROW_HEIGHT = 40;
+// Inter-widget gutter (x, y).
 export const GRID_MARGIN: [number, number] = [16, 16];
+// Grid outer padding (x, y). Kept at 0 so the widget grid spans the SAME
+// content box as the dashboard header/toolbar above it — otherwise RGL
+// defaults containerPadding to `margin`, insetting the grid 16px on every side
+// and misaligning it against the full-width header (inconsistent gutters).
+export const GRID_CONTAINER_PADDING: [number, number] = [0, 0];
 
 // Column-span presets offered in the UI ("¼ / ½ / ¾ / full" on the lg grid).
 export const SIZE_PRESETS = [
