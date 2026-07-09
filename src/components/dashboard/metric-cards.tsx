@@ -7,6 +7,7 @@ import { useAppStore } from "@/store/app-store";
 import { format, subDays } from "date-fns";
 import { BiTrendingUp, BiTrendingDown, BiMessageRounded } from "react-icons/bi";
 import { cn } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/format";
 
 interface MetricCardProps {
   label: string;
@@ -51,19 +52,6 @@ function MetricCard({ label, value, delta, previousValue, invertDeltaColor = fal
       <p className="text-[11px] text-ink-muted mt-1.5 truncate">vs prev. {previousValue}</p>
     </button>
   );
-}
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
-
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 100_000) return `$${(n / 1_000).toFixed(0)}K`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
 }
 
 export function MetricCards() {

@@ -38,6 +38,7 @@ import {
   CHART_GRID,
   CHART_AXIS_TEXT,
 } from "@/lib/dashboard/chart-theme";
+import { formatCurrency, formatNumber as formatNum } from "@/lib/format";
 
 // Model identity drawn from the canonical SERIES_PALETTE (blue, violet, cyan,
 // pink, teal) — one entry per model, by index. No model uses red/green/amber,
@@ -49,18 +50,6 @@ const MODEL_COLORS: Record<AttributionModel, string> = {
   time_decay: SERIES_PALETTE[3],
   position_based: SERIES_PALETTE[4],
 };
-
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
-}
-
-function formatNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
 
 const chartTooltipStyle = {
   backgroundColor: "white",

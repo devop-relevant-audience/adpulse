@@ -15,6 +15,24 @@ import { format, subDays } from 'date-fns';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = 'google/gemini-3-flash-preview';
 
+// Abort any single OpenRouter request that stalls past this window so a hung
+// upstream can't wedge the route (which is itself bounded by maxDuration below).
+const OPENROUTER_TIMEOUT_MS = 30_000;
+// Cap on the tool-calling loop iterations before we stream the final answer.
+const MAX_TOOL_ITERATIONS = 5;
+// Cap the conversation history replayed to the model each turn. The full thread
+// is persisted in the DB; only the most recent messages are resent, to bound
+// token cost / latency and stay well under the model context window as threads
+// grow. Counts prior stored messages — the system prompt and the new user
+// message are added on top and always sent.
+const MAX_HISTORY_MESSAGES = 20;
+
+// Streaming SSE route: it runs a bounded tool-calling loop then streams tokens,
+// so it needs more headroom than the platform default. The Node runtime is
+// required because the tool executors hit the Drizzle/pg data layer.
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 const chatSchema = z.object({
 	message: z.string().min(1),
 	clientId: z.string().uuid(),
@@ -312,22 +330,35 @@ interface OpenRouterMessage {
 }
 
 async function callOpenRouter(messages: OpenRouterMessage[], apiKey: string, stream = false): Promise<Response> {
-	return fetch(OPENROUTER_URL, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${apiKey}`,
-			'HTTP-Referer': 'https://adpulse.app',
-			'X-Title': 'AdPulse',
-		},
-		body: JSON.stringify({
-			model: MODEL,
-			messages,
-			tools: TOOL_DEFINITIONS,
-			tool_choice: 'auto',
-			stream,
-		}),
-	});
+	// Guard every outbound call with an AbortController-based timeout. fetch()
+	// resolves once the response headers arrive: for stream=false OpenRouter
+	// buffers the whole completion first, so the window covers generation; for
+	// stream=true it covers connect/TTFB, and the timer is cleared here (in
+	// `finally`) before POST reads the token stream, so the stream body itself is
+	// never aborted mid-flight.
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
+	try {
+		return await fetch(OPENROUTER_URL, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${apiKey}`,
+				'HTTP-Referer': 'https://adpulse.app',
+				'X-Title': 'AdPulse',
+			},
+			body: JSON.stringify({
+				model: MODEL,
+				messages,
+				tools: TOOL_DEFINITIONS,
+				tool_choice: 'auto',
+				stream,
+			}),
+			signal: controller.signal,
+		});
+	} finally {
+		clearTimeout(timeout);
+	}
 }
 
 async function resolveToolCalls(
@@ -335,10 +366,18 @@ async function resolveToolCalls(
 	apiKey: string,
 	authorizedClientId: string,
 ): Promise<OpenRouterMessage[]> {
-	let maxIterations = 5;
+	let maxIterations = MAX_TOOL_ITERATIONS;
 
 	while (maxIterations > 0) {
-		const response = await callOpenRouter(messages, apiKey, false);
+		let response: Response;
+		try {
+			response = await callOpenRouter(messages, apiKey, false);
+		} catch (error) {
+			// Timeout (AbortError) or network failure during tool resolution: stop
+			// looping and let the caller proceed with the messages gathered so far.
+			logger.error('OpenRouter tool-resolution request failed', error, { route: 'chat.POST' });
+			break;
+		}
 		if (!response.ok) break;
 
 		const data = await response.json();
@@ -358,7 +397,24 @@ async function resolveToolCalls(
 		});
 
 		for (const toolCall of assistantMessage.tool_calls) {
-			const args = JSON.parse(toolCall.function.arguments);
+			let args: Record<string, string>;
+			try {
+				args = JSON.parse(toolCall.function.arguments);
+			} catch (error) {
+				// The model emitted malformed JSON for the tool arguments. Feed the
+				// error back as the tool result so the loop can recover on the next
+				// iteration instead of crashing the whole request.
+				logger.error('Failed to parse tool-call arguments', error, {
+					route: 'chat.POST',
+					tool: toolCall.function.name,
+				});
+				messages.push({
+					role: 'tool',
+					tool_call_id: toolCall.id,
+					content: JSON.stringify({ error: 'Invalid tool arguments: could not parse JSON.' }),
+				});
+				continue;
+			}
 			const result = await executeTool(toolCall.function.name, args, authorizedClientId);
 			messages.push({
 				role: 'tool',
@@ -417,7 +473,11 @@ export const POST = withRoute('chat.POST', async (request: NextRequest) => {
 		// Load prior conversation history from the DB BEFORE inserting the new
 		// message, then persist the incoming user message.
 		const prior = await getMessages(session.id);
-		const history = prior.map((m) => ({ role: m.role, content: m.content }));
+		// Cap the replayed history to the most recent turns. The full thread stays
+		// in the DB; resending only the tail bounds token cost/latency and keeps
+		// requests under the model context window as conversations grow.
+		const recentPrior = prior.slice(-MAX_HISTORY_MESSAGES);
+		const history = recentPrior.map((m) => ({ role: m.role, content: m.content }));
 		await addMessage(session.id, 'user', message, referenceContext ?? null);
 
 		const apiKey = process.env.OPENROUTER_API_KEY;
@@ -461,7 +521,15 @@ IMPORTANT RULES:
 
 		const resolvedMessages = await resolveToolCalls([...messages], apiKey, clientId);
 
-		const streamResponse = await callOpenRouter(resolvedMessages, apiKey, true);
+		let streamResponse: Response;
+		try {
+			streamResponse = await callOpenRouter(resolvedMessages, apiKey, true);
+		} catch (error) {
+			// Timeout (AbortError) or network failure before the stream opened.
+			// Degrade to the basic-mode summary rather than 500-ing the request.
+			logger.error('OpenRouter streaming request failed', error, { route: 'chat.POST' });
+			return handleWithoutAI(session.id, clientId, referenceContext);
+		}
 
 		if (!streamResponse.ok) {
 			const errorText = await streamResponse.text();

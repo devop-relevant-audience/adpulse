@@ -2,6 +2,7 @@
 // forms). Keys line up with the ComparisonResult summary/delta shape from
 // src/lib/data/queries.ts and the daily-trend row shape.
 import type { PeriodSummary } from "@/lib/data/queries";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 
 export type MetricFormat = "currency" | "number" | "percent";
 
@@ -34,27 +35,12 @@ export function getMetricOption(value: string): MetricOption {
   return METRIC_OPTIONS.find((m) => m.value === value) ?? METRIC_OPTIONS[0];
 }
 
-export function formatNumber(n: number): string {
-  if (!Number.isFinite(n)) return "—";
-  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
-
-export function formatCurrency(n: number): string {
-  if (!Number.isFinite(n)) return "—";
-  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(n) >= 100_000) return `$${(n / 1_000).toFixed(0)}K`;
-  if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
-}
-
 export function formatMetric(value: number, format: MetricFormat): string {
   switch (format) {
     case "currency":
       return formatCurrency(value);
     case "percent":
-      return `${value.toFixed(2)}%`;
+      return formatPercent(value);
     case "number":
       return formatNumber(value);
   }

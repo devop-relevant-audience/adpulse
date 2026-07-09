@@ -30,12 +30,7 @@ import {
 } from "@/lib/dashboard/chart-theme";
 import type { Platform } from "@/lib/types/database";
 import type { ChannelMixAnalysis } from "@/lib/data/optimizer";
-
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
-}
+import { formatCurrencyCompact as formatCurrency } from "@/lib/format";
 
 function AllocationDonut({ title, allocation, totalSpend }: {
   title: string;

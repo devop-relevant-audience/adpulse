@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 import { BiPulse, BiLineChart } from "react-icons/bi";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
+import { formatCurrencyCompact as formatCurrency, formatNumber } from "@/lib/format";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
 
 const GRADE_CONFIG = {
@@ -86,18 +87,6 @@ export function HealthWidget() {
       </div>
     </Panel>
   );
-}
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
-
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
 }
 
 export function ConversionWidget() {

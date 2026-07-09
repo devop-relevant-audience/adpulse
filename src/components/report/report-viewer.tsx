@@ -9,18 +9,7 @@ import { useAppStore } from "@/store/app-store";
 import type { ReferenceContext } from "@/store/app-store";
 import type { Platform } from "@/lib/types/database";
 import type { ReportData } from "@/lib/report/builder";
-
-function formatNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
-
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
-}
+import { formatCurrency, formatNumber as formatNum } from "@/lib/format";
 
 function DeltaBadge({ value, invert = false }: { value: number; invert?: boolean }) {
   const isGood = invert ? value < 0 : value >= 0;

@@ -4,7 +4,7 @@ import { useFunnel } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
-import { formatNumber } from "@/lib/dashboard/metrics";
+import { formatNumber } from "@/lib/format";
 
 const STAGE_COLORS = ["#6366f1", "#f59e0b", "#10b981"];
 
