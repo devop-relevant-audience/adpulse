@@ -53,7 +53,6 @@ interface AppState {
   selectedPlatform: Platform | undefined;
   referenceContext: ReferenceContext | null;
   isChatOpen: boolean;
-  activeView: ViewId;
 
   setSelectedClientId: (id: string) => void;
   setDateRange: (range: { start: string; end: string }) => void;
@@ -61,7 +60,6 @@ interface AppState {
   setReferenceContext: (ctx: ReferenceContext | null) => void;
   toggleChat: () => void;
   setChatOpen: (open: boolean) => void;
-  setActiveView: (view: ViewId) => void;
 }
 
 function getDefaultDateRange() {
@@ -78,7 +76,6 @@ export const useAppStore = create<AppState>((set) => ({
   selectedPlatform: undefined,
   referenceContext: null,
   isChatOpen: false,
-  activeView: VIEWS.dashboard,
 
   setSelectedClientId: (id) => set({ selectedClientId: id }),
   setDateRange: (range) => set({ dateRange: range }),
@@ -86,5 +83,4 @@ export const useAppStore = create<AppState>((set) => ({
   setReferenceContext: (ctx) => set({ referenceContext: ctx, isChatOpen: true }),
   toggleChat: () => set((s) => ({ isChatOpen: !s.isChatOpen })),
   setChatOpen: (open) => set({ isChatOpen: open }),
-  setActiveView: (view) => set({ activeView: view }),
 }));

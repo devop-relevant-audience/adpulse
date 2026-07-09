@@ -23,6 +23,7 @@ import {
   GRID_BREAKPOINTS,
   GRID_ROW_HEIGHT,
   GRID_MARGIN,
+  GRID_CONTAINER_PADDING,
   type DashboardConfig,
   type DashboardLayouts,
   type WidgetInstance,
@@ -190,6 +191,7 @@ export function CustomizableDashboard() {
             cols={GRID_COLS}
             rowHeight={GRID_ROW_HEIGHT}
             margin={GRID_MARGIN}
+            containerPadding={GRID_CONTAINER_PADDING}
             dragConfig={{ enabled: editMode, handle: ".widget-drag-handle" }}
             resizeConfig={{ enabled: editMode }}
             onLayoutChange={handleLayoutChange}

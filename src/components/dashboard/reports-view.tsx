@@ -14,6 +14,7 @@ import {
 } from "@/hooks/use-metrics";
 import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -294,8 +295,8 @@ export function ReportsView() {
   const [showForm, setShowForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ReportScheduleRow | undefined>();
 
-  const { data: reports, isLoading: reportsLoading } = useGeneratedReports(clientId);
-  const { data: schedules, isLoading: schedulesLoading } = useReportSchedules(clientId);
+  const { data: reports, isLoading: reportsLoading, isError: reportsError, refetch: refetchReports } = useGeneratedReports(clientId);
+  const { data: schedules, isLoading: schedulesLoading, isError: schedulesError, refetch: refetchSchedules } = useReportSchedules(clientId);
   const updateSchedule = useUpdateReportSchedule();
   const deleteSchedule = useDeleteReportSchedule();
   const sendNow = useSendReportNow();
@@ -335,7 +336,10 @@ export function ReportsView() {
       {tab === "reports" && (
         <div className="space-y-3">
           {reportsLoading && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
-          {!reportsLoading && (!reports || reports.length === 0) && (
+          {!reportsLoading && reportsError && (
+            <QueryError onRetry={() => refetchReports()} message="Couldn't load reports" />
+          )}
+          {!reportsLoading && !reportsError && (!reports || reports.length === 0) && (
             <div className="text-center py-12">
               <BiFile className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
               <p className="text-[13px] text-ink-muted">No reports generated yet.</p>
@@ -370,7 +374,11 @@ export function ReportsView() {
 
           {schedulesLoading && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
 
-          {!schedulesLoading && (!schedules || schedules.length === 0) && (
+          {!schedulesLoading && schedulesError && (
+            <QueryError onRetry={() => refetchSchedules()} message="Couldn't load schedules" />
+          )}
+
+          {!schedulesLoading && !schedulesError && (!schedules || schedules.length === 0) && (
             <div className="text-center py-12">
               <BiTime className="w-10 h-10 text-ink-muted/40 mx-auto mb-3" />
               <p className="text-[13px] text-ink-muted">No scheduled deliveries yet.</p>

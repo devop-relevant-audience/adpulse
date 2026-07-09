@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveCo
 import { useAttributionComparison } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
 import type { WidgetRenderProps } from "@/lib/dashboard/types";
 import type { Platform, AttributionModel } from "@/lib/types/database";
@@ -33,7 +34,7 @@ export function AttributionMiniWidget({ config }: WidgetRenderProps) {
   const modelA = readModel(config, "modelA", "first_touch");
   const modelB = readModel(config, "modelB", "last_touch");
 
-  const { data, isLoading } = useAttributionComparison({
+  const { data, isLoading, isError, refetch } = useAttributionComparison({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
@@ -56,6 +57,7 @@ export function AttributionMiniWidget({ config }: WidgetRenderProps) {
   const labelB = data?.models.find((m) => m.model === modelB)?.label ?? "Last Touch";
 
   if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!data || chartData.length === 0)
     return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
 

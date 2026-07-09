@@ -11,6 +11,7 @@ import {
 } from "@/hooks/use-metrics";
 import type { ComparisonResult } from "@/lib/data/queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/ui/query-error";
 import {
   Select,
   SelectContent,
@@ -315,12 +316,12 @@ function AISummaryCard({ campaigns }: { campaigns: CampaignComparisonData[] }) {
 function CampaignComparisonTab({ clientId }: { clientId: string }) {
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
-  const { data: campaigns, isLoading: campaignsLoading } = useCampaigns(clientId);
+  const { data: campaigns, isLoading: campaignsLoading, isError: campaignsError, refetch: refetchCampaigns } = useCampaigns(clientId);
   const [selectedIds, setSelectedIds] = useState<string[]>(["", ""]);
 
   const activeIds = selectedIds.filter(Boolean);
 
-  const { data: compData, isLoading: compLoading } = useCampaignComparison({
+  const { data: compData, isLoading: compLoading, isError: compError, refetch: refetchComp } = useCampaignComparison({
     clientId,
     campaignIds: activeIds,
     startDate: dateRange.start,
@@ -354,6 +355,10 @@ function CampaignComparisonTab({ clientId }: { clientId: string }) {
 
   if (campaignsLoading) {
     return <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>;
+  }
+
+  if (campaignsError) {
+    return <QueryError onRetry={() => refetchCampaigns()} message="Couldn't load campaigns" />;
   }
 
   function updateSelection(index: number, value: string) {
@@ -393,6 +398,10 @@ function CampaignComparisonTab({ clientId }: { clientId: string }) {
       </Panel>
 
       {compLoading && activeIds.length >= 2 && <Skeleton className="h-[400px] w-full" />}
+
+      {compError && activeIds.length >= 2 && (
+        <QueryError onRetry={() => refetchComp()} message="Couldn't load the campaign comparison" />
+      )}
 
       {campaignList.length >= 2 && (
         <>
@@ -606,7 +615,7 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
 
   const platform = platformFilter === "all" ? undefined : platformFilter;
 
-  const { data: comparison, isLoading: compLoading } = useComparison({
+  const { data: comparison, isLoading: compLoading, isError: compError, refetch: refetchComparison } = useComparison({
     clientId,
     currentStart: periodA.start,
     currentEnd: periodA.end,
@@ -681,6 +690,10 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
       </Panel>
 
       {isLoading && <Skeleton className="h-[400px] w-full" />}
+
+      {compError && !isLoading && (
+        <QueryError onRetry={() => refetchComparison()} message="Couldn't load the period comparison" />
+      )}
 
       {comparison && (
         <>

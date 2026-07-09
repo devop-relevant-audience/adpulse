@@ -7,6 +7,7 @@ import { isAgencyRole } from "@/lib/auth/roles";
 import { useCreatives } from "@/hooks/use-metrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Panel } from "@/components/ui/panel";
+import { QueryError } from "@/components/ui/query-error";
 import {
   Select,
   SelectContent,
@@ -224,7 +225,7 @@ export function CreativeGallery() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [generatorOpen, setGeneratorOpen] = useState(false);
 
-  const { data: creatives, isLoading } = useCreatives({
+  const { data: creatives, isLoading, isError, refetch } = useCreatives({
     clientId,
     platform: platformFilter || undefined,
     status: statusFilter || undefined,
@@ -238,6 +239,10 @@ export function CreativeGallery() {
         Select a client to view creatives
       </Panel>
     );
+  }
+
+  if (isError) {
+    return <QueryError onRetry={() => refetch()} message="Couldn't load creatives" />;
   }
 
   if (isLoading) {

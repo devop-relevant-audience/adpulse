@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCreatives } from "@/lib/data/queries";
 import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
+import { withRoute } from "@/lib/http/with-route";
+import { logger } from "@/lib/log";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import type { Platform, CreativeType, AdCreativeRow } from "@/lib/types/database";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -69,64 +72,72 @@ function summarizeTopPerformers(creatives: AdCreativeRow[]): string {
     .join("\n\n");
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withRoute("creatives.generate.POST", async (request: NextRequest) => {
   const gate = await requireUser();
   if (!gate.ok) return gate.response;
   const role = requireAgencyRole(gate.ctx);
   if (!role.ok) return role.response;
 
-  try {
-    const body = await request.json();
-    const parsed = requestSchema.safeParse(body);
+  // Throttle per authenticated user (fall back to IP) before any OpenRouter or
+  // DB work. Fails open when Upstash isn't configured.
+  const rl = await checkRateLimit(gate.ctx.userId || getClientIp(request), {
+    prefix: "creatives-generate",
+    limit: 10,
+    windowSeconds: 60,
+  });
+  if (!rl.ok) return rateLimitResponse(rl);
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.flatten() },
-        { status: 400 },
-      );
-    }
+  const body = await request.json();
+  const parsed = requestSchema.safeParse(body);
 
-    const { clientId, count, platforms } = parsed.data;
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
 
-    const allCreatives = await getCreatives({
-      clientId,
-      sort: "ctr",
-      order: "desc",
-    });
+  const { clientId, count, platforms } = parsed.data;
 
-    if (allCreatives.length === 0) {
-      return NextResponse.json(
-        { error: "No creatives found for this client. Seed data first." },
-        { status: 404 },
-      );
-    }
+  const allCreatives = await getCreatives({
+    clientId,
+    sort: "ctr",
+    order: "desc",
+  });
 
-    const topPerformers = allCreatives
-      .filter((c) => c.status === "active")
-      .sort((a, b) => {
-        const scoreA = Number(a.ctr) * 1000 + Number(a.conversions) / Math.max(Number(a.cpa), 1);
-        const scoreB = Number(b.ctr) * 1000 + Number(b.conversions) / Math.max(Number(b.cpa), 1);
-        return scoreB - scoreA;
-      })
-      .slice(0, 8);
+  if (allCreatives.length === 0) {
+    return NextResponse.json(
+      { error: "No creatives found for this client. Seed data first." },
+      { status: 404 },
+    );
+  }
 
-    if (topPerformers.length === 0) {
-      return NextResponse.json(
-        { error: "No active creatives to base variants on." },
-        { status: 404 },
-      );
-    }
+  const topPerformers = allCreatives
+    .filter((c) => c.status === "active")
+    .sort((a, b) => {
+      const scoreA = Number(a.ctr) * 1000 + Number(a.conversions) / Math.max(Number(a.cpa), 1);
+      const scoreB = Number(b.ctr) * 1000 + Number(b.conversions) / Math.max(Number(b.cpa), 1);
+      return scoreB - scoreA;
+    })
+    .slice(0, 8);
 
-    const platformSet = platforms?.length
-      ? platforms
-      : [...new Set(topPerformers.map((c) => c.platform))];
+  if (topPerformers.length === 0) {
+    return NextResponse.json(
+      { error: "No active creatives to base variants on." },
+      { status: 404 },
+    );
+  }
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(generateFallbackVariants(topPerformers, count, platformSet));
-    }
+  const platformSet = platforms?.length
+    ? platforms
+    : [...new Set(topPerformers.map((c) => c.platform))];
 
-    const prompt = `You are an expert ad creative strategist. Analyze these top-performing ad creatives and generate ${count} new creative variants that combine the best elements (headlines, copy angles, formats, tones) from the winners.
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(generateFallbackVariants(topPerformers, count, platformSet));
+  }
+
+  const prompt = `You are an expert ad creative strategist. Analyze these top-performing ad creatives and generate ${count} new creative variants that combine the best elements (headlines, copy angles, formats, tones) from the winners.
 
 TOP PERFORMING CREATIVES:
 ${summarizeTopPerformers(topPerformers)}
@@ -156,91 +167,89 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code fences):
   ]
 }`;
 
-    const response = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://adpulse.app",
-        "X-Title": "AdPulse",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a JSON-only API. Respond with valid JSON only, no markdown formatting, no code fences, no explanations outside the JSON.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.8,
-        response_format: { type: "json_object" },
-      }),
+  const response = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": "https://adpulse.app",
+      "X-Title": "AdPulse",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a JSON-only API. Respond with valid JSON only, no markdown formatting, no code fences, no explanations outside the JSON.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.8,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    logger.error("Creative generation OpenRouter error", undefined, {
+      route: "creatives.generate.POST",
+      detail: await response.text(),
     });
-
-    if (!response.ok) {
-      console.error("OpenRouter error:", await response.text());
-      return NextResponse.json(generateFallbackVariants(topPerformers, count, platformSet));
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      return NextResponse.json(generateFallbackVariants(topPerformers, count, platformSet));
-    }
-
-    let aiVariants: { variants: Array<Omit<GeneratedCreative, "thumbnail_url">> };
-    try {
-      const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      aiVariants = JSON.parse(cleaned);
-    } catch {
-      console.error("Failed to parse AI response:", content);
-      return NextResponse.json(generateFallbackVariants(topPerformers, count, platformSet));
-    }
-
-    const variants: GeneratedCreative[] = (aiVariants.variants || [])
-      .slice(0, count)
-      .map((v, i) => ({
-        headline: v.headline || "New Variant",
-        body_copy: v.body_copy || "Generated creative variant",
-        creative_type: (["image", "video", "carousel"].includes(v.creative_type)
-          ? v.creative_type
-          : "image") as CreativeType,
-        platform: (platformSet.includes(v.platform as Platform)
-          ? v.platform
-          : platformSet[0]) as Platform,
-        rationale: v.rationale || "",
-        inspired_by: v.inspired_by || [],
-        thumbnail_url: buildThumbnailUrl(
-          v.headline || "New Variant",
-          (v.creative_type || "image") as CreativeType,
-          (v.platform || platformSet[0]) as Platform,
-          i,
-        ),
-      }));
-
-    return NextResponse.json({
-      variants,
-      topPerformers: topPerformers.map((c) => ({
-        headline: c.headline,
-        creative_type: c.creative_type,
-        platform: c.platform,
-        ctr: c.ctr,
-        cpa: c.cpa,
-        conversions: c.conversions,
-      })),
-      generatedWith: "ai",
-    });
-  } catch (error) {
-    console.error("Creative generation error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate creatives" },
-      { status: 500 },
-    );
+    return NextResponse.json(generateFallbackVariants(topPerformers, count, platformSet));
   }
-}
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) {
+    return NextResponse.json(generateFallbackVariants(topPerformers, count, platformSet));
+  }
+
+  let aiVariants: { variants: Array<Omit<GeneratedCreative, "thumbnail_url">> };
+  try {
+    const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    aiVariants = JSON.parse(cleaned);
+  } catch {
+    logger.error("Creative generation failed to parse AI response", undefined, {
+      route: "creatives.generate.POST",
+    });
+    return NextResponse.json(generateFallbackVariants(topPerformers, count, platformSet));
+  }
+
+  const variants: GeneratedCreative[] = (aiVariants.variants || [])
+    .slice(0, count)
+    .map((v, i) => ({
+      headline: v.headline || "New Variant",
+      body_copy: v.body_copy || "Generated creative variant",
+      creative_type: (["image", "video", "carousel"].includes(v.creative_type)
+        ? v.creative_type
+        : "image") as CreativeType,
+      platform: (platformSet.includes(v.platform as Platform)
+        ? v.platform
+        : platformSet[0]) as Platform,
+      rationale: v.rationale || "",
+      inspired_by: v.inspired_by || [],
+      thumbnail_url: buildThumbnailUrl(
+        v.headline || "New Variant",
+        (v.creative_type || "image") as CreativeType,
+        (v.platform || platformSet[0]) as Platform,
+        i,
+      ),
+    }));
+
+  return NextResponse.json({
+    variants,
+    topPerformers: topPerformers.map((c) => ({
+      headline: c.headline,
+      creative_type: c.creative_type,
+      platform: c.platform,
+      ctr: c.ctr,
+      cpa: c.cpa,
+      conversions: c.conversions,
+    })),
+    generatedWith: "ai",
+  });
+});
 
 function generateFallbackVariants(
   topPerformers: AdCreativeRow[],

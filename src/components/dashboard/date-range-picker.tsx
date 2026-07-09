@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAppStore } from "@/store/app-store";
+import { useSetUrlFilters } from "@/hooks/use-url-filters";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfQuarter, subQuarters, endOfQuarter } from "date-fns";
 import {
   Select,
@@ -35,7 +36,9 @@ const PRESETS = [
 
 export function DateRangePicker() {
   const dateRange = useAppStore((s) => s.dateRange);
-  const setDateRange = useAppStore((s) => s.setDateRange);
+  // Writes to the URL (?start&end); the [clientId] layout mirrors it back into
+  // the store, so the display above keeps reading `dateRange` from the store.
+  const { setDateRange } = useSetUrlFilters();
   const [showCustom, setShowCustom] = useState(false);
   const [customStart, setCustomStart] = useState(dateRange.start);
   const [customEnd, setCustomEnd] = useState(dateRange.end);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppStore } from "@/store/app-store";
+import { useSetUrlFilters } from "@/hooks/use-url-filters";
 import { cn } from "@/lib/utils";
 import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
 import type { Platform } from "@/lib/types/database";
@@ -14,7 +15,9 @@ const PLATFORM_OPTIONS: Array<{ value: Platform | "all"; label: string }> = [
 
 export function PlatformFilter() {
   const selectedPlatform = useAppStore((s) => s.selectedPlatform);
-  const setSelectedPlatform = useAppStore((s) => s.setSelectedPlatform);
+  // Writes to the URL (?platform); the [clientId] layout mirrors it into the
+  // store, which the pill state below still reads.
+  const { setPlatform: setSelectedPlatform } = useSetUrlFilters();
 
   const currentValue = selectedPlatform || "all";
 
