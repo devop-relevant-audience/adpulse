@@ -52,6 +52,7 @@ export async function getClients(): Promise<ClientRow[]> {
       name: clients.name,
       industry: clients.industry,
       is_demo: clients.isDemo,
+      atlas_project_id: clients.atlasProjectId,
       created_at: clients.createdAt,
     })
     .from(clients)

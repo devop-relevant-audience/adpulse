@@ -1,12 +1,19 @@
-// Hand-maintained Drizzle model of the Supabase Postgres schema. `drizzle-kit
-// pull`/`generate` are unreliable here (pull crashes on this project's CHECK
-// constraints — see AGENTS.md), so this file is NOT generated. When you change
-// the schema, write an idempotent migration in `drizzle/NNNN_*.sql`, run
-// `npm run db:migrate`, and hand-edit this file (and src/lib/types/database.ts)
-// to match. Keep the index()/uniqueIndex()/check() calls in sync with the SQL.
+// Hand-maintained Drizzle model of AdPulse's tables, which live in the
+// dedicated `adpulse` Postgres schema INSIDE the shared Atlas Supabase project.
+// Atlas owns `public` (managed by drizzle-kit push from the Atlas repo); AdPulse
+// must never create objects there — everything here goes through
+// `adpulseSchema.table(...)`. Read-only models of the Atlas tables AdPulse
+// consumes live in ./atlas-schema.ts.
+//
+// `drizzle-kit pull`/`generate` are unreliable here (pull crashes on this
+// project's CHECK constraints — see AGENTS.md), so this file is NOT generated.
+// When you change the schema, write an idempotent migration in
+// `drizzle/NNNN_*.sql`, run `npm run db:migrate`, and hand-edit this file (and
+// src/lib/types/database.ts) to match. Keep the index()/uniqueIndex()/check()
+// calls in sync with the SQL.
 import { sql } from "drizzle-orm";
 import {
-  pgTable,
+  pgSchema,
   uuid,
   text,
   integer,
@@ -22,22 +29,38 @@ import {
 } from "drizzle-orm/pg-core";
 import type { DashboardLayouts, WidgetInstance } from "@/lib/dashboard/types";
 
-export const clients = pgTable("clients", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  industry: text("industry").notNull(),
-  // Demo/seed clients keep the showcase-only features (attribution, LTV,
-  // creatives); real clients hide them until real data sources exist.
-  isDemo: boolean("is_demo").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-});
+// All AdPulse-owned tables live in this schema, isolated from Atlas's `public`.
+export const adpulseSchema = pgSchema("adpulse");
+
+export const clients = adpulseSchema.table(
+  "clients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    industry: text("industry").notNull(),
+    // Demo/seed clients keep the showcase-only features (attribution, LTV,
+    // creatives); real clients hide them until real data sources exist.
+    isDemo: boolean("is_demo").notNull().default(false),
+    // Link to the Atlas project this client belongs to (public.projects.id).
+    // Drives client_user access: Atlas project membership (public.project_users)
+    // grants access to the AdPulse client linked here. NULL = not linked (demo
+    // clients) — reachable by agency roles only.
+    atlasProjectId: uuid("atlas_project_id"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("clients_atlas_project_idx")
+      .on(table.atlasProjectId)
+      .where(sql`${table.atlasProjectId} IS NOT NULL`),
+  ]
+);
 
 // --- Ingestion foundation (Windsor workstream, docs/schema-v2-assessment.md) ---
 
 // One row per connected platform ad account. Currency/timezone are immutable
 // account-level facts on all three platforms; timezone is nullable because
 // Windsor doesn't currently expose it (entered manually).
-export const adAccounts = pgTable(
+export const adAccounts = adpulseSchema.table(
   "ad_accounts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -63,7 +86,7 @@ export const adAccounts = pgTable(
 // Landing layer: verbatim Windsor response row per (account, campaign, date).
 // Normalization is a re-runnable pure function of this table — a mapping
 // mistake is a re-run, not a re-pull.
-export const rawWindsorRows = pgTable(
+export const rawWindsorRows = adpulseSchema.table(
   "raw_windsor_rows",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -86,7 +109,7 @@ export const rawWindsorRows = pgTable(
 // / TikTok optimization event; attribution_window = 'value' (account's active
 // setting) or a fixed-window reading (e.g. '7d_click') where the platform
 // embeds per-window breakdowns.
-export const conversionMappings = pgTable(
+export const conversionMappings = adpulseSchema.table(
   "conversion_mappings",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -107,7 +130,7 @@ export const conversionMappings = pgTable(
 // SCD-lite campaign dimension. status/objective/campaign_type are
 // platform-native OPEN enums (values get added over time and legacy values
 // still appear on read) — deliberately no CHECK constraints.
-export const campaigns = pgTable(
+export const campaigns = adpulseSchema.table(
   "campaigns",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -127,7 +150,7 @@ export const campaigns = pgTable(
   ]
 );
 
-export const campaignPerformance = pgTable(
+export const campaignPerformance = adpulseSchema.table(
   "campaign_performance",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -164,7 +187,7 @@ export const campaignPerformance = pgTable(
   ]
 );
 
-export const campaignBudgets = pgTable("campaign_budgets", {
+export const campaignBudgets = adpulseSchema.table("campaign_budgets", {
   id: uuid("id").primaryKey().defaultRandom(),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   campaignId: text("campaign_id").notNull(),
@@ -175,7 +198,7 @@ export const campaignBudgets = pgTable("campaign_budgets", {
   index("idx_campaign_budgets_client_month").on(table.clientId, table.month),
 ]);
 
-export const reports = pgTable("reports", {
+export const reports = adpulseSchema.table("reports", {
   id: uuid("id").primaryKey().defaultRandom(),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
@@ -194,7 +217,7 @@ export const reports = pgTable("reports", {
   uniqueIndex("idx_reports_share_token").on(table.shareToken).where(sql`${table.shareToken} IS NOT NULL`),
 ]);
 
-export const chatSessions = pgTable("chat_sessions", {
+export const chatSessions = adpulseSchema.table("chat_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
@@ -203,7 +226,7 @@ export const chatSessions = pgTable("chat_sessions", {
   index("idx_chat_sessions_client").on(table.clientId),
 ]);
 
-export const chatMessages = pgTable(
+export const chatMessages = adpulseSchema.table(
   "chat_messages",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -219,7 +242,7 @@ export const chatMessages = pgTable(
   ]
 );
 
-export const adCreatives = pgTable(
+export const adCreatives = adpulseSchema.table(
   "ad_creatives",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -255,7 +278,7 @@ export const adCreatives = pgTable(
   ]
 );
 
-export const alertRules = pgTable(
+export const alertRules = adpulseSchema.table(
   "alert_rules",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -288,7 +311,7 @@ export const alertRules = pgTable(
   ]
 );
 
-export const alertHistory = pgTable(
+export const alertHistory = adpulseSchema.table(
   "alert_history",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -313,7 +336,7 @@ export const alertHistory = pgTable(
   ]
 );
 
-export const reportSchedules = pgTable(
+export const reportSchedules = adpulseSchema.table(
   "report_schedules",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -351,7 +374,7 @@ export const reportSchedules = pgTable(
 // Used to compute multi-touch attribution models and the blended-vs-reported
 // ROAS contrast (platforms each self-claim conversions, so summing
 // campaign_performance across platforms over-counts vs these real journeys).
-export const attributionJourneys = pgTable(
+export const attributionJourneys = adpulseSchema.table(
   "attribution_journeys",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -371,7 +394,7 @@ export const attributionJourneys = pgTable(
 
 // Customer cohorts by acquisition channel + acquisition month, with a retention
 // curve (per-customer cumulative revenue over month offsets) for LTV / LTV:CAC.
-export const customerCohorts = pgTable(
+export const customerCohorts = adpulseSchema.table(
   "customer_cohorts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -396,7 +419,7 @@ export const customerCohorts = pgTable(
 // --- Customizable dashboards ---
 // Per-client saved dashboard layouts. `layouts`/`widgets` are nested JSON that
 // crosses the case boundary untouched (their inner keys stay camelCase).
-export const dashboards = pgTable("dashboards", {
+export const dashboards = adpulseSchema.table("dashboards", {
   id: uuid("id").primaryKey().defaultRandom(),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   name: text("name").notNull().default("Default"),
@@ -411,36 +434,6 @@ export const dashboards = pgTable("dashboards", {
 ]);
 
 // --- Auth & tenancy ---
-// One profile row per Supabase auth user. `id` is the auth.users id; the
-// cross-schema FK to auth.users(id) ON DELETE CASCADE lives in the migration
-// (drizzle/0004_auth_tenancy.sql) since Drizzle doesn't model the auth schema.
-export const userProfiles = pgTable(
-  "user_profiles",
-  {
-    id: uuid("id").primaryKey(),
-    fullName: text("full_name"),
-    role: text("role").notNull().default("client_user"),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-  },
-  (table) => [
-    check("user_profiles_role_check", sql`(${table.role} = ANY (ARRAY['agency_admin'::text, 'agency_member'::text, 'client_user'::text]))`),
-  ]
-);
-
-// Per-client membership — grants a (non-agency) user access to a single client.
-export const clientMembers = pgTable(
-  "client_members",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull().references(() => userProfiles.id, { onDelete: "cascade" }),
-    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
-    role: text("role").notNull().default("viewer"),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
-  },
-  (table) => [
-    check("client_members_role_check", sql`(${table.role} = ANY (ARRAY['viewer'::text]))`),
-    index("client_members_client_idx").on(table.clientId),
-    uniqueIndex("client_members_user_client_idx").on(table.userId, table.clientId),
-  ]
-);
+// AdPulse stores NO user tables. Identity is the shared Clerk session; roles
+// and client-project membership are read from Atlas's public.user_roles and
+// public.project_users (see ./atlas-schema.ts and src/lib/auth/atlas-roles.ts).

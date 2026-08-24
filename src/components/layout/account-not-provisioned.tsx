@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { BiShieldX, BiRefresh } from "react-icons/bi";
 import { Button } from "@/components/ui/button";
-import { signOutAndRedirect } from "@/lib/auth/sign-out";
+import { useSignOutAndRedirect } from "@/lib/auth/sign-out";
 
 // Full-page state for an authenticated user with no user_profiles row
 // (/api/me → 403). They have a valid session but no access yet, so the only
 // action is to sign out.
 export function AccountNotProvisioned() {
   const [signingOut, setSigningOut] = useState(false);
+  const signOutAndRedirect = useSignOutAndRedirect();
 
   return (
     <div className="min-h-screen grid place-items-center bg-background px-6">

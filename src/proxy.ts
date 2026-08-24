@@ -1,82 +1,44 @@
-// Next 16 proxy (formerly middleware). Refreshes the Supabase session on every
-// matched request and enforces an optimistic auth gate — "is there a verified
-// session?". Per-route authorization (which client a user may see) lands in a
-// later stage; keep this file to session refresh + coarse gating.
+// Next 16 proxy (formerly middleware), running on the shared Atlas Clerk
+// instance. Coarse gate only — "is there a Clerk session?". Per-route
+// authorization (which client a user may see) lives in src/lib/auth/guard.ts.
+// Users already signed in to Atlas (same Clerk instance, same root domain in
+// production) pass straight through without seeing /login.
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import type { Database } from "@/lib/types/database";
 
-export async function proxy(request: NextRequest) {
-  // Start from a passthrough response; setAll recreates it so refreshed auth
-  // cookies ride along on the request (upstream) and the response (to browser).
-  let response = NextResponse.next({ request });
+const isLoginRoute = createRouteMatcher(["/login(.*)"]);
 
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  // getUser() refreshes + verifies against the Auth server. Do NOT trust
-  // getSession() for gating.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { pathname, searchParams } = request.nextUrl;
-  const isApi = pathname.startsWith("/api");
-
-  // Public surfaces that must work without a session.
-  const isPublic =
-    pathname === "/login" ||
-    pathname === "/auth/callback" ||
-    // Invite acceptance: the session materializes client-side from the URL
-    // (hash tokens) on this page, so it must load without a prior session.
-    pathname === "/auth/accept-invite" ||
-    // Public shared-report links land on `/` with a ?share= token.
+// Public surfaces that must work without a session: the sign-in page, public
+// shared-report links (`/?share=<token>`), and the share-view API (token +
+// password are checked inside the route, which is also rate-limited).
+function isPublic(req: NextRequest): boolean {
+  const { pathname, searchParams } = req.nextUrl;
+  return (
+    isLoginRoute(req) ||
     (pathname === "/" && searchParams.has("share")) ||
-    // Public share-view API (token + password checked inside the route).
-    (pathname === "/api/reports/share" && request.method === "GET");
+    (pathname === "/api/reports/share" && req.method === "GET")
+  );
+}
+
+export default clerkMiddleware(async (auth, req: NextRequest) => {
+  const { userId } = await auth();
 
   // Signed-in users have no business on the login page.
-  if (user && pathname === "/login") {
-    return redirectPreservingCookies(new URL("/", request.url), response);
+  if (userId && isLoginRoute(req)) {
+    return NextResponse.redirect(new URL("/", req.url));
   }
 
-  if (!user && !isPublic) {
-    if (isApi) {
+  if (!userId && !isPublic(req)) {
+    if (req.nextUrl.pathname.startsWith("/api")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const loginUrl = new URL("/login", request.url);
-    return redirectPreservingCookies(loginUrl, response);
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("redirect_url", req.url);
+    return NextResponse.redirect(loginUrl);
   }
 
-  return response;
-}
-
-// Redirects mint a fresh response, which would drop any Set-Cookie headers the
-// session refresh just wrote. Copy them onto the redirect so the refreshed
-// session survives the hop.
-function redirectPreservingCookies(url: URL, from: NextResponse) {
-  const redirect = NextResponse.redirect(url);
-  from.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
-  return redirect;
-}
+  return NextResponse.next();
+});
 
 export const config = {
   // Run on everything except Next internals, the favicon, and static assets by

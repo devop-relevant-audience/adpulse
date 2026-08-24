@@ -1,15 +1,18 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
+import { useClerk } from "@clerk/nextjs";
 
-// Sign out locally (this device only — `scope: "local"` leaves other sessions
-// intact) and hard-navigate to /login so all client state (React Query cache,
-// Zustand stores) is dropped.
-export async function signOutAndRedirect() {
-  try {
-    const supabase = createClient();
-    await supabase.auth.signOut({ scope: "local" });
-  } finally {
-    window.location.assign("/login");
-  }
+// Sign out of the shared Clerk session (this also ends the session for Atlas —
+// it is one login across both apps) and hard-navigate to /login so all client
+// state (React Query cache, Zustand stores) is dropped.
+export function useSignOutAndRedirect() {
+  const { signOut } = useClerk();
+
+  return async function signOutAndRedirect() {
+    try {
+      await signOut();
+    } finally {
+      window.location.assign("/login");
+    }
+  };
 }

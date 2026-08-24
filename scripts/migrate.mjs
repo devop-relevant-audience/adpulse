@@ -7,8 +7,13 @@
 //                                              # whose schema already matches the repo)
 //
 // Migrations are the plain SQL files in drizzle/*.sql, applied in ascending
-// filename order (0000_baseline.sql first). drizzle-kit generate/migrate are
-// unreliable on this project (see AGENTS.md), so this is the canonical runner.
+// filename order (0000_shared_baseline.sql first). drizzle-kit generate/migrate
+// are unreliable on this project (see AGENTS.md), so this is the canonical runner.
+//
+// DATABASE_URL points at the SHARED Atlas Supabase project. AdPulse owns only
+// the `adpulse` schema there (the ledger lives at adpulse._migrations); Atlas
+// owns `public` and manages it from the Atlas repo — migrations here must never
+// create or alter objects in `public`.
 //
 // Each file runs inside a single transaction and is recorded in the _migrations
 // ledger table on success; a failure rolls the whole file back and stops. Files
@@ -40,7 +45,8 @@ const sql = postgres(DATABASE_URL, {
 
 async function main() {
   await sql.unsafe(`
-    CREATE TABLE IF NOT EXISTS _migrations (
+    CREATE SCHEMA IF NOT EXISTS adpulse;
+    CREATE TABLE IF NOT EXISTS adpulse._migrations (
       name text PRIMARY KEY,
       applied_at timestamptz NOT NULL DEFAULT now()
     );
@@ -51,7 +57,7 @@ async function main() {
     .sort();
 
   const applied = new Set(
-    (await sql`SELECT name FROM _migrations`).map((r) => r.name)
+    (await sql`SELECT name FROM adpulse._migrations`).map((r) => r.name)
   );
   const pending = files.filter((f) => !applied.has(f));
 
@@ -71,7 +77,7 @@ async function main() {
 
   if (mode === "--mark-applied") {
     for (const f of pending) {
-      await sql`INSERT INTO _migrations (name) VALUES (${f}) ON CONFLICT DO NOTHING`;
+      await sql`INSERT INTO adpulse._migrations (name) VALUES (${f}) ON CONFLICT DO NOTHING`;
       console.log(`  ✓ marked applied (not run): ${f}`);
     }
     console.log(`Recorded ${pending.length} migration(s) without running them.`);
@@ -89,7 +95,7 @@ async function main() {
     process.stdout.write(`Applying ${f} ... `);
     await sql.begin(async (tx) => {
       await tx.unsafe(contents);
-      await tx`INSERT INTO _migrations (name) VALUES (${f})`;
+      await tx`INSERT INTO adpulse._migrations (name) VALUES (${f})`;
     });
     console.log("✓");
   }

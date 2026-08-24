@@ -61,12 +61,7 @@ export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
 
       if (!res.ok) {
         const data = await res.json();
-        const msg = data.error || "Failed to create share link";
-        if (msg.includes("row-level security") || msg.includes("policy")) {
-          console.error("Share link creation failed — database write permissions not configured (set SUPABASE_SERVICE_ROLE_KEY):", msg);
-          throw new Error("Sharing is temporarily unavailable. Please try again later.");
-        }
-        throw new Error(msg);
+        throw new Error(data.error || "Failed to create share link");
       }
 
       const data = await res.json();

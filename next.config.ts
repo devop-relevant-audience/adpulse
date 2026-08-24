@@ -18,21 +18,37 @@ function originOf(url: string | undefined): string | null {
   }
 }
 
+/**
+ * Clerk's browser SDK loads clerk-js from, and talks to, the instance's
+ * Frontend API domain, which is embedded (base64, `$`-terminated) in the
+ * publishable key — derive it so the CSP can never drift from the configured
+ * instance (dev: *.clerk.accounts.dev; prod: clerk.<root domain>).
+ */
+function clerkOriginFromKey(key: string | undefined): string | null {
+  if (!key) return null;
+  const encoded = key.replace(/^pk_(test|live)_/, "");
+  try {
+    const domain = Buffer.from(encoded, "base64").toString("utf8").replace(/\$$/, "");
+    return domain ? `https://${domain}` : null;
+  } catch {
+    return null;
+  }
+}
+
 // Browser-reached origins are derived from the SAME build-time env the client
 // code is compiled against, so the CSP can never drift from what the bundle
 // actually calls:
-//  - The browser Supabase auth client (src/lib/supabase/client.ts) talks to
-//    NEXT_PUBLIC_SUPABASE_URL for auth (fetch; the app uses no realtime, so no
-//    wss is needed).
+//  - The Clerk browser SDK (auth) loads from and calls the instance's Frontend
+//    API origin derived above.
 //  - The Sentry browser SDK (src/instrumentation-client.ts) ingests errors to
 //    the origin embedded in NEXT_PUBLIC_SENTRY_DSN. URL.origin strips the DSN's
 //    public-key credential automatically.
 // OpenRouter and Upstash are deliberately absent: they are only ever called
 // from server routes (chat, creatives/generate, rate-limit), never the browser.
-const supabaseOrigin = originOf(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const clerkOrigin = clerkOriginFromKey(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 const sentryOrigin = originOf(process.env.NEXT_PUBLIC_SENTRY_DSN);
 
-const connectSrc = ["'self'", supabaseOrigin, sentryOrigin].filter(Boolean);
+const connectSrc = ["'self'", clerkOrigin, sentryOrigin].filter(Boolean);
 
 // The PDF export (src/components/report/report-generator.tsx) opens a blank
 // popup and document.write()s HTML that @imports Google Fonts. A window opened
@@ -48,7 +64,10 @@ const cspDirectives = [
   // dynamic rendering (disables static/PPR) — out of scope for this change.
   // 'unsafe-eval' is added in dev only, where React/Turbopack use eval for
   // error stacks and HMR; production never needs it.
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  // clerk-js is loaded from the Clerk Frontend API origin; the sign-in widget
+  // can load Cloudflare Turnstile (Clerk's bot protection) from
+  // challenges.cloudflare.com.
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${clerkOrigin ? ` ${clerkOrigin}` : ""} https://challenges.cloudflare.com`,
   // 'unsafe-inline': Tailwind v4, react-grid-layout (inline transform/size on
   // every grid item), and Recharts all set inline style attributes at runtime.
   // fonts.googleapis.com covers the print-popup stylesheet @import above.
@@ -57,7 +76,8 @@ const cspDirectives = [
   // (creative-gallery.tsx, creative-generator.tsx, buildThumbnailUrl). data:
   // covers inline/canvas images; blob: covers URL.createObjectURL used by the
   // CSV/asset export flows.
-  `img-src 'self' data: blob: https://placehold.co`,
+  // img.clerk.com serves user avatars in Clerk components.
+  `img-src 'self' data: blob: https://placehold.co https://img.clerk.com`,
   // 'self' = next/font self-hosted files; gstatic = print-popup font files;
   // data: = any base64-inlined font.
   `font-src 'self' data: https://fonts.gstatic.com`,
@@ -67,10 +87,13 @@ const cspDirectives = [
   `form-action 'self'`,
   // Clickjacking defense: the app (incl. public share pages) must not be
   // embeddable. frame-ancestors is the modern control; X-Frame-Options below
-  // is the legacy belt-and-suspenders. frame-src 'none' — the app embeds no
-  // iframes (the PDF export uses window.open, not a frame).
+  // is the legacy belt-and-suspenders. frame-src allows only Cloudflare
+  // Turnstile (Clerk bot protection renders it in an iframe on sign-in); the
+  // app itself embeds no other frames (the PDF export uses window.open).
   `frame-ancestors 'none'`,
-  `frame-src 'none'`,
+  `frame-src https://challenges.cloudflare.com`,
+  // clerk-js spins up a web worker for session refresh scheduling.
+  `worker-src 'self' blob:`,
   `upgrade-insecure-requests`,
 ];
 

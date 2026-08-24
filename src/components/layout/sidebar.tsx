@@ -9,7 +9,7 @@ import { useClients } from "@/hooks/use-metrics";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useFilterQuery } from "@/hooks/use-url-filters";
 import { isAgencyRole, isAdminRole, roleLabel } from "@/lib/auth/roles";
-import { signOutAndRedirect } from "@/lib/auth/sign-out";
+import { useSignOutAndRedirect } from "@/lib/auth/sign-out";
 import { cn } from "@/lib/utils";
 import { BiGridAlt, BiFile, BiMessageRounded, BiChevronLeft, BiChevronRight, BiData, BiRefresh, BiCheck, BiChevronDown, BiBuildings, BiError, BiTachometer, BiFilterAlt, BiSliderAlt, BiPulse, BiBell, BiTransferAlt, BiImage, BiCoinStack, BiGroup, BiLogOut } from "react-icons/bi";
 import { Logo } from "@/components/brand/logo";
@@ -204,6 +204,7 @@ function UserFooter({
   role?: AppRole;
 }) {
   const [signingOut, setSigningOut] = useState(false);
+  const signOutAndRedirect = useSignOutAndRedirect();
 
   function handleSignOut() {
     setSigningOut(true);

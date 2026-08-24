@@ -3,6 +3,9 @@ export interface ClientRow {
   name: string;
   industry: string;
   is_demo: boolean;
+  // Atlas project this client is linked to (public.projects.id in the shared
+  // DB); NULL = unlinked (demo clients), reachable by agency roles only.
+  atlas_project_id: string | null;
   created_at: string;
 }
 
@@ -11,6 +14,7 @@ export interface ClientInsert {
   name: string;
   industry: string;
   is_demo?: boolean;
+  atlas_project_id?: string | null;
   created_at?: string;
 }
 
@@ -521,60 +525,15 @@ export interface DashboardInsert {
 }
 
 // --- Auth & tenancy ---
-// Application-level roles. `agency_*` roles see all clients; `client_user` sees
-// only clients they're a member of (via client_members). Later stages import this.
+// Application-level roles, mapped from Atlas roles (src/lib/auth/atlas-roles.ts).
+// `agency_*` roles see all clients; `client_user` sees only clients linked (via
+// clients.atlas_project_id) to an Atlas project they're assigned to. AdPulse
+// stores no user tables of its own.
 export type AppRole = 'agency_admin' | 'agency_member' | 'client_user';
 
-// One profile per Supabase auth user; `id` is the auth.users id. The FK to
-// auth.users(id) lives in the migration, not in Drizzle.
-export interface UserProfileRow {
-  id: string;
-  full_name: string | null;
-  role: AppRole;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface UserProfileInsert {
-  id: string;
-  full_name?: string | null;
-  role?: AppRole;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export const CLIENT_MEMBER_ROLES = ['viewer'] as const;
-export type ClientMemberRole = (typeof CLIENT_MEMBER_ROLES)[number];
-
-export interface ClientMemberRow {
-  id: string;
-  user_id: string;
-  client_id: string;
-  role: ClientMemberRole;
-  created_at: string;
-}
-
-export interface ClientMemberInsert {
-  id?: string;
-  user_id: string;
-  client_id: string;
-  role?: ClientMemberRole;
-  created_at?: string;
-}
-
 export interface Database {
-  public: {
+  adpulse: {
     Tables: {
-      user_profiles: {
-        Row: UserProfileRow;
-        Insert: UserProfileInsert;
-        Update: Partial<UserProfileInsert>;
-      };
-      client_members: {
-        Row: ClientMemberRow;
-        Insert: ClientMemberInsert;
-        Update: Partial<ClientMemberInsert>;
-      };
       dashboards: {
         Row: DashboardRow;
         Insert: DashboardInsert;

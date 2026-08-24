@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { BiBuildings, BiRefresh } from "react-icons/bi";
 import { Button } from "@/components/ui/button";
-import { signOutAndRedirect } from "@/lib/auth/sign-out";
+import { useSignOutAndRedirect } from "@/lib/auth/sign-out";
 
 // Full-page state for a provisioned user who has no accessible clients (e.g. an
 // agency with nothing seeded yet, or a client_user with no memberships). Without
 // a client there is no dashboard to route to.
 export function NoClientsState() {
   const [signingOut, setSigningOut] = useState(false);
+  const signOutAndRedirect = useSignOutAndRedirect();
 
   return (
     <div className="min-h-screen grid place-items-center bg-background px-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { AppRole } from "@/lib/types/database";
 
 export interface TeamUser {
@@ -10,20 +10,6 @@ export interface TeamUser {
   role: AppRole;
   created_at: string;
   clients: Array<{ id: string; name: string }>;
-}
-
-export interface InviteUserInput {
-  email: string;
-  full_name?: string;
-  role: AppRole;
-  client_ids?: string[];
-}
-
-export interface UpdateUserInput {
-  user_id: string;
-  role?: AppRole;
-  full_name?: string | null;
-  client_ids?: string[];
 }
 
 async function readError(res: Response, fallback: string): Promise<never> {
@@ -37,6 +23,8 @@ async function readError(res: Response, fallback: string): Promise<never> {
   throw new Error(message);
 }
 
+// Read-only: the directory is derived from Atlas's user_roles/project_users —
+// invites, role changes, and removals happen in Atlas, not here.
 export function useTeam() {
   return useQuery<TeamUser[]>({
     queryKey: ["team"],
@@ -44,56 +32,6 @@ export function useTeam() {
       const res = await fetch("/api/users");
       if (!res.ok) return readError(res, "Failed to load team");
       return res.json();
-    },
-  });
-}
-
-export function useInviteUser() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: InviteUserInput) => {
-      const res = await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      if (!res.ok) return readError(res, "Failed to invite user");
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["team"] });
-    },
-  });
-}
-
-export function useUpdateUser() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: UpdateUserInput) => {
-      const res = await fetch("/api/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      if (!res.ok) return readError(res, "Failed to update user");
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["team"] });
-    },
-  });
-}
-
-export function useRemoveUser() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (userId: string) => {
-      const res = await fetch(`/api/users?userId=${userId}`, { method: "DELETE" });
-      if (!res.ok) return readError(res, "Failed to remove user");
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["team"] });
     },
   });
 }
