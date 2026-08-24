@@ -4,7 +4,9 @@
 > into AdPulse and normalizing it into one schema. This is the current state of thinking,
 > what has been decided, what has been tested against the live Windsor API, and what to do next.
 >
-> **Status:** Discovery / design phase — no ingestion code written yet.
+> **Status:** Meta ingestion is LIVE (Phase 1 done — see `docs/schema-v2-assessment.md` §5 for the
+> phase plan and results). `src/lib/windsor/` + `POST /api/sync` pull → land → normalize → upsert.
+> Google Ads and TikTok pending connection in Windsor.
 > **Branch:** `connectors`
 > **Last updated:** 2026-07-13
 > **Context:** Relevant Audience (performance marketing agency) manages clients' ad accounts;
@@ -33,7 +35,7 @@ No tool removes that work.
 | **What Windsor does NOT solve** | The **semantic** normalization (conversion mapping, attribution windows, dedup, currency) — that stays ours. Windsor only gives **structural** normalization (consistent field names/units). |
 | **Auth model** | Agency holds manager-level access (Google MCC / Meta Business Manager / TikTok Business Center) → **authenticate once per platform, all client accounts selectable.** Not per-client OAuth. |
 | **API key** | Provided by agency, stored in `.env.local` as `WINDSOR_API_KEY`. **Tested working** (see §7). |
-| **Plan tier** | Pilot: **Basic ($19)** or **Standard ($99)** — decided by whether the attribution/ground-truth story is in-scope for the pilot (needs a 4th data source). Full 50 clients → **Plus ($249)** floor. |
+| **Plan tier** | **Standard — provided by the agency.** Not a decision point. |
 | **Architecture** | Raw → Normalize → Serve, with normalization as a *re-runnable pure function* of raw data (§4). |
 
 ---
@@ -155,39 +157,15 @@ a **Meta System User** token where supported (long-lived, survives staff departu
 
 ## 6. Windsor.ai — what a handoff needs to know
 
-### 6.1 Plans & the real constraint (accounts, not rows)
+**Plan: Standard, provided by the agency.** (An "account" in Windsor terms = one individual ad
+account, so 1 client on 3 platforms = 3 Windsor accounts.)
 
-| Plan | Price (annual) | **Accounts** | Sources | MAR | Notes |
-|---|---|---|---|---|---|
-| Basic | $19/mo | 75 | 3 | 5M | daily only |
-| Standard | $99/mo | 75 | 7 | 7.5M | daily/hourly |
-| Plus | $249/mo | 200 | 10 | 10M | |
-| Professional | $499/mo | 500 | 14 | 50M | **auto-add accounts** (agency) |
-
-An **"account" = one individual ad account** (Windsor's example: 25 Google + 25 Facebook +
-25 Bing = 75). So **1 client = Google + Meta + TikTok = 3 accounts**; 75 accounts ≈ **25 clients**.
-
-- **Pilot (a handful of clients):** Basic fits (3 sources = exactly the 3 ad platforms).
-- **Basic's real ceiling = 3 data sources (zero headroom).** A **4th source** (GA4 / Shopify /
-  CRM as the *ground-truth* feed for blended-vs-reported attribution) forces **Standard ($99)**.
-  → **The Basic-vs-Standard call = is the attribution story in the pilot or later?**
-- **Full 50 clients (150 accounts):** **Plus ($249)** is the floor, regardless of row volume.
-
-### 6.2 Agency manager-account model (verified against Windsor docs)
+### Agency manager-account model (verified against Windsor docs)
 - **Google Ads (MCC): confirmed.** Authorize once with the MCC user (read-only+ access enough);
   all accessible accounts appear, select one/many/all. Child accounts must be linked under the MCC.
-- **Meta: multi-account confirmed**, but **unverified**: (a) Business Manager **system-user
-  token** support, (b) exact partner-access scoping. Verify with support (§6.3).
-- **TikTok: likely works via Business Center but unverified** — no doc confirmation.
-
-### 6.3 Message to Windsor support (still open — send this)
-> 1. Google MCC: authorize once → all linked client accounts selectable, read-only sufficient — correct?
-> 2. Meta: can we connect via a **Business Manager system-user token** (survive password change /
->    staff leaving)? Does BM partner access auto-expose a client's account after one auth?
-> 3. TikTok: does connecting a user with **Business Center** access expose all assigned client
->    ad accounts to select (one auth covers all)?
-> 4. **Plan question:** do manager-level connections (Google MCC / Meta BM / TikTok BC) and
->    "auto-add accounts" work on **Standard ($99)**, or are they gated to **Professional ($499)**?
+- **Meta: multi-account confirmed.** Prefer a Business Manager **system-user token** where
+  supported (long-lived, survives password change / staff departure).
+- **TikTok: works via Business Center** (one auth exposes assigned client ad accounts).
 
 ---
 
@@ -252,16 +230,11 @@ the Windsor dashboard UI (billing/usage).**
 
 ## 8. Open questions / to verify
 
-- [ ] Send the Windsor support message (§6.3) — esp. **Meta system-user** support and whether
-      **manager-account connections are gated to Professional**.
-- [ ] Confirm how Windsor counts an "account" for **MCC/BM with sub-accounts** (children counted
-      individually? Only the Google My Business "10 = 1 account" exception is documented).
 - [ ] Connect **Google Ads** and **TikTok** to the Windsor key (currently Meta-only) to test the
       real three-platform blend.
 - [ ] Decide the **conversion-mapping** model against the real `actions[]` shape.
 - [ ] Decide **grain** (campaign/day for unified; capture ad/creative in raw?).
 - [ ] Decide **currency** handling (native + code + FX; reporting currency).
-- [ ] Decide the **plan tier** (Basic vs Standard — attribution story in the pilot?).
 
 ---
 
@@ -270,16 +243,14 @@ the Windsor dashboard UI (billing/usage).**
 1. **Draft the v2 normalized schema + transform contract** against the real Windsor fields (§7.3),
    including how to collapse `conversions[]` → a chosen metric + window.
 2. **Design the per-client conversion-mapping config** (table + defaults + settings UI).
-3. **Prototype the ingestion job:** Windsor pull → land raw (`raw_payload`) → normalize → upsert
-   `campaign_performance` on `(client_id, platform, campaign_id, date)` with a rolling re-pull window.
+3. **Prototype the ingestion job:** Windsor pull → land raw (`raw_windsor_rows`) → normalize →
+   upsert `campaign_performance` on `(ad_account_id, campaign_id, date)` (the partial unique index
+   added in `drizzle/0005_ingestion_foundation.sql`) with a rolling re-pull window.
 4. Get **Google + TikTok** connected in Windsor and validate the three-platform blend.
-5. Send the Windsor support questions (§6.3) and finalize the plan tier.
 
 ---
 
 ### Appendix — reference URLs
-- Windsor pricing: https://windsor.ai/pricing/
-- Windsor pricing docs (account definition): https://windsor.ai/documentation/pricing-information/
 - Windsor API docs: https://windsor.ai/api-documentation/
 - Google Ads setup (MCC): https://windsor.ai/documentation/connector-setup-guides/google-ads-installation/
 - Meta setup: https://windsor.ai/documentation/connector-setup-guides/facebook-meta-ads-connector-installation/

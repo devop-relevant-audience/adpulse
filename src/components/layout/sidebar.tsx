@@ -258,9 +258,13 @@ export function Sidebar() {
   const isChatOpen = useAppStore((s) => s.isChatOpen);
   const { clientId, currentView, filterQuery } = useNavContext();
   const { data: me } = useCurrentUser();
+  const { data: clients } = useClients();
   const role = me?.profile.role;
   const isAgency = isAgencyRole(role);
   const isAdmin = isAdminRole(role);
+  // Attribution & creatives run entirely on fabricated demo data (see
+  // src/components/dashboard/demo-only.tsx) — hide them for real clients.
+  const isDemoClient = clients?.find((c) => c.id === clientId)?.is_demo !== false;
 
   const navItems: NavItem[] = [
     { id: VIEWS.dashboard, label: "Dashboard", icon: <BiGridAlt className="w-4 h-4" /> },
@@ -300,6 +304,7 @@ export function Sidebar() {
           .filter((item) => {
             if (item.id === VIEWS.alerts) return isAgency;
             if (item.id === VIEWS.team) return isAdmin;
+            if (item.id === VIEWS.attribution || item.id === VIEWS.creatives) return isDemoClient;
             return true;
           })
           .map((item) => {

@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from "recharts";
 import { useAttributionComparison } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
+import { useSelectedClient } from "@/hooks/use-selected-client";
+import { DemoOnlyWidgetPlaceholder } from "@/components/dashboard/demo-only";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
@@ -33,9 +35,12 @@ export function AttributionMiniWidget({ config }: WidgetRenderProps) {
 
   const modelA = readModel(config, "modelA", "first_touch");
   const modelB = readModel(config, "modelB", "last_touch");
+  // Multi-touch attribution comes from attribution_journeys, which is
+  // fabricated demo data — not available for live (non-demo) clients yet.
+  const isNonDemo = useSelectedClient()?.is_demo === false;
 
   const { data, isLoading, isError, refetch } = useAttributionComparison({
-    clientId,
+    clientId: isNonDemo ? null : clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
     platform,
@@ -56,6 +61,7 @@ export function AttributionMiniWidget({ config }: WidgetRenderProps) {
   const labelA = data?.models.find((m) => m.model === modelA)?.label ?? "First Touch";
   const labelB = data?.models.find((m) => m.model === modelB)?.label ?? "Last Touch";
 
+  if (isNonDemo) return <DemoOnlyWidgetPlaceholder label="Attribution models are demo-only for now" />;
   if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
   if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!data || chartData.length === 0)

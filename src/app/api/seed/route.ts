@@ -25,9 +25,9 @@ import { generateAttributionJourneys, generateCustomerCohorts } from "@/lib/mock
 import type { CampaignPerformanceInsert, Platform } from "@/lib/types/database";
 
 const CLIENTS = [
-  { name: "Zenith Apparel", industry: "Fashion & Retail" },
-  { name: "NovaTech Solutions", industry: "SaaS & Technology" },
-  { name: "GreenLeaf Wellness", industry: "Health & Wellness" },
+  { name: "Zenith Apparel", industry: "Fashion & Retail", isDemo: true },
+  { name: "NovaTech Solutions", industry: "SaaS & Technology", isDemo: true },
+  { name: "GreenLeaf Wellness", industry: "Health & Wellness", isDemo: true },
 ];
 
 export const POST = withRoute("seed.POST", async (request: NextRequest) => {

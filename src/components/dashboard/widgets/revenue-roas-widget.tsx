@@ -3,6 +3,8 @@
 import { BiTrendingUp, BiError } from "react-icons/bi";
 import { useRevenueOverview } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
+import { useSelectedClient } from "@/hooks/use-selected-client";
+import { DemoOnlyWidgetPlaceholder } from "@/components/dashboard/demo-only";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { formatCurrency } from "@/lib/format";
@@ -11,13 +13,20 @@ export function RevenueRoasWidget() {
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
+  // Blended ROAS/revenue is derived from attribution_journeys, which is
+  // fabricated demo data — not available for live (non-demo) clients yet.
+  const isNonDemo = useSelectedClient()?.is_demo === false;
 
   const { data, isLoading, isError, refetch } = useRevenueOverview({
-    clientId,
+    clientId: isNonDemo ? null : clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
     platform,
   });
+
+  if (isNonDemo) {
+    return <DemoOnlyWidgetPlaceholder label="Revenue & ROAS is demo-only for now" />;
+  }
 
   if (!clientId || isLoading) {
     return (

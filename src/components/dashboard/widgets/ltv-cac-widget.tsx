@@ -3,6 +3,8 @@
 import { BiError } from "react-icons/bi";
 import { useCohortAnalysis } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
+import { useSelectedClient } from "@/hooks/use-selected-client";
+import { DemoOnlyWidgetPlaceholder } from "@/components/dashboard/demo-only";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
@@ -21,14 +23,18 @@ export function LtvCacWidget() {
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
+  // LTV:CAC comes from customer_cohorts, which is fabricated demo data — not
+  // available for live (non-demo) clients yet.
+  const isNonDemo = useSelectedClient()?.is_demo === false;
 
   const { data, isLoading, isError, refetch } = useCohortAnalysis({
-    clientId,
+    clientId: isNonDemo ? null : clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
     platform,
   });
 
+  if (isNonDemo) return <DemoOnlyWidgetPlaceholder label="LTV : CAC is demo-only for now" />;
   if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
   if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!data || data.cohorts.length === 0)

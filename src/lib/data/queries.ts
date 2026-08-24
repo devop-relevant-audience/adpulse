@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   adCreatives,
@@ -51,6 +51,7 @@ export async function getClients(): Promise<ClientRow[]> {
       id: clients.id,
       name: clients.name,
       industry: clients.industry,
+      is_demo: clients.isDemo,
       created_at: clients.createdAt,
     })
     .from(clients)
@@ -76,23 +77,28 @@ export async function getMetrics(params: {
     conditions.push(eq(campaignPerformance.campaignId, params.campaignId));
   }
 
+  // ctr/cpc/cpm are not stored — computed from base counts in the projection
+  // (ctr as a percent, matching the previous stored scale). raw_payload is
+  // deliberately excluded from the serving shape.
   const rows = await db
     .select({
       id: campaignPerformance.id,
       client_id: campaignPerformance.clientId,
+      ad_account_id: campaignPerformance.adAccountId,
       platform: campaignPerformance.platform,
       campaign_id: campaignPerformance.campaignId,
       campaign_name: campaignPerformance.campaignName,
       date: campaignPerformance.date,
       impressions: campaignPerformance.impressions,
       clicks: campaignPerformance.clicks,
+      link_clicks: campaignPerformance.linkClicks,
       spend: campaignPerformance.spend,
       conversions: campaignPerformance.conversions,
       revenue: campaignPerformance.revenue,
-      ctr: campaignPerformance.ctr,
-      cpc: campaignPerformance.cpc,
-      cpm: campaignPerformance.cpm,
-      raw_payload: campaignPerformance.rawPayload,
+      currency: campaignPerformance.currency,
+      ctr: sql<number>`case when ${campaignPerformance.impressions} > 0 then round((${campaignPerformance.clicks}::numeric / ${campaignPerformance.impressions}) * 100, 2) else 0 end`.mapWith(Number),
+      cpc: sql<number>`case when ${campaignPerformance.clicks} > 0 then round(${campaignPerformance.spend} / ${campaignPerformance.clicks}, 4) else 0 end`.mapWith(Number),
+      cpm: sql<number>`case when ${campaignPerformance.impressions} > 0 then round((${campaignPerformance.spend} / ${campaignPerformance.impressions}) * 1000, 4) else 0 end`.mapWith(Number),
       created_at: campaignPerformance.createdAt,
     })
     .from(campaignPerformance)
@@ -132,10 +138,13 @@ export interface PeriodSummary {
   totalClicks: number;
   totalSpend: number;
   totalConversions: number;
+  // NULL revenue rows (value tracking not configured) count as 0 here.
+  totalRevenue: number;
   avgCtr: number;
   avgCpc: number;
   avgCpm: number;
   avgCpa: number;
+  avgRoas: number;
 }
 
 function summarizeMetrics(
@@ -144,9 +153,7 @@ function summarizeMetrics(
     clicks: number;
     spend: number;
     conversions: number;
-    ctr: number;
-    cpc: number;
-    cpm: number;
+    revenue: number | null;
   }>
 ): PeriodSummary {
   if (rows.length === 0) {
@@ -155,10 +162,12 @@ function summarizeMetrics(
       totalClicks: 0,
       totalSpend: 0,
       totalConversions: 0,
+      totalRevenue: 0,
       avgCtr: 0,
       avgCpc: 0,
       avgCpm: 0,
       avgCpa: 0,
+      avgRoas: 0,
     };
   }
 
@@ -166,16 +175,19 @@ function summarizeMetrics(
   const totalClicks = rows.reduce((s, r) => s + Number(r.clicks), 0);
   const totalSpend = rows.reduce((s, r) => s + Number(r.spend), 0);
   const totalConversions = rows.reduce((s, r) => s + Number(r.conversions), 0);
+  const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue ?? 0), 0);
 
   return {
     totalImpressions,
     totalClicks,
     totalSpend: Number(totalSpend.toFixed(2)),
     totalConversions,
+    totalRevenue: Number(totalRevenue.toFixed(2)),
     avgCtr: totalImpressions > 0 ? Number(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0,
     avgCpc: totalClicks > 0 ? Number((totalSpend / totalClicks).toFixed(4)) : 0,
     avgCpm: totalImpressions > 0 ? Number(((totalSpend / totalImpressions) * 1000).toFixed(4)) : 0,
     avgCpa: totalConversions > 0 ? Number((totalSpend / totalConversions).toFixed(2)) : 0,
+    avgRoas: totalSpend > 0 ? Number((totalRevenue / totalSpend).toFixed(2)) : 0,
   };
 }
 
@@ -216,10 +228,12 @@ export async function compareMetrics(params: {
     "totalClicks",
     "totalSpend",
     "totalConversions",
+    "totalRevenue",
     "avgCtr",
     "avgCpc",
     "avgCpm",
     "avgCpa",
+    "avgRoas",
   ] as const;
 
   const deltas: Record<string, { absolute: number; percentage: number }> = {};

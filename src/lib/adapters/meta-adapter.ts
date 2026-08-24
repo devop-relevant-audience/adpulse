@@ -27,9 +27,7 @@ export function normalizeMetaAds(
       spend: round(Number(row.spend), 2),
       conversions,
       revenue: round(revenue, 2),
-      ctr: round(Number(row.ctr) * 100, 2),
-      cpc: round(Number(row.cpc), 4),
-      cpm: round(Number(row.cpm), 4),
+      currency: "USD",
       raw_payload: row as unknown as Record<string, unknown>,
     };
   });

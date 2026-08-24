@@ -2,6 +2,7 @@ export interface ClientRow {
   id: string;
   name: string;
   industry: string;
+  is_demo: boolean;
   created_at: string;
 }
 
@@ -9,48 +10,165 @@ export interface ClientInsert {
   id?: string;
   name: string;
   industry: string;
+  is_demo?: boolean;
   created_at?: string;
 }
 
 export const PLATFORMS = ['google', 'meta', 'tiktok'] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
+// ctr/cpc/cpm are NOT stored columns — the data layer computes them from base
+// counts in the select projection. revenue is NULL when value tracking isn't
+// configured on the account (distinct from 0 = tracked, no sales).
+// raw_payload exists on the table but is excluded from the serving projection.
 export interface CampaignPerformanceRow {
   id: string;
   client_id: string;
+  ad_account_id: string | null;
   platform: Platform;
   campaign_id: string;
   campaign_name: string;
   date: string;
   impressions: number;
   clicks: number;
+  link_clicks: number | null;
   spend: number;
   conversions: number;
-  revenue: number;
+  revenue: number | null;
+  currency: string | null;
   ctr: number;
   cpc: number;
   cpm: number;
-  raw_payload: Record<string, unknown>;
   created_at: string;
 }
 
 export interface CampaignPerformanceInsert {
   id?: string;
   client_id: string;
+  ad_account_id?: string | null;
   platform: Platform;
   campaign_id: string;
   campaign_name: string;
   date: string;
   impressions: number;
   clicks: number;
+  link_clicks?: number | null;
   spend: number;
   conversions: number;
-  revenue: number;
-  ctr: number;
-  cpc: number;
-  cpm: number;
-  raw_payload: Record<string, unknown>;
+  revenue?: number | null;
+  currency?: string | null;
+  raw_payload?: Record<string, unknown>;
+  transform_version?: number | null;
+  synced_at?: string | null;
   created_at?: string;
+}
+
+// --- Ingestion foundation (Windsor workstream) ---
+
+export const AD_ACCOUNT_STATUSES = ['active', 'paused', 'disconnected'] as const;
+export type AdAccountStatus = (typeof AD_ACCOUNT_STATUSES)[number];
+
+export interface AdAccountRow {
+  id: string;
+  client_id: string;
+  platform: Platform;
+  external_account_id: string;
+  account_name: string;
+  currency: string;
+  timezone: string | null;
+  status: AdAccountStatus;
+  connected_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdAccountInsert {
+  id?: string;
+  client_id: string;
+  platform: Platform;
+  external_account_id: string;
+  account_name: string;
+  currency: string;
+  timezone?: string | null;
+  status?: AdAccountStatus;
+  connected_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RawWindsorRow {
+  id: string;
+  ad_account_id: string;
+  platform: Platform;
+  campaign_id: string;
+  date: string;
+  payload: Record<string, unknown>;
+  pulled_at: string;
+}
+
+export interface RawWindsorRowInsert {
+  id?: string;
+  ad_account_id: string;
+  platform: Platform;
+  campaign_id: string;
+  date: string;
+  payload: Record<string, unknown>;
+  pulled_at?: string;
+}
+
+export const CONVERSION_MAPPING_TARGETS = ['conversions', 'revenue'] as const;
+export type ConversionMappingTarget = (typeof CONVERSION_MAPPING_TARGETS)[number];
+
+export interface ConversionMappingRow {
+  id: string;
+  ad_account_id: string;
+  target: ConversionMappingTarget;
+  event_key: string;
+  attribution_window: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversionMappingInsert {
+  id?: string;
+  ad_account_id: string;
+  target?: ConversionMappingTarget;
+  event_key: string;
+  attribution_window?: string;
+  enabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Campaign dimension. status/objective/campaign_type are platform-native open
+// enums — typed as plain strings on purpose.
+export interface CampaignRow {
+  id: string;
+  ad_account_id: string;
+  campaign_id: string;
+  name: string;
+  status: string | null;
+  objective: string | null;
+  campaign_type: string | null;
+  first_seen: string | null;
+  last_seen: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CampaignInsert {
+  id?: string;
+  ad_account_id: string;
+  campaign_id: string;
+  name: string;
+  status?: string | null;
+  objective?: string | null;
+  campaign_type?: string | null;
+  first_seen?: string | null;
+  last_seen?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ReportRow {
@@ -177,7 +295,7 @@ export interface AdCreativeInsert {
 
 // --- Alerts & Notifications ---
 
-export const ALERT_METRICS = ['spend', 'cpa', 'ctr', 'cpc', 'conversions', 'impressions'] as const;
+export const ALERT_METRICS = ['spend', 'cpa', 'ctr', 'cpc', 'conversions', 'impressions', 'revenue', 'roas'] as const;
 export type AlertMetric = (typeof ALERT_METRICS)[number];
 
 export const ALERT_CONDITIONS = ['above', 'below', 'increases_by_pct', 'decreases_by_pct'] as const;
@@ -476,6 +594,26 @@ export interface Database {
         Row: CampaignPerformanceRow;
         Insert: CampaignPerformanceInsert;
         Update: Partial<CampaignPerformanceInsert>;
+      };
+      ad_accounts: {
+        Row: AdAccountRow;
+        Insert: AdAccountInsert;
+        Update: Partial<AdAccountInsert>;
+      };
+      raw_windsor_rows: {
+        Row: RawWindsorRow;
+        Insert: RawWindsorRowInsert;
+        Update: Partial<RawWindsorRowInsert>;
+      };
+      conversion_mappings: {
+        Row: ConversionMappingRow;
+        Insert: ConversionMappingInsert;
+        Update: Partial<ConversionMappingInsert>;
+      };
+      campaigns: {
+        Row: CampaignRow;
+        Insert: CampaignInsert;
+        Update: Partial<CampaignInsert>;
       };
       clients: {
         Row: ClientRow;

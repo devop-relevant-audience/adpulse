@@ -19,11 +19,9 @@ export function normalizeGoogleAds(
       impressions: Number(row.metrics.impressions),
       clicks: Number(row.metrics.clicks),
       spend,
-      conversions: Math.round(Number(row.metrics.conversions)),
+      conversions: round(Number(row.metrics.conversions), 4),
       revenue: round(Number(row.metrics.conversionsValue), 2),
-      ctr: round(Number(row.metrics.ctr) * 100, 2),
-      cpc: round(Number(row.metrics.averageCpc), 4),
-      cpm: round(Number(row.metrics.averageCpm), 4),
+      currency: "USD",
       raw_payload: row as unknown as Record<string, unknown>,
     };
   });

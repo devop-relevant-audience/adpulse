@@ -38,21 +38,23 @@ function safeNum(val: unknown, fallback: number): number {
 const emptyComparison = {
   current: {
     totalImpressions: 0, totalClicks: 0, totalSpend: 0, totalConversions: 0,
-    avgCtr: 0, avgCpc: 0, avgCpa: 0, avgCpm: 0,
+    totalRevenue: 0, avgCtr: 0, avgCpc: 0, avgCpa: 0, avgCpm: 0, avgRoas: 0,
   },
   previous: {
     totalImpressions: 0, totalClicks: 0, totalSpend: 0, totalConversions: 0,
-    avgCtr: 0, avgCpc: 0, avgCpa: 0, avgCpm: 0,
+    totalRevenue: 0, avgCtr: 0, avgCpc: 0, avgCpa: 0, avgCpm: 0, avgRoas: 0,
   },
   deltas: {
     totalImpressions: { absolute: 0, percentage: 0 },
     totalClicks: { absolute: 0, percentage: 0 },
     totalSpend: { absolute: 0, percentage: 0 },
     totalConversions: { absolute: 0, percentage: 0 },
+    totalRevenue: { absolute: 0, percentage: 0 },
     avgCtr: { absolute: 0, percentage: 0 },
     avgCpc: { absolute: 0, percentage: 0 },
     avgCpa: { absolute: 0, percentage: 0 },
     avgCpm: { absolute: 0, percentage: 0 },
+    avgRoas: { absolute: 0, percentage: 0 },
   },
 };
 

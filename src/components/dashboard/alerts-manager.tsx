@@ -55,6 +55,7 @@ const SEVERITY_CONFIG: Record<AlertSeverity, { bg: string; border: string; text:
 const METRIC_LABELS: Record<string, string> = {
   spend: "Spend", cpa: "CPA", ctr: "CTR", cpc: "CPC",
   conversions: "Conversions", impressions: "Impressions",
+  revenue: "Revenue", roas: "ROAS",
 };
 
 const CONDITION_LABELS: Record<string, string> = {

@@ -26,27 +26,131 @@ export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   industry: text("industry").notNull(),
+  // Demo/seed clients keep the showcase-only features (attribution, LTV,
+  // creatives); real clients hide them until real data sources exist.
+  isDemo: boolean("is_demo").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
 });
+
+// --- Ingestion foundation (Windsor workstream, docs/schema-v2-assessment.md) ---
+
+// One row per connected platform ad account. Currency/timezone are immutable
+// account-level facts on all three platforms; timezone is nullable because
+// Windsor doesn't currently expose it (entered manually).
+export const adAccounts = pgTable(
+  "ad_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    externalAccountId: text("external_account_id").notNull(),
+    accountName: text("account_name").notNull(),
+    currency: text("currency").notNull(),
+    timezone: text("timezone"),
+    status: text("status").notNull().default("active"),
+    connectedAt: timestamp("connected_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("ad_accounts_platform_check", sql`(${table.platform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),
+    check("ad_accounts_status_check", sql`(${table.status} = ANY (ARRAY['active'::text, 'paused'::text, 'disconnected'::text]))`),
+    uniqueIndex("ad_accounts_platform_external_idx").on(table.platform, table.externalAccountId),
+    index("ad_accounts_client_idx").on(table.clientId),
+  ]
+);
+
+// Landing layer: verbatim Windsor response row per (account, campaign, date).
+// Normalization is a re-runnable pure function of this table — a mapping
+// mistake is a re-run, not a re-pull.
+export const rawWindsorRows = pgTable(
+  "raw_windsor_rows",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    campaignId: text("campaign_id").notNull(),
+    date: date("date").notNull(),
+    // Nested JSON — passed through the case converter untouched.
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    pulledAt: timestamp("pulled_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("raw_windsor_rows_natural_key").on(table.adAccountId, table.campaignId, table.date),
+    index("raw_windsor_rows_date_idx").on(table.date),
+  ]
+);
+
+// Per-account rules defining which platform events count toward unified
+// conversions/revenue. event_key = Meta action_type / Google conversion action
+// / TikTok optimization event; attribution_window = 'value' (account's active
+// setting) or a fixed-window reading (e.g. '7d_click') where the platform
+// embeds per-window breakdowns.
+export const conversionMappings = pgTable(
+  "conversion_mappings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
+    target: text("target").notNull().default("conversions"),
+    eventKey: text("event_key").notNull(),
+    attributionWindow: text("attribution_window").notNull().default("value"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("conversion_mappings_target_check", sql`(${table.target} = ANY (ARRAY['conversions'::text, 'revenue'::text]))`),
+    uniqueIndex("conversion_mappings_account_target_event_idx").on(table.adAccountId, table.target, table.eventKey),
+  ]
+);
+
+// SCD-lite campaign dimension. status/objective/campaign_type are
+// platform-native OPEN enums (values get added over time and legacy values
+// still appear on read) — deliberately no CHECK constraints.
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adAccountId: uuid("ad_account_id").notNull().references(() => adAccounts.id, { onDelete: "cascade" }),
+    campaignId: text("campaign_id").notNull(),
+    name: text("name").notNull(),
+    status: text("status"),
+    objective: text("objective"),
+    campaignType: text("campaign_type"),
+    firstSeen: date("first_seen"),
+    lastSeen: date("last_seen"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("campaigns_account_campaign_idx").on(table.adAccountId, table.campaignId),
+  ]
+);
 
 export const campaignPerformance = pgTable(
   "campaign_performance",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    // NULL on demo/seed rows; set for real ingested rows (upsert key below).
+    adAccountId: uuid("ad_account_id").references(() => adAccounts.id, { onDelete: "cascade" }),
     platform: text("platform").notNull(),
     campaignId: text("campaign_id").notNull(),
     campaignName: text("campaign_name").notNull(),
     date: date("date").notNull(),
     impressions: integer("impressions").notNull().default(0),
     clicks: integer("clicks").notNull().default(0),
+    linkClicks: integer("link_clicks"),
     spend: numeric("spend", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
-    conversions: integer("conversions").notNull().default(0),
-    revenue: numeric("revenue", { precision: 14, scale: 2, mode: "number" }).notNull().default(0),
-    ctr: numeric("ctr", { precision: 8, scale: 4, mode: "number" }).notNull().default(0),
-    cpc: numeric("cpc", { precision: 10, scale: 4, mode: "number" }).notNull().default(0),
-    cpm: numeric("cpm", { precision: 10, scale: 4, mode: "number" }).notNull().default(0),
+    // numeric, not integer: Google DDA reports fractional conversion credit.
+    conversions: numeric("conversions", { precision: 14, scale: 4, mode: "number" }).notNull().default(0),
+    // NULL = value tracking not configured; 0 = tracked, no sales.
+    revenue: numeric("revenue", { precision: 14, scale: 2, mode: "number" }),
+    currency: text("currency"),
+    // ctr/cpc/cpm are intentionally NOT stored — always recomputed from base counts.
     rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),
+    transformVersion: integer("transform_version"),
+    syncedAt: timestamp("synced_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   },
   (table) => [
@@ -54,6 +158,9 @@ export const campaignPerformance = pgTable(
     index("idx_campaign_perf_client_date").on(table.clientId, table.date),
     index("idx_campaign_perf_campaign").on(table.campaignId),
     index("idx_campaign_perf_platform").on(table.platform),
+    uniqueIndex("campaign_performance_upsert_key")
+      .on(table.adAccountId, table.campaignId, table.date)
+      .where(sql`${table.adAccountId} IS NOT NULL`),
   ]
 );
 
@@ -171,7 +278,7 @@ export const alertRules = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   },
   (table) => [
-    check("alert_rules_metric_check", sql`(${table.metric} = ANY (ARRAY['spend'::text, 'cpa'::text, 'ctr'::text, 'cpc'::text, 'conversions'::text, 'impressions'::text]))`),
+    check("alert_rules_metric_check", sql`(${table.metric} = ANY (ARRAY['spend'::text, 'cpa'::text, 'ctr'::text, 'cpc'::text, 'conversions'::text, 'impressions'::text, 'revenue'::text, 'roas'::text]))`),
     check("alert_rules_condition_check", sql`(${table.condition} = ANY (ARRAY['above'::text, 'below'::text, 'increases_by_pct'::text, 'decreases_by_pct'::text]))`),
     check("alert_rules_evaluation_window_check", sql`(${table.evaluationWindow} = ANY (ARRAY['daily'::text, 'weekly'::text]))`),
     check("alert_rules_platform_check", sql`(${table.platform} = ANY (ARRAY['google'::text, 'meta'::text, 'tiktok'::text]))`),

@@ -9,13 +9,13 @@ import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
 import { withRoute } from "@/lib/http/with-route";
 import { logger } from "@/lib/log";
 import { sendMockEmail } from "@/lib/mock-email";
-import type { AlertRuleRow, Platform } from "@/lib/types/database";
+import { ALERT_METRICS, type AlertRuleRow, type Platform } from "@/lib/types/database";
 import { format, subDays, subWeeks } from "date-fns";
 
 const alertRuleSchema = z.object({
   client_id: z.string().uuid(),
   name: z.string().min(1),
-  metric: z.enum(["spend", "cpa", "ctr", "cpc", "conversions", "impressions"]),
+  metric: z.enum(ALERT_METRICS),
   condition: z.enum(["above", "below", "increases_by_pct", "decreases_by_pct"]),
   threshold: z.number(),
   evaluation_window: z.enum(["daily", "weekly"]).default("daily"),
@@ -203,6 +203,7 @@ async function handleEvaluate(request: NextRequest) {
       const metricMap: Record<string, string> = {
         spend: "totalSpend", cpa: "avgCpa", ctr: "avgCtr",
         cpc: "avgCpc", conversions: "totalConversions", impressions: "totalImpressions",
+        revenue: "totalRevenue", roas: "avgRoas",
       };
       const deltaKey = metricMap[rule.metric] || rule.metric;
       const delta = comparison.deltas[deltaKey];
@@ -225,17 +226,20 @@ async function handleEvaluate(request: NextRequest) {
           clicks: acc.clicks + Number(r.clicks),
           impressions: acc.impressions + Number(r.impressions),
           conversions: acc.conversions + Number(r.conversions),
+          revenue: acc.revenue + Number(r.revenue ?? 0),
         }),
-        { spend: 0, clicks: 0, impressions: 0, conversions: 0 }
+        { spend: 0, clicks: 0, impressions: 0, conversions: 0, revenue: 0 }
       );
 
       const computedMetrics: Record<string, number> = {
         spend: totals.spend,
         conversions: totals.conversions,
         impressions: totals.impressions,
+        revenue: totals.revenue,
         cpa: totals.conversions > 0 ? totals.spend / totals.conversions : 0,
         ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
         cpc: totals.clicks > 0 ? totals.spend / totals.clicks : 0,
+        roas: totals.spend > 0 ? totals.revenue / totals.spend : 0,
       };
 
       actualValue = computedMetrics[rule.metric] ?? 0;
