@@ -1,9 +1,11 @@
-// Meta sync pipeline: Windsor pull → land raw_windsor_rows → normalize (pure
+// Generic Windsor sync pipeline: pull → land raw_windsor_rows → normalize (pure
 // function of the landing layer + conversion_mappings) → upsert
 // campaign_performance + campaigns dimension. Restatement-safe: every run
-// re-pulls a rolling window and upserts on the natural keys.
+// re-pulls a rolling window and upserts on the natural keys. Platform-specific
+// semantics (connector, fields, mappings, normalization) come from the
+// PlatformAdapter in ./adapter.
 
-import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   adAccounts,
@@ -13,22 +15,14 @@ import {
   conversionMappings,
   rawWindsorRows,
 } from "@/lib/db/schema";
-import { fetchWindsorRows, type WindsorRow } from "./client";
-import {
-  META_FIELDS,
-  META_TRANSFORM_VERSION,
-  deriveDefaultMappings,
-  normalizeMetaPayload,
-} from "./meta";
+import { getAdapter, type SyncPlatform } from "./adapter";
+import { fetchWindsorRows, type WindsorConnector, type WindsorRow } from "./client";
 
-// Meta restates conversions for up to ~28 days (attribution windows), so an
-// incremental run re-pulls the trailing 28; a first run backfills 90.
-const INCREMENTAL_DAYS = 28;
-const BACKFILL_DAYS = 90;
 const BATCH_SIZE = 500;
 
 export interface SyncSummary {
-  connector: "facebook";
+  platform: SyncPlatform;
+  connector: WindsorConnector;
   dateFrom: string;
   dateTo: string;
   accountsSeen: number;
@@ -49,35 +43,50 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-export async function syncMeta(params: { days?: number } = {}): Promise<SyncSummary> {
+export async function syncPlatform(
+  platform: SyncPlatform,
+  params: { days?: number } = {}
+): Promise<SyncSummary> {
+  const adapter = getAdapter(platform);
+
   // 1. Window: explicit > incremental (have raw rows) > first-run backfill.
   let days = params.days;
   if (!days) {
     const existing = await db
       .select({ id: rawWindsorRows.id })
       .from(rawWindsorRows)
-      .where(eq(rawWindsorRows.platform, "meta"))
+      .where(eq(rawWindsorRows.platform, platform))
       .limit(1);
-    days = existing.length > 0 ? INCREMENTAL_DAYS : BACKFILL_DAYS;
+    days = existing.length > 0 ? adapter.incrementalDays : adapter.backfillDays;
   }
   const now = new Date();
   const dateTo = isoDate(now);
   const dateFrom = isoDate(new Date(now.getTime() - days * 24 * 60 * 60 * 1000));
 
   // 2. Pull. One request covers every connected account (rows carry account_id).
-  const rows = await fetchWindsorRows({ connector: "facebook", fields: META_FIELDS, dateFrom, dateTo });
+  const rows = await fetchWindsorRows({
+    connector: adapter.connector,
+    fields: adapter.fields,
+    dateFrom,
+    dateTo,
+  });
 
-  const byAccount = new Map<string, { name: string; currency: string; rows: WindsorRow[] }>();
+  const byAccount = new Map<
+    string,
+    { name: string; currency: string; timezone: string | null; rows: WindsorRow[] }
+  >();
   for (const row of rows) {
-    const externalId = String(row.account_id ?? "");
-    if (!externalId || !row.campaign_id || !row.date) continue;
-    const acc = byAccount.get(externalId) ?? {
-      name: String(row.account_name ?? externalId),
-      currency: String(row.currency ?? "USD"),
+    const identity = adapter.readAccount(row);
+    if (!identity) continue;
+    const acc = byAccount.get(identity.externalId) ?? {
+      name: identity.name,
+      currency: identity.currency,
+      timezone: identity.timezone,
       rows: [],
     };
+    acc.timezone = acc.timezone ?? identity.timezone;
     acc.rows.push(row);
-    byAccount.set(externalId, acc);
+    byAccount.set(identity.externalId, acc);
   }
 
   // 3. Ensure ad_accounts (+ a real client per new account — 1 account = 1
@@ -91,9 +100,10 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
       id: adAccounts.id,
       externalAccountId: adAccounts.externalAccountId,
       clientId: adAccounts.clientId,
+      timezone: adAccounts.timezone,
     })
     .from(adAccounts)
-    .where(eq(adAccounts.platform, "meta"));
+    .where(eq(adAccounts.platform, platform));
   for (const acc of existingAccounts) {
     accountIdByExternal.set(acc.externalAccountId, acc.id);
     clientIdByAccountId.set(acc.id, acc.clientId);
@@ -109,15 +119,27 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
       .insert(adAccounts)
       .values({
         clientId: client.id,
-        platform: "meta",
+        platform,
         externalAccountId: externalId,
         accountName: acc.name,
         currency: acc.currency,
+        timezone: acc.timezone,
       })
       .returning({ id: adAccounts.id });
     accountIdByExternal.set(externalId, account.id);
     clientIdByAccountId.set(account.id, client.id);
     accountsCreated.push(acc.name);
+  }
+
+  // 3b. Backfill timezone on accounts that predate us pulling the field.
+  for (const acc of existingAccounts) {
+    if (acc.timezone) continue;
+    const timezone = byAccount.get(acc.externalAccountId)?.timezone;
+    if (!timezone) continue;
+    await db
+      .update(adAccounts)
+      .set({ timezone, updatedAt: sql`now()` })
+      .where(and(eq(adAccounts.id, acc.id), isNull(adAccounts.timezone)));
   }
 
   // 4. Seed default conversion mappings for accounts that have none yet.
@@ -139,7 +161,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
   for (const [externalId, acc] of byAccount) {
     const accountId = accountIdByExternal.get(externalId)!;
     if ((mappingsByAccount.get(accountId) ?? []).length > 0) continue;
-    const defaults = deriveDefaultMappings(acc.rows);
+    const defaults = adapter.deriveDefaultMappings(acc.rows);
     if (defaults.length === 0) continue;
     const inserted = await db
       .insert(conversionMappings)
@@ -165,7 +187,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
     const accountId = accountIdByExternal.get(externalId)!;
     const values = acc.rows.map((row) => ({
       adAccountId: accountId,
-      platform: "meta",
+      platform,
       campaignId: String(row.campaign_id),
       date: String(row.date),
       payload: row as Record<string, unknown>,
@@ -193,7 +215,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
         .from(rawWindsorRows)
         .where(
           and(
-            eq(rawWindsorRows.platform, "meta"),
+            eq(rawWindsorRows.platform, platform),
             inArray(rawWindsorRows.adAccountId, accountIds),
             gte(rawWindsorRows.date, dateFrom),
             lte(rawWindsorRows.date, dateTo)
@@ -204,7 +226,16 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
   let factsUpserted = 0;
   const campaignMeta = new Map<
     string,
-    { adAccountId: string; campaignId: string; name: string; status: string | null; objective: string | null; firstSeen: string; lastSeen: string }
+    {
+      adAccountId: string;
+      campaignId: string;
+      name: string;
+      status: string | null;
+      objective: string | null;
+      campaignType: string | null;
+      firstSeen: string;
+      lastSeen: string;
+    }
   >();
 
   const factValues = landed.map((raw) => {
@@ -214,7 +245,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
       attribution_window: m.attributionWindow,
       enabled: m.enabled,
     }));
-    const fact = normalizeMetaPayload(raw.payload, mappings);
+    const fact = adapter.normalize(raw.payload, mappings);
 
     const key = `${raw.adAccountId}:${fact.campaignId}`;
     const meta = campaignMeta.get(key);
@@ -225,6 +256,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
         name: fact.campaignName,
         status: fact.campaignStatus,
         objective: fact.objective,
+        campaignType: fact.campaignType,
         firstSeen: meta && meta.firstSeen < fact.date ? meta.firstSeen : fact.date,
         lastSeen: fact.date,
       });
@@ -235,7 +267,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
     return {
       clientId: clientIdByAccountId.get(raw.adAccountId)!,
       adAccountId: raw.adAccountId,
-      platform: "meta",
+      platform,
       campaignId: fact.campaignId,
       campaignName: fact.campaignName,
       date: fact.date,
@@ -246,7 +278,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
       conversions: fact.conversions,
       revenue: fact.revenue,
       currency: fact.currency,
-      transformVersion: META_TRANSFORM_VERSION,
+      transformVersion: adapter.transformVersion,
       syncedAt: new Date().toISOString(),
     };
   });
@@ -278,7 +310,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
     factsUpserted += batch.length;
   }
 
-  // 7. Campaign dimension (SCD-lite): latest name/status/objective, widen
+  // 7. Campaign dimension (SCD-lite): latest name/status/objective/type, widen
   //    first_seen/last_seen.
   let campaignsUpserted = 0;
   const dimValues = [...campaignMeta.values()].map((c) => ({
@@ -287,6 +319,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
     name: c.name,
     status: c.status,
     objective: c.objective,
+    campaignType: c.campaignType,
     firstSeen: c.firstSeen,
     lastSeen: c.lastSeen,
   }));
@@ -300,6 +333,7 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
           name: sql`excluded.name`,
           status: sql`excluded.status`,
           objective: sql`excluded.objective`,
+          campaignType: sql`excluded.campaign_type`,
           firstSeen: sql`least(${campaigns.firstSeen}, excluded.first_seen)`,
           lastSeen: sql`greatest(${campaigns.lastSeen}, excluded.last_seen)`,
           updatedAt: sql`now()`,
@@ -309,7 +343,8 @@ export async function syncMeta(params: { days?: number } = {}): Promise<SyncSumm
   }
 
   return {
-    connector: "facebook",
+    platform,
+    connector: adapter.connector,
     dateFrom,
     dateTo,
     accountsSeen: byAccount.size,

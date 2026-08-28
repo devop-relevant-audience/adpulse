@@ -3,7 +3,13 @@
 // and the raw→fact normalization. Pure functions of the raw payload + mapping
 // config — re-runnable without a re-pull (docs/schema-v2-assessment.md §4).
 
-import type { ConversionMappingRow } from "@/lib/types/database";
+import type {
+  AccountIdentity,
+  DefaultMapping,
+  MappingRule,
+  NormalizedFact,
+  PlatformAdapter,
+} from "./adapter";
 import type { WindsorRow } from "./client";
 
 // Bump when normalization logic changes semantics; stamped on every fact row so
@@ -21,6 +27,7 @@ export const META_FIELDS = [
   "account_id",
   "account_name",
   "currency",
+  "account_timezone",
   "campaign_id",
   "campaign",
   "campaign_status",
@@ -87,12 +94,6 @@ const PURCHASE_FAMILY = new Set([
   "offsite_conversion.fb_pixel_purchase",
 ]);
 
-export interface DefaultMapping {
-  target: "conversions" | "revenue";
-  eventKey: string;
-  attributionWindow: string;
-}
-
 /**
  * Seed mappings for an account we have no config for yet, from its observed
  * events. Heuristic (confirmed with the agency): purchase family first (real
@@ -143,22 +144,6 @@ export function deriveDefaultMappings(payloads: WindsorRow[]): DefaultMapping[] 
   return mappings;
 }
 
-export interface NormalizedMetaFact {
-  campaignId: string;
-  campaignName: string;
-  date: string;
-  impressions: number;
-  clicks: number;
-  linkClicks: number | null;
-  spend: number;
-  conversions: number;
-  /** null = no revenue mapping configured for the account (not tracked). */
-  revenue: number | null;
-  currency: string | null;
-  campaignStatus: string | null;
-  objective: string | null;
-}
-
 function num(value: unknown): number {
   const n = Number(value ?? 0);
   return Number.isFinite(n) ? n : 0;
@@ -171,8 +156,8 @@ function str(value: unknown): string | null {
 /** Normalize one raw Windsor Meta payload using the account's mapping config. */
 export function normalizeMetaPayload(
   payload: WindsorRow,
-  mappings: Pick<ConversionMappingRow, "target" | "event_key" | "attribution_window" | "enabled">[]
-): NormalizedMetaFact {
+  mappings: MappingRule[]
+): NormalizedFact {
   const enabled = mappings.filter((m) => m.enabled);
   const conversionRules = enabled.filter((m) => m.target === "conversions");
   const revenueRules = enabled.filter((m) => m.target === "revenue");
@@ -199,5 +184,33 @@ export function normalizeMetaPayload(
     currency: str(payload.currency),
     campaignStatus: str(payload.campaign_status),
     objective: str(payload.objective),
+    // Meta has no campaign-type dimension; objective carries that meaning.
+    campaignType: null,
   };
 }
+
+/** Reads the account identity off a Meta row (note: `account_timezone`). */
+function readMetaAccount(row: WindsorRow): AccountIdentity | null {
+  const externalId = String(row.account_id ?? "");
+  if (!externalId || !row.campaign_id || !row.date) return null;
+  return {
+    externalId,
+    name: String(row.account_name ?? externalId),
+    currency: String(row.currency ?? "USD"),
+    timezone: str(row.account_timezone),
+  };
+}
+
+export const metaAdapter: PlatformAdapter = {
+  platform: "meta",
+  connector: "facebook",
+  fields: META_FIELDS,
+  transformVersion: META_TRANSFORM_VERSION,
+  // Meta restates conversions for up to ~28 days (attribution windows), so an
+  // incremental run re-pulls the trailing 28; a first run backfills 90.
+  incrementalDays: 28,
+  backfillDays: 90,
+  readAccount: readMetaAccount,
+  deriveDefaultMappings,
+  normalize: normalizeMetaPayload,
+};
