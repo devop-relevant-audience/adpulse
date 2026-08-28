@@ -7,7 +7,8 @@ import { Panel } from "@/components/ui/panel";
 import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { BiBulb, BiTrendingUp, BiTrendingDown, BiDollar, BiPointer, BiShow, BiLineChart, BiCalendar, BiSolidMagicWand } from "react-icons/bi";
-import { formatCurrency, formatNumber } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import type { HealthScoreResult } from "@/lib/data/health-score";
 
 const GRADE_CONFIG = {
@@ -109,6 +110,7 @@ function SubScoreCard({ name, score, weight, description }: {
 }
 
 export function HealthScore() {
+  const { formatCurrency } = useCurrencyFormat();
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
 

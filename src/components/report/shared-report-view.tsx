@@ -10,6 +10,7 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import type { ReportData } from "@/lib/report/builder";
+import { DEFAULT_CURRENCY } from "@/lib/format";
 
 interface SharedReportViewProps {
   token: string;
@@ -92,7 +93,6 @@ function parseReportResponse(raw: Record<string, unknown>): ParsedReport {
     campaigns: safeStr(rawNarratives.campaigns, ""),
     health: safeStr(rawNarratives.health, ""),
     creatives: safeStr(rawNarratives.creatives, ""),
-    optimizer: safeStr(rawNarratives.optimizer, ""),
     recommendations: safeStr(rawNarratives.recommendations, ""),
   };
 
@@ -120,14 +120,11 @@ function parseReportResponse(raw: Record<string, unknown>): ParsedReport {
     avgCtr: 0, avgCpa: 0, totalCreativeSpend: 0,
     byType: [], topPerformers: [], fatiguedCreatives: [],
   };
-  const emptyOptimizer = {
-    currentAllocation: {}, recommendedAllocation: {},
-    platforms: [], suggestions: [], projectedImpact: { additionalConversions: 0, cpaReduction: 0 },
-  };
-
   const data: ReportData = {
     id: safeStr(raw.id, undefined as unknown as string),
     clientName: safeStr(raw.title, "Client").replace(" — Performance Report", ""),
+    // Reports saved before currency was recorded predate any non-USD client.
+    currency: safeStr(ms.currency, DEFAULT_CURRENCY),
     dateRange,
     comparisonRange,
     generatedAt: new Date().toISOString(),
@@ -138,7 +135,6 @@ function parseReportResponse(raw: Record<string, unknown>): ParsedReport {
     campaignBreakdown: safeArr(ms.campaignBreakdown, []) as ReportData["campaignBreakdown"],
     healthScore: healthScore as unknown as ReportData["healthScore"],
     creatives: safeObj(ms.creatives, emptyCreatives) as ReportData["creatives"],
-    optimizer: safeObj(ms.optimizer, emptyOptimizer) as ReportData["optimizer"],
     narratives,
   };
 

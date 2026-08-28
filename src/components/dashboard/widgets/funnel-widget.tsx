@@ -1,23 +1,23 @@
 "use client";
 
 import { useFunnel } from "@/hooks/use-metrics";
-import { useAppStore } from "@/store/app-store";
+import { useWidgetScope } from "@/hooks/use-widget-scope";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { formatNumber } from "@/lib/format";
+import type { WidgetRenderProps } from "@/lib/dashboard/types";
 
 const STAGE_COLORS = ["#6366f1", "#f59e0b", "#10b981"];
 
-export function FunnelWidget() {
-  const clientId = useAppStore((s) => s.selectedClientId);
-  const dateRange = useAppStore((s) => s.dateRange);
-  const platform = useAppStore((s) => s.selectedPlatform);
+export function FunnelWidget({ config }: WidgetRenderProps) {
+  const { clientId, dateRange, platforms, campaignIds } = useWidgetScope(config);
 
   const { data: funnelData, isLoading, isError, refetch } = useFunnel({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
-    platform,
+    platforms,
+    campaignIds,
   });
 
   if (!clientId || isLoading) {

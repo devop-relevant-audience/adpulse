@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getCreatives } from "@/lib/data/queries";
+import { getClientCurrency, getCreatives } from "@/lib/data/queries";
+import { currencySymbol } from "@/lib/format";
 import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
 import { withRoute } from "@/lib/http/with-route";
 import { logger } from "@/lib/log";
@@ -60,14 +61,14 @@ function buildThumbnailUrl(
   return `https://placehold.co/${dims}/${color.bg}/${color.fg}?text=${text}`;
 }
 
-function summarizeTopPerformers(creatives: AdCreativeRow[]): string {
+function summarizeTopPerformers(creatives: AdCreativeRow[], sym: string): string {
   return creatives
     .map(
       (c, i) =>
         `${i + 1}. "${c.headline}" — ${c.creative_type} on ${c.platform}\n` +
         `   Copy: "${c.body_copy}"\n` +
-        `   CTR: ${(Number(c.ctr) * 100).toFixed(2)}%, CPA: $${Number(c.cpa).toFixed(2)}, ` +
-        `Conversions: ${c.conversions}, Spend: $${Number(c.spend).toFixed(0)}`,
+        `   CTR: ${(Number(c.ctr) * 100).toFixed(2)}%, CPA: ${sym}${Number(c.cpa).toFixed(2)}, ` +
+        `Conversions: ${c.conversions}, Spend: ${sym}${Number(c.spend).toFixed(0)}`,
     )
     .join("\n\n");
 }
@@ -137,10 +138,12 @@ export const POST = withRoute("creatives.generate.POST", async (request: NextReq
     return NextResponse.json(generateFallbackVariants(topPerformers, count, platformSet));
   }
 
+  const sym = currencySymbol(await getClientCurrency(clientId));
+
   const prompt = `You are an expert ad creative strategist. Analyze these top-performing ad creatives and generate ${count} new creative variants that combine the best elements (headlines, copy angles, formats, tones) from the winners.
 
 TOP PERFORMING CREATIVES:
-${summarizeTopPerformers(topPerformers)}
+${summarizeTopPerformers(topPerformers, sym)}
 
 REQUIREMENTS:
 - Generate exactly ${count} new creative variants

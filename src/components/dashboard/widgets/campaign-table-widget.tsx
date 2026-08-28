@@ -3,9 +3,11 @@
 import { useMemo } from "react";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
+import { useWidgetScope } from "@/hooks/use-widget-scope";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
-import { formatCurrency, formatNumber } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { aggregateCampaignTotals } from "@/lib/data/campaign-aggregate";
 import {
   Select,
@@ -59,9 +61,8 @@ function readSortBy(config: Record<string, unknown>): "spend" | "conversions" | 
 }
 
 export function CampaignTableWidget({ config }: WidgetRenderProps) {
-  const clientId = useAppStore((s) => s.selectedClientId);
-  const dateRange = useAppStore((s) => s.dateRange);
-  const platform = useAppStore((s) => s.selectedPlatform);
+  const { formatCurrency } = useCurrencyFormat();
+  const { clientId, dateRange, platforms, campaignIds } = useWidgetScope(config);
   const setReferenceContext = useAppStore((s) => s.setReferenceContext);
 
   const limit = readLimit(config);
@@ -71,7 +72,8 @@ export function CampaignTableWidget({ config }: WidgetRenderProps) {
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
-    platform,
+    platforms,
+    campaignIds,
   });
 
   const campaigns = useMemo(() => {

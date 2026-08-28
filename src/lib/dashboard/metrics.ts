@@ -35,10 +35,10 @@ export function getMetricOption(value: string): MetricOption {
   return METRIC_OPTIONS.find((m) => m.value === value) ?? METRIC_OPTIONS[0];
 }
 
-export function formatMetric(value: number, format: MetricFormat): string {
+export function formatMetric(value: number, format: MetricFormat, currency?: string): string {
   switch (format) {
     case "currency":
-      return formatCurrency(value);
+      return formatCurrency(value, currency);
     case "percent":
       return formatPercent(value);
     case "number":

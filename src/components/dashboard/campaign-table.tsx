@@ -17,6 +17,7 @@ import { BiSort, BiDownArrowAlt, BiUpArrowAlt, BiDownload, BiMessageRounded } fr
 import { cn } from "@/lib/utils";
 import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
 import { formatNumber as formatNum } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { aggregateCampaignTotals } from "@/lib/data/campaign-aggregate";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
 
@@ -57,6 +58,7 @@ export function CampaignTable() {
   const platform = useAppStore((s) => s.selectedPlatform);
   const setReferenceContext = useAppStore((s) => s.setReferenceContext);
 
+  const { currency, symbol } = useCurrencyFormat();
   const [sortField, setSortField] = useState<SortField>("totalSpend");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -106,7 +108,7 @@ export function CampaignTable() {
 
   const handleExportCSV = () => {
     if (!campaigns.length) return;
-    const headers = ["Campaign", "Platform", "Impressions", "Clicks", "Spend", "Conversions", "CTR (%)", "CPC ($)", "CPA ($)"];
+    const headers = ["Campaign", "Platform", "Impressions", "Clicks", "Spend", "Conversions", "CTR (%)", `CPC (${currency})`, `CPA (${currency})`];
     const rows = campaigns.map(c => [c.campaignName, c.platform, c.totalImpressions, c.totalClicks, c.totalSpend, c.totalConversions, c.avgCtr, c.avgCpc, c.avgCpa]);
     const csvContent = [headers.join(","), ...rows.map(e => e.map(x => `"${x}"`).join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -216,7 +218,7 @@ export function CampaignTable() {
                   {formatNum(campaign.totalClicks)}
                 </TableCell>
                 <TableCell className="text-right text-[13px] tabular-nums font-medium text-ink">
-                  ${campaign.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {symbol}{campaign.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell className="text-right text-[13px] tabular-nums text-ink-secondary">
                   {formatNum(campaign.totalConversions)}
@@ -225,10 +227,10 @@ export function CampaignTable() {
                   {campaign.avgCtr}%
                 </TableCell>
                 <TableCell className="text-right text-[13px] tabular-nums text-ink-secondary">
-                  ${campaign.avgCpc.toFixed(2)}
+                  {symbol}{campaign.avgCpc.toFixed(2)}
                 </TableCell>
                 <TableCell className="text-right text-[13px] tabular-nums text-ink-secondary pr-5">
-                  ${campaign.avgCpa.toFixed(2)}
+                  {symbol}{campaign.avgCpa.toFixed(2)}
                 </TableCell>
               </TableRow>
             ))}

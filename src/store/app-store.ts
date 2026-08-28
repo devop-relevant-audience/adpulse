@@ -4,10 +4,8 @@ import type { Platform } from "@/lib/types/database";
 
 export const VIEWS = {
   dashboard: "dashboard",
-  anomalies: "anomalies",
   pacing: "pacing",
   funnel: "funnel",
-  optimizer: "optimizer",
   attribution: "attribution",
   health: "health",
   creatives: "creatives",

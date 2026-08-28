@@ -2,18 +2,18 @@
 
 import { useMemo } from "react";
 import { useMetrics } from "@/hooks/use-metrics";
-import { useAppStore } from "@/store/app-store";
+import { useWidgetScope } from "@/hooks/use-widget-scope";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
-import { formatCurrency, formatNumber } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
 import type { WidgetRenderProps } from "@/lib/dashboard/types";
 import type { Platform } from "@/lib/types/database";
 
 export function PlatformBreakdownWidget({ config }: WidgetRenderProps) {
-  const clientId = useAppStore((s) => s.selectedClientId);
-  const dateRange = useAppStore((s) => s.dateRange);
-  const platform = useAppStore((s) => s.selectedPlatform);
+  const { formatCurrency } = useCurrencyFormat();
+  const { clientId, dateRange, platforms, campaignIds } = useWidgetScope(config);
 
   const metricKey = (typeof config.metric === "string" ? config.metric : "spend") as
     | "spend"
@@ -23,7 +23,8 @@ export function PlatformBreakdownWidget({ config }: WidgetRenderProps) {
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
-    platform,
+    platforms,
+    campaignIds,
   });
 
   const rows = useMemo(() => {

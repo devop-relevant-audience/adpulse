@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { WidgetFiltersForm } from "@/components/dashboard/widget-filters-form";
 import { getWidget } from "@/lib/dashboard/widget-registry";
 import { SIZE_PRESETS } from "@/lib/dashboard/types";
 import type { WidgetInstance } from "@/lib/dashboard/types";
@@ -45,6 +46,7 @@ export function WidgetConfigDialog({
   if (!instance) return null;
   const def = getWidget(instance.type);
   const ConfigForm = def?.ConfigForm;
+  const supportsFilters = def?.supportsFilters === true;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -53,7 +55,7 @@ export function WidgetConfigDialog({
           <DialogTitle>Configure {def?.title ?? "widget"}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5 py-1">
+        <div className="space-y-5 py-1 max-h-[70vh] overflow-y-auto">
           <div className="space-y-2">
             <label className="text-xs font-medium text-ink-secondary">Width</label>
             <div className="flex gap-1.5">
@@ -75,9 +77,9 @@ export function WidgetConfigDialog({
             </div>
           </div>
 
-          {ConfigForm ? (
-            <ConfigForm config={draft} onChange={setDraft} />
-          ) : (
+          {ConfigForm && <ConfigForm config={draft} onChange={setDraft} />}
+          {supportsFilters && <WidgetFiltersForm config={draft} onChange={setDraft} />}
+          {!ConfigForm && !supportsFilters && (
             <p className="text-xs text-ink-muted">This widget has no additional settings.</p>
           )}
         </div>

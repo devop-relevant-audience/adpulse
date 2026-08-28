@@ -4,6 +4,7 @@ import { format, subDays } from "date-fns";
 import { BiTrendingUp, BiTrendingDown } from "react-icons/bi";
 import { useComparison } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
+import { useWidgetScope } from "@/hooks/use-widget-scope";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ import {
   getMetricOption,
   formatMetric,
 } from "@/lib/dashboard/metrics";
+import { useClientCurrency } from "@/hooks/use-currency-format";
 import {
   Select,
   SelectContent,
@@ -27,9 +29,9 @@ function readMetric(config: Record<string, unknown>): string {
 }
 
 export function KpiWidget({ config }: WidgetRenderProps) {
-  const clientId = useAppStore((s) => s.selectedClientId);
-  const dateRange = useAppStore((s) => s.dateRange);
-  const platform = useAppStore((s) => s.selectedPlatform);
+  const currency = useClientCurrency();
+  const scope = useWidgetScope(config);
+  const { clientId, dateRange } = scope;
   const setReferenceContext = useAppStore((s) => s.setReferenceContext);
 
   const metric = getMetricOption(readMetric(config));
@@ -47,7 +49,8 @@ export function KpiWidget({ config }: WidgetRenderProps) {
     currentEnd: dateRange.end,
     previousStart,
     previousEnd,
-    platform,
+    platforms: scope.platforms,
+    campaignIds: scope.campaignIds,
   });
 
   if (!clientId || isLoading) {
@@ -73,13 +76,13 @@ export function KpiWidget({ config }: WidgetRenderProps) {
     <button
       type="button"
       onClick={() =>
-        setReferenceContext({ metric: metric.value, dateRange, platform, value: delta })
+        setReferenceContext({ metric: metric.value, dateRange, platform: scope.platform, value: delta })
       }
       className="h-full w-full flex flex-col justify-center text-left px-1 group"
     >
       <p className="text-[12px] font-medium text-ink-muted">{metric.label}</p>
       <p className="text-2xl font-semibold tracking-tight text-ink leading-tight truncate mt-1">
-        {formatMetric(value, metric.format)}
+        {formatMetric(value, metric.format, currency)}
       </p>
       <div className="flex items-center gap-2 mt-2">
         {!isNeutral && (
@@ -94,7 +97,7 @@ export function KpiWidget({ config }: WidgetRenderProps) {
           </span>
         )}
         <span className="text-[11px] text-ink-muted truncate">
-          vs {formatMetric(prev, metric.format)}
+          vs {formatMetric(prev, metric.format, currency)}
         </span>
       </div>
     </button>

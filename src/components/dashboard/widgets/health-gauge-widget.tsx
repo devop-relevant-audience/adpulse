@@ -1,12 +1,13 @@
 "use client";
 
 import { useHealthScore } from "@/hooks/use-metrics";
-import { useAppStore } from "@/store/app-store";
+import { useWidgetScope } from "@/hooks/use-widget-scope";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { BiSolidMagicWand } from "react-icons/bi";
 import type { HealthScoreResult } from "@/lib/data/health-score";
+import type { WidgetRenderProps } from "@/lib/dashboard/types";
 
 const GRADE_CONFIG = {
   A: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", label: "Excellent" },
@@ -68,14 +69,15 @@ function MiniGauge({ score, grade }: { score: number; grade: HealthScoreResult["
   );
 }
 
-export function HealthGaugeWidget() {
-  const clientId = useAppStore((s) => s.selectedClientId);
-  const dateRange = useAppStore((s) => s.dateRange);
+export function HealthGaugeWidget({ config }: WidgetRenderProps) {
+  const { clientId, dateRange, platforms, campaignIds } = useWidgetScope(config);
 
   const { data: healthData, isLoading, isError, refetch } = useHealthScore({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
+    platforms,
+    campaignIds,
   });
 
   if (!clientId || isLoading) {

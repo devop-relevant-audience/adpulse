@@ -38,7 +38,8 @@ import {
   CHART_GRID,
   CHART_AXIS_TEXT,
 } from "@/lib/dashboard/chart-theme";
-import { formatCurrency, formatNumber as formatNum } from "@/lib/format";
+import { formatNumber as formatNum } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 // Model identity drawn from the canonical SERIES_PALETTE (blue, violet, cyan,
 // pink, teal) — one entry per model, by index. No model uses red/green/amber,
@@ -90,6 +91,7 @@ function StatCard({ label, value, sub, icon }: { label: string; value: string; s
 // ---------- Tab 1: Revenue & ROAS ----------
 
 function RevenueRoasTab({ clientId }: { clientId: string }) {
+  const { formatCurrency } = useCurrencyFormat();
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
 
@@ -227,6 +229,7 @@ function RevenueRoasTab({ clientId }: { clientId: string }) {
 const MODEL_ORDER: AttributionModel[] = ["first_touch", "last_touch", "linear", "time_decay", "position_based"];
 
 function AttributionModelsTab({ clientId }: { clientId: string }) {
+  const { formatCurrency } = useCurrencyFormat();
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
   const [selectedModel, setSelectedModel] = useState<AttributionModel>("last_touch");
@@ -359,6 +362,7 @@ function AttributionModelsTab({ clientId }: { clientId: string }) {
 // ---------- Tab 3: LTV & Cohorts ----------
 
 function CohortsTab({ clientId }: { clientId: string }) {
+  const { formatCurrency } = useCurrencyFormat();
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
 

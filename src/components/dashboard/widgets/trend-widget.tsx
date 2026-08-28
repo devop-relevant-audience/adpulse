@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 import { useDailyTrend } from "@/hooks/use-metrics";
-import { useAppStore } from "@/store/app-store";
+import { useWidgetScope } from "@/hooks/use-widget-scope";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
@@ -30,9 +30,7 @@ function readMetrics(config: Record<string, unknown>): string[] {
 }
 
 export function TrendWidget({ config }: WidgetRenderProps) {
-  const clientId = useAppStore((s) => s.selectedClientId);
-  const dateRange = useAppStore((s) => s.dateRange);
-  const platform = useAppStore((s) => s.selectedPlatform);
+  const { clientId, dateRange, platforms, campaignIds } = useWidgetScope(config);
 
   const metrics = readMetrics(config).map(getMetricOption);
 
@@ -40,7 +38,8 @@ export function TrendWidget({ config }: WidgetRenderProps) {
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
-    platform,
+    platforms,
+    campaignIds,
   });
 
   if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;

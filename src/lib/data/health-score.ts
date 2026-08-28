@@ -1,4 +1,5 @@
-import { getMetrics } from "./queries";
+import { getClientCurrency, getMetrics } from "./queries";
+import { currencySymbol } from "@/lib/format";
 import type { Platform } from "@/lib/types/database";
 
 interface SubScore {
@@ -53,6 +54,8 @@ export async function calculateHealthScore(params: {
   startDate: string;
   endDate: string;
   platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }): Promise<HealthScoreResult> {
   const rows = await getMetrics(params);
 
@@ -164,6 +167,8 @@ export async function calculateHealthScore(params: {
     spendEffScore = clamp(50 + roasChange * 200, 0, 100);
   }
 
+  const sym = currencySymbol(await getClientCurrency(params.clientId));
+
   const subScores: SubScore[] = [
     {
       name: "CPA Efficiency",
@@ -171,8 +176,8 @@ export async function calculateHealthScore(params: {
       weight: 0.25,
       weightedScore: Number((cpaScore * 0.25).toFixed(1)),
       description: recentCpa < avgCpa
-        ? `Recent CPA ($${recentCpa.toFixed(2)}) is below average ($${avgCpa.toFixed(2)})`
-        : `Recent CPA ($${recentCpa.toFixed(2)}) is above average ($${avgCpa.toFixed(2)})`,
+        ? `Recent CPA (${sym}${recentCpa.toFixed(2)}) is below average (${sym}${avgCpa.toFixed(2)})`
+        : `Recent CPA (${sym}${recentCpa.toFixed(2)}) is above average (${sym}${avgCpa.toFixed(2)})`,
     },
     {
       name: "CTR Trend",

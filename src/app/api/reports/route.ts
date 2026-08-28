@@ -48,6 +48,7 @@ export const POST = withRoute("reports.POST", async (request: NextRequest) => {
         comparison_end: reportData.comparisonRange.end,
         narrative: reportData.narratives.executive,
         metrics_summary: {
+          currency: reportData.currency,
           comparison: reportData.comparison,
           campaignBreakdown: reportData.campaignBreakdown,
           platformBreakdown: reportData.platformBreakdown,

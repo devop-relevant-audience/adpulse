@@ -3,6 +3,8 @@
 // `widgets`/`layouts` blobs are nested JSON and cross the Drizzle case boundary
 // untouched (same rule as raw_payload / retention).
 
+import type { Platform } from "@/lib/types/database";
+
 export const WIDGET_TYPES = [
   "kpi",
   "trend",
@@ -17,6 +19,18 @@ export const WIDGET_TYPES = [
 ] as const;
 
 export type WidgetType = (typeof WIDGET_TYPES)[number];
+
+/**
+ * Optional per-widget data filter stored at `WidgetInstance.config.filters`.
+ * Read/normalize it with `src/lib/dashboard/filters.ts` — never trust the raw
+ * JSON shape. Empty arrays are never persisted (the key is dropped instead).
+ */
+export interface WidgetFilters {
+  /** Platforms to include. Empty/absent = follow the page's platform selector. */
+  platforms?: Platform[];
+  /** Campaign ids to include. Empty/absent = all campaigns. */
+  campaignIds?: string[];
+}
 
 export interface WidgetInstance {
   /** Unique key — matches the react-grid-layout item key (`i`). */

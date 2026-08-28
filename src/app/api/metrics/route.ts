@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMetrics, compareMetrics, getDailyTrend, detectAnomalies, getFunnelData, getCampaignPacing } from "@/lib/data/queries";
+import { getMetrics, compareMetrics, getDailyTrend, getFunnelData, getCampaignPacing } from "@/lib/data/queries";
 import { calculateHealthScore } from "@/lib/data/health-score";
 import { z } from "zod";
 import { requireClientAccess, requireUser } from "@/lib/auth/guard";
@@ -12,7 +12,17 @@ const metricsSchema = z.object({
   endDate: z.string(),
   platform: z.enum(["google", "meta", "tiktok"]).optional(),
   campaignId: z.string().optional(),
+  platforms: z.string().optional(),
+  campaignIds: z.string().optional(),
 });
+
+const PLATFORM_VALUES: readonly Platform[] = ["google", "meta", "tiktok"];
+const MAX_CAMPAIGN_IDS = 200;
+
+function splitList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
 
 export const GET = withRoute("metrics.GET", async (request: NextRequest) => {
   const gate = await requireUser();
@@ -27,6 +37,8 @@ export const GET = withRoute("metrics.GET", async (request: NextRequest) => {
     endDate: searchParams.get("endDate"),
     platform: searchParams.get("platform") || undefined,
     campaignId: searchParams.get("campaignId") || undefined,
+    platforms: searchParams.get("platforms") || undefined,
+    campaignIds: searchParams.get("campaignIds") || undefined,
   });
 
   if (!parsed.success) {
@@ -39,9 +51,26 @@ export const GET = withRoute("metrics.GET", async (request: NextRequest) => {
   const access = await requireClientAccess(gate.ctx, parsed.data.clientId);
   if (!access.ok) return access.response;
 
+  const platformList = splitList(parsed.data.platforms);
+  if (platformList.some((p) => !PLATFORM_VALUES.includes(p as Platform))) {
+    return NextResponse.json({ error: "Invalid platforms" }, { status: 400 });
+  }
+  const campaignIdList = Array.from(new Set(splitList(parsed.data.campaignIds)));
+  if (campaignIdList.length > MAX_CAMPAIGN_IDS) {
+    return NextResponse.json(
+      { error: `Too many campaignIds (max ${MAX_CAMPAIGN_IDS})` },
+      { status: 400 }
+    );
+  }
+
   const params = {
-    ...parsed.data,
+    clientId: parsed.data.clientId,
+    startDate: parsed.data.startDate,
+    endDate: parsed.data.endDate,
+    campaignId: parsed.data.campaignId,
     platform: parsed.data.platform as Platform | undefined,
+    platforms: platformList.length ? (platformList as Platform[]) : undefined,
+    campaignIds: campaignIdList.length ? campaignIdList : undefined,
   };
 
   switch (action) {
@@ -61,6 +90,8 @@ export const GET = withRoute("metrics.GET", async (request: NextRequest) => {
         previousStart,
         previousEnd,
         platform: params.platform,
+        platforms: params.platforms,
+        campaignIds: params.campaignIds,
       });
       return NextResponse.json(result);
     }
@@ -68,11 +99,6 @@ export const GET = withRoute("metrics.GET", async (request: NextRequest) => {
     case "trend": {
       const trend = await getDailyTrend(params);
       return NextResponse.json(trend);
-    }
-
-    case "anomalies": {
-      const anomalies = await detectAnomalies(params);
-      return NextResponse.json(anomalies);
     }
 
     case "funnel": {

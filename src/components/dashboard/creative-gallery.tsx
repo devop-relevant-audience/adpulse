@@ -20,6 +20,7 @@ import { BiImage, BiVideo, BiCarousel, BiError, BiMessageRounded, BiSort, BiTren
 import { CreativeGenerator } from "@/components/dashboard/creative-generator";
 import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
 import { formatNumber as formatNum } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import type { AdCreativeRow, Platform, CreativeStatus } from "@/lib/types/database";
 
 const CREATIVE_TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -57,6 +58,7 @@ function FatigueBar({ daysRunning }: { daysRunning: number }) {
 }
 
 function SummaryCards({ creatives }: { creatives: AdCreativeRow[] }) {
+  const { symbol } = useCurrencyFormat();
   const total = creatives.length;
   const avgCtr =
     total > 0
@@ -71,7 +73,7 @@ function SummaryCards({ creatives }: { creatives: AdCreativeRow[] }) {
   const cards = [
     { label: "Total creatives", value: String(total), sub: null },
     { label: "Avg CTR", value: `${avgCtr.toFixed(2)}%`, sub: null },
-    { label: "Avg CPA", value: `$${avgCpa.toFixed(2)}`, sub: null },
+    { label: "Avg CPA", value: `${symbol}${avgCpa.toFixed(2)}`, sub: null },
     {
       label: "Fatigued",
       value: String(fatiguedCount),
@@ -117,6 +119,7 @@ function CreativeCard({
   creative: AdCreativeRow;
   onAskAI: () => void;
 }) {
+  const { symbol } = useCurrencyFormat();
   const status = STATUS_STYLES[creative.status as CreativeStatus];
   const typeIcon = CREATIVE_TYPE_ICONS[creative.creative_type];
 
@@ -164,8 +167,8 @@ function CreativeCard({
         {/* Metrics grid */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
           <MetricCell label="CTR" value={`${(Number(creative.ctr) * 100).toFixed(2)}%`} />
-          <MetricCell label="CPA" value={`$${Number(creative.cpa).toFixed(2)}`} />
-          <MetricCell label="Spend" value={`$${formatNum(Number(creative.spend))}`} />
+          <MetricCell label="CPA" value={`${symbol}${Number(creative.cpa).toFixed(2)}`} />
+          <MetricCell label="Spend" value={`${symbol}${formatNum(Number(creative.spend))}`} />
           <MetricCell label="Conv." value={formatNum(Number(creative.conversions))} />
         </div>
 

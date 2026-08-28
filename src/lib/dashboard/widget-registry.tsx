@@ -35,6 +35,8 @@ export interface WidgetDefinition {
   ConfigForm?: React.ComponentType<WidgetConfigFormProps>;
   /** Optional dynamic panel title derived from the widget's config. */
   getTitle?: (config: Record<string, unknown>) => string;
+  /** Widget reads config.filters via useWidgetScope; the config dialog shows the shared filter form. */
+  supportsFilters?: boolean;
 }
 
 // Registered widgets. Stage 2 appends the remaining catalog entries
@@ -50,6 +52,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     defaultConfig: { metric: "spend" },
     Render: KpiWidget,
     ConfigForm: KpiConfigForm,
+    supportsFilters: true,
     getTitle: (c) => {
       const map: Record<string, string> = {
         spend: "Spend", conversions: "Conversions", cpa: "CPA", ctr: "CTR",
@@ -68,6 +71,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     defaultConfig: { metrics: ["spend", "conversions"] },
     Render: TrendWidget,
     ConfigForm: TrendConfigForm,
+    supportsFilters: true,
   },
   {
     type: "platform-breakdown",
@@ -78,6 +82,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     defaultSize: { w: 4, h: 7, minW: 3, minH: 5 },
     defaultConfig: { metric: "spend" },
     Render: PlatformBreakdownWidget,
+    supportsFilters: true,
   },
   {
     type: "note",
@@ -100,6 +105,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     defaultConfig: { limit: 8, sortBy: "spend" },
     Render: CampaignTableWidget,
     ConfigForm: CampaignTableConfigForm,
+    supportsFilters: true,
   },
   {
     type: "health-gauge",
@@ -110,6 +116,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     defaultSize: { w: 4, h: 8, minW: 3, minH: 6 },
     defaultConfig: {},
     Render: HealthGaugeWidget,
+    supportsFilters: true,
   },
   {
     type: "funnel",
@@ -120,6 +127,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     defaultSize: { w: 6, h: 7, minW: 4, minH: 5 },
     defaultConfig: {},
     Render: FunnelWidget,
+    supportsFilters: true,
   },
   {
     type: "revenue-roas",

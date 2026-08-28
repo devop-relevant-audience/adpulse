@@ -11,7 +11,7 @@ import { useFilterQuery } from "@/hooks/use-url-filters";
 import { isAgencyRole, isAdminRole, roleLabel } from "@/lib/auth/roles";
 import { useSignOutAndRedirect } from "@/lib/auth/sign-out";
 import { cn } from "@/lib/utils";
-import { BiGridAlt, BiFile, BiMessageRounded, BiChevronLeft, BiChevronRight, BiData, BiRefresh, BiCheck, BiChevronDown, BiBuildings, BiError, BiTachometer, BiFilterAlt, BiSliderAlt, BiPulse, BiBell, BiTransferAlt, BiImage, BiCoinStack, BiGroup, BiLogOut } from "react-icons/bi";
+import { BiGridAlt, BiFile, BiMessageRounded, BiChevronLeft, BiChevronRight, BiData, BiRefresh, BiCheck, BiChevronDown, BiBuildings, BiTachometer, BiFilterAlt, BiPulse, BiBell, BiTransferAlt, BiImage, BiCoinStack, BiGroup, BiLogOut } from "react-icons/bi";
 import { Logo } from "@/components/brand/logo";
 import { useQueryClient } from "@tanstack/react-query";
 import { VIEWS } from "@/store/app-store";
@@ -269,10 +269,8 @@ export function Sidebar() {
 
   const navItems: NavItem[] = [
     { id: VIEWS.dashboard, label: "Dashboard", icon: <BiGridAlt className="w-4 h-4" /> },
-    { id: VIEWS.anomalies, label: "Anomalies", icon: <BiError className="w-4 h-4" /> },
     { id: VIEWS.pacing, label: "Pacing", icon: <BiTachometer className="w-4 h-4" /> },
     { id: VIEWS.funnel, label: "Funnel", icon: <BiFilterAlt className="w-4 h-4" /> },
-    { id: VIEWS.optimizer, label: "Channel mix", icon: <BiSliderAlt className="w-4 h-4" /> },
     { id: VIEWS.attribution, label: "Attribution", icon: <BiCoinStack className="w-4 h-4" /> },
     { id: VIEWS.health, label: "Health score", icon: <BiPulse className="w-4 h-4" /> },
     { id: VIEWS.creatives, label: "Creatives", icon: <BiImage className="w-4 h-4" /> },

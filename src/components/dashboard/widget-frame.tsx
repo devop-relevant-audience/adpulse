@@ -1,10 +1,11 @@
 "use client";
 
 import React from "react";
-import { BiMove, BiCog, BiX, BiError } from "react-icons/bi";
+import { BiMove, BiCog, BiX, BiError, BiFilterAlt } from "react-icons/bi";
 import { cn } from "@/lib/utils";
 import { Panel } from "@/components/ui/panel";
 import { getWidget } from "@/lib/dashboard/widget-registry";
+import { describeWidgetFilters, readWidgetFilters } from "@/lib/dashboard/filters";
 import type { WidgetInstance } from "@/lib/dashboard/types";
 
 class WidgetErrorBoundary extends React.Component<
@@ -53,6 +54,8 @@ export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: Widge
 
   const title = def.getTitle ? def.getTitle(instance.config) : def.title;
   const Render = def.Render;
+  const filterLabel = describeWidgetFilters(readWidgetFilters(instance.config));
+  const canConfigure = Boolean(def.ConfigForm || def.supportsFilters);
 
   return (
     <Panel className="h-full w-full flex flex-col overflow-hidden group/widget">
@@ -66,9 +69,18 @@ export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: Widge
         <span className="text-[12px] font-medium text-ink-secondary truncate flex-1">
           {title}
         </span>
+        {filterLabel && (
+          <span
+            title={filterLabel}
+            className="inline-flex items-center gap-1 shrink-0 min-w-0 max-w-[45%] text-[10px] text-ink-muted bg-canvas-soft border border-hairline/60 rounded-full px-1.5 py-px"
+          >
+            <BiFilterAlt className="w-2.5 h-2.5 shrink-0" />
+            <span className="truncate">{filterLabel}</span>
+          </span>
+        )}
         {editMode && (
           <div className="flex items-center gap-0.5 shrink-0">
-            {def.ConfigForm && (
+            {canConfigure && (
               <button
                 type="button"
                 aria-label="Configure widget"

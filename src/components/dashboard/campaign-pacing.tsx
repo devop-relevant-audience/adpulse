@@ -8,7 +8,7 @@ import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT, STATUS_COLORS } from "@/lib/dashboard/chart-theme";
-import { formatCurrencyCompact as formatCurrency } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import type { CampaignPacingItem } from "@/lib/data/queries";
 
 const STATUS_CONFIG = {
@@ -23,6 +23,7 @@ function PacingSummaryCards({ totalBudget, totalSpent, totalProjected, overallSt
   totalProjected: number;
   overallStatus: "on_track" | "underpacing" | "overpacing";
 }) {
+  const { formatCurrencyCompact: formatCurrency } = useCurrencyFormat();
   const statusConfig = STATUS_CONFIG[overallStatus];
   const utilizationPercent = totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : "0";
 
@@ -50,6 +51,7 @@ function PacingSummaryCards({ totalBudget, totalSpent, totalProjected, overallSt
 }
 
 function PacingBar({ item }: { item: CampaignPacingItem }) {
+  const { formatCurrencyCompact: formatCurrency } = useCurrencyFormat();
   const statusConfig = STATUS_CONFIG[item.status];
   const spentPercent = Math.min(item.monthlyBudget > 0 ? (item.spentToDate / item.monthlyBudget) * 100 : 0, 100);
 

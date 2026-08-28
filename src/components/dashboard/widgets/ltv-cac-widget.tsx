@@ -8,7 +8,7 @@ import { DemoOnlyWidgetPlaceholder } from "@/components/dashboard/demo-only";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { PLATFORM_LABELS_SHORT as PLATFORM_LABELS } from "@/lib/dashboard/chart-theme";
 import type { Platform } from "@/lib/types/database";
 
@@ -20,6 +20,7 @@ const PLATFORM_COLORS: Record<Platform, string> = {
 };
 
 export function LtvCacWidget() {
+  const { formatCurrency } = useCurrencyFormat();
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);

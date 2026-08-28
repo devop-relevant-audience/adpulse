@@ -7,7 +7,8 @@ import { useAppStore } from "@/store/app-store";
 import { format, subDays } from "date-fns";
 import { BiTrendingUp, BiTrendingDown, BiMessageRounded } from "react-icons/bi";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatNumber } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 interface MetricCardProps {
   label: string;
@@ -55,6 +56,7 @@ function MetricCard({ label, value, delta, previousValue, invertDeltaColor = fal
 }
 
 export function MetricCards() {
+  const { formatCurrency } = useCurrencyFormat();
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);

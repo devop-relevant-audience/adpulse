@@ -1,0 +1,49 @@
+"use client";
+
+import { useMemo } from "react";
+import { useAppStore } from "@/store/app-store";
+import { hasWidgetFilters, readWidgetFilters } from "@/lib/dashboard/filters";
+import type { WidgetFilters } from "@/lib/dashboard/types";
+import type { Platform } from "@/lib/types/database";
+
+export interface WidgetScope {
+  clientId: string | null;
+  dateRange: { start: string; end: string };
+  /** Effective platform filter: widget override, else the global selector wrapped in an array, else undefined. */
+  platforms: Platform[] | undefined;
+  /** Single-platform convenience for callers that need one value (undefined when 0 or 2+ platforms). */
+  platform: Platform | undefined;
+  campaignIds: string[] | undefined;
+  filters: WidgetFilters;
+  hasWidgetFilters: boolean;
+}
+
+/**
+ * Combines the page-level selection (client, date range, platform) with the
+ * widget's own `config.filters`. A non-empty widget platform list replaces the
+ * global platform selector; campaign ids only ever come from the widget.
+ */
+export function useWidgetScope(config: Record<string, unknown>): WidgetScope {
+  const clientId = useAppStore((s) => s.selectedClientId);
+  const dateRange = useAppStore((s) => s.dateRange);
+  const selectedPlatform = useAppStore((s) => s.selectedPlatform);
+
+  return useMemo<WidgetScope>(() => {
+    const filters = readWidgetFilters(config);
+    const platforms = filters.platforms?.length
+      ? filters.platforms
+      : selectedPlatform
+        ? [selectedPlatform]
+        : undefined;
+    const platform = platforms && platforms.length === 1 ? platforms[0] : undefined;
+    return {
+      clientId,
+      dateRange,
+      platforms,
+      platform,
+      campaignIds: filters.campaignIds,
+      filters,
+      hasWidgetFilters: hasWidgetFilters(filters),
+    };
+  }, [config, clientId, dateRange, selectedPlatform]);
+}

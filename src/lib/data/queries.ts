@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  adAccounts,
   adCreatives,
   campaignBudgets,
   campaignPerformance,
@@ -13,6 +14,7 @@ import type {
   ClientRow,
   CreativeStatus,
 } from "@/lib/types/database";
+import { DEFAULT_CURRENCY } from "@/lib/format";
 
 type AdCreativeSelect = typeof adCreatives.$inferSelect;
 
@@ -46,6 +48,16 @@ function toAdCreativeRow(row: AdCreativeSelect): AdCreativeRow {
 }
 
 export async function getClients(): Promise<ClientRow[]> {
+  // Account currency = currency of every fact row for the client. One account
+  // per client today; `min` keeps this deterministic if that changes.
+  const accountCurrency = db
+    .select({
+      clientId: adAccounts.clientId,
+      currency: sql<string>`min(${adAccounts.currency})`.as("currency"),
+    })
+    .from(adAccounts)
+    .groupBy(adAccounts.clientId)
+    .as("account_currency");
   return db
     .select({
       id: clients.id,
@@ -54,9 +66,23 @@ export async function getClients(): Promise<ClientRow[]> {
       is_demo: clients.isDemo,
       atlas_project_id: clients.atlasProjectId,
       created_at: clients.createdAt,
+      currency: accountCurrency.currency,
     })
     .from(clients)
+    .leftJoin(accountCurrency, eq(accountCurrency.clientId, clients.id))
     .orderBy(asc(clients.name));
+}
+
+/** Currency for server-side formatting (reports, chat, insights). Falls back to
+ * DEFAULT_CURRENCY for clients without an ad account. */
+export async function getClientCurrency(clientId: string): Promise<string> {
+  const [row] = await db
+    .select({ currency: adAccounts.currency })
+    .from(adAccounts)
+    .where(eq(adAccounts.clientId, clientId))
+    .orderBy(asc(adAccounts.currency))
+    .limit(1);
+  return row?.currency ?? DEFAULT_CURRENCY;
 }
 
 export async function getMetrics(params: {
@@ -64,7 +90,9 @@ export async function getMetrics(params: {
   startDate: string;
   endDate: string;
   platform?: Platform;
+  platforms?: Platform[];
   campaignId?: string;
+  campaignIds?: string[];
 }): Promise<CampaignPerformanceRow[]> {
   const conditions = [
     eq(campaignPerformance.clientId, params.clientId),
@@ -74,8 +102,14 @@ export async function getMetrics(params: {
   if (params.platform) {
     conditions.push(eq(campaignPerformance.platform, params.platform));
   }
+  if (params.platforms?.length) {
+    conditions.push(inArray(campaignPerformance.platform, params.platforms));
+  }
   if (params.campaignId) {
     conditions.push(eq(campaignPerformance.campaignId, params.campaignId));
+  }
+  if (params.campaignIds?.length) {
+    conditions.push(inArray(campaignPerformance.campaignId, params.campaignIds));
   }
 
   // ctr/cpc/cpm are not stored — computed from base counts in the projection
@@ -205,6 +239,8 @@ export async function compareMetrics(params: {
   previousStart: string;
   previousEnd: string;
   platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }): Promise<ComparisonResult> {
   const [currentRows, previousRows] = await Promise.all([
     getMetrics({
@@ -212,12 +248,16 @@ export async function compareMetrics(params: {
       startDate: params.currentStart,
       endDate: params.currentEnd,
       platform: params.platform,
+      platforms: params.platforms,
+      campaignIds: params.campaignIds,
     }),
     getMetrics({
       clientId: params.clientId,
       startDate: params.previousStart,
       endDate: params.previousEnd,
       platform: params.platform,
+      platforms: params.platforms,
+      campaignIds: params.campaignIds,
     }),
   ]);
 
@@ -249,102 +289,13 @@ export async function compareMetrics(params: {
   return { current, previous, deltas };
 }
 
-export interface AnomalyPoint {
-  date: string;
-  metric: string;
-  value: number;
-  expected: number;
-  zScore: number;
-  severity: "critical" | "warning" | "info";
-  direction: "spike" | "drop";
-  campaignName?: string;
-  platform?: Platform;
-}
-
-export async function detectAnomalies(params: {
-  clientId: string;
-  startDate: string;
-  endDate: string;
-  platform?: Platform;
-}): Promise<AnomalyPoint[]> {
-  const rows = await getMetrics(params);
-  if (rows.length === 0) return [];
-
-  const dailyMap = new Map<
-    string,
-    { date: string; spend: number; ctr: number; cpc: number; conversions: number; impressions: number; clicks: number }
-  >();
-
-  for (const row of rows) {
-    const existing = dailyMap.get(row.date);
-    if (existing) {
-      existing.spend += Number(row.spend);
-      existing.impressions += Number(row.impressions);
-      existing.clicks += Number(row.clicks);
-      existing.conversions += Number(row.conversions);
-    } else {
-      dailyMap.set(row.date, {
-        date: row.date,
-        spend: Number(row.spend),
-        impressions: Number(row.impressions),
-        clicks: Number(row.clicks),
-        conversions: Number(row.conversions),
-        ctr: 0,
-        cpc: 0,
-      });
-    }
-  }
-
-  const dailyData = Array.from(dailyMap.values())
-    .map((d) => ({
-      ...d,
-      ctr: d.impressions > 0 ? (d.clicks / d.impressions) * 100 : 0,
-      cpc: d.clicks > 0 ? d.spend / d.clicks : 0,
-      cpa: d.conversions > 0 ? d.spend / d.conversions : 0,
-    }))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-  const anomalies: AnomalyPoint[] = [];
-  const metricsToCheck = ["spend", "ctr", "cpc", "cpa", "conversions"] as const;
-  const WINDOW = 7;
-
-  for (const metric of metricsToCheck) {
-    for (let i = WINDOW; i < dailyData.length; i++) {
-      const window = dailyData.slice(i - WINDOW, i);
-      const values = window.map((d) => d[metric]);
-      const mean = values.reduce((a, b) => a + b, 0) / values.length;
-      const stddev = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length);
-
-      if (stddev === 0) continue;
-
-      const current = dailyData[i][metric];
-      const zScore = (current - mean) / stddev;
-      const absZ = Math.abs(zScore);
-
-      if (absZ <= 2.0) continue;
-
-      const severity = absZ > 3 ? "critical" : absZ > 2.5 ? "warning" : "info";
-
-      anomalies.push({
-        date: dailyData[i].date,
-        metric,
-        value: Number(current.toFixed(2)),
-        expected: Number(mean.toFixed(2)),
-        zScore: Number(zScore.toFixed(2)),
-        severity,
-        direction: zScore > 0 ? "spike" : "drop",
-      });
-    }
-  }
-
-  return anomalies.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-}
-
 export async function getDailyTrend(params: {
   clientId: string;
   startDate: string;
   endDate: string;
   platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }) {
   const rows = await getMetrics(params);
 
@@ -400,6 +351,8 @@ export async function getFunnelData(params: {
   startDate: string;
   endDate: string;
   platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }): Promise<FunnelData> {
   const rows = await getMetrics(params);
 

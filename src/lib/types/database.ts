@@ -7,6 +7,10 @@ export interface ClientRow {
   // DB); NULL = unlinked (demo clients), reachable by agency roles only.
   atlas_project_id: string | null;
   created_at: string;
+  // Derived, not a column: ISO 4217 code of the client's ad_accounts (the
+  // account currency is the currency of every fact row). NULL = no ad account
+  // (demo clients) — callers fall back to DEFAULT_CURRENCY.
+  currency: string | null;
 }
 
 export interface ClientInsert {

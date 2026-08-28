@@ -46,6 +46,7 @@ import { Panel } from "@/components/ui/panel";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { SERIES_PALETTE, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/dashboard/chart-theme";
 import { formatCurrency, formatNumber as formatNum } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 function DeltaBadge({ value, invert = false }: { value: number; invert?: boolean }) {
   if (value === 0) return <span className="inline-flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded text-ink-muted bg-canvas-soft"><BiMinus className="w-3 h-3" />0%</span>;
@@ -60,14 +61,21 @@ function DeltaBadge({ value, invert = false }: { value: number; invert?: boolean
   );
 }
 
-const METRIC_DEFS = [
-  { key: "totalSpend", label: "Spend", format: formatCurrency, best: "low" as const },
-  { key: "totalConversions", label: "Conversions", format: formatNum, best: "high" as const },
-  { key: "avgCpa", label: "CPA", format: formatCurrency, best: "low" as const },
-  { key: "avgCtr", label: "CTR", format: (v: number) => `${v}%`, best: "high" as const },
-  { key: "avgCpc", label: "CPC", format: formatCurrency, best: "low" as const },
-  { key: "totalImpressions", label: "Impressions", format: formatNum, best: "high" as const },
-  { key: "totalClicks", label: "Clicks", format: formatNum, best: "high" as const },
+type MetricDef = {
+  key: string;
+  label: string;
+  format: (v: number, currency: string) => string;
+  best: "low" | "high";
+};
+
+const METRIC_DEFS: MetricDef[] = [
+  { key: "totalSpend", label: "Spend", format: formatCurrency, best: "low" },
+  { key: "totalConversions", label: "Conversions", format: formatNum, best: "high" },
+  { key: "avgCpa", label: "CPA", format: formatCurrency, best: "low" },
+  { key: "avgCtr", label: "CTR", format: (v) => `${v}%`, best: "high" },
+  { key: "avgCpc", label: "CPC", format: formatCurrency, best: "low" },
+  { key: "totalImpressions", label: "Impressions", format: formatNum, best: "high" },
+  { key: "totalClicks", label: "Clicks", format: formatNum, best: "high" },
 ];
 
 function getVal(c: CampaignComparisonData, key: string): number {
@@ -95,7 +103,7 @@ function computeWinners(campaigns: CampaignComparisonData[]) {
   return { wins, perMetric, overallWinnerId };
 }
 
-function generateAISummary(campaigns: CampaignComparisonData[]): string {
+function generateAISummary(campaigns: CampaignComparisonData[], currency: string): string {
   if (campaigns.length < 2) return "";
   const { wins, overallWinnerId } = computeWinners(campaigns);
   const winner = campaigns.find((c) => c.campaignId === overallWinnerId);
@@ -114,7 +122,7 @@ function generateAISummary(campaigns: CampaignComparisonData[]): string {
   parts.push(`**${winner.campaignName}** is the overall best performer, winning ${wins[winner.campaignId]} out of ${METRIC_DEFS.length - 1} metrics.\n`);
 
   if (cpaDiff && Number(cpaDiff) > 0) {
-    parts.push(`- **CPA:** ${cpaDiff}% lower (${formatCurrency(winner.avgCpa)} vs ${formatCurrency(loser.avgCpa)}) compared to ${loser.campaignName}`);
+    parts.push(`- **CPA:** ${cpaDiff}% lower (${formatCurrency(winner.avgCpa, currency)} vs ${formatCurrency(loser.avgCpa, currency)}) compared to ${loser.campaignName}`);
   }
   if (convDiff && Number(convDiff) > 0) {
     parts.push(`- **Conversions:** ${convDiff}% more (${formatNum(winner.totalConversions)} vs ${formatNum(loser.totalConversions)})`);
@@ -127,7 +135,7 @@ function generateAISummary(campaigns: CampaignComparisonData[]): string {
   const efficientCampaign = campaigns.reduce((best, c) => c.avgCpa > 0 && (best.avgCpa === 0 || c.avgCpa < best.avgCpa) ? c : best, campaigns[0]);
 
   if (highSpender.campaignId !== efficientCampaign.campaignId) {
-    parts.push(`\n**Recommendation:** Consider shifting budget from ${highSpender.campaignName} (highest spend at ${formatCurrency(highSpender.totalSpend)}) toward ${efficientCampaign.campaignName} (most efficient at ${formatCurrency(efficientCampaign.avgCpa)} CPA) for better overall ROI.`);
+    parts.push(`\n**Recommendation:** Consider shifting budget from ${highSpender.campaignName} (highest spend at ${formatCurrency(highSpender.totalSpend, currency)}) toward ${efficientCampaign.campaignName} (most efficient at ${formatCurrency(efficientCampaign.avgCpa, currency)} CPA) for better overall ROI.`);
   }
 
   return parts.join("\n");
@@ -174,6 +182,7 @@ function CampaignSelector({
 }
 
 function OverallWinnerBanner({ campaigns }: { campaigns: CampaignComparisonData[] }) {
+  const { formatCurrency } = useCurrencyFormat();
   const { wins, overallWinnerId } = computeWinners(campaigns);
   const winner = campaigns.find((c) => c.campaignId === overallWinnerId);
   const winnerIdx = campaigns.findIndex((c) => c.campaignId === overallWinnerId);
@@ -216,7 +225,8 @@ function OverallWinnerBanner({ campaigns }: { campaigns: CampaignComparisonData[
 function AISummaryCard({ campaigns }: { campaigns: CampaignComparisonData[] }) {
   const [loading, setLoading] = useState(false);
   const [aiText, setAiText] = useState<string | null>(null);
-  const fallbackText = useMemo(() => generateAISummary(campaigns), [campaigns]);
+  const { currency } = useCurrencyFormat();
+  const fallbackText = useMemo(() => generateAISummary(campaigns, currency), [campaigns, currency]);
   const clientId = useAppStore((s) => s.selectedClientId);
 
   const fetchAISummary = useCallback(async () => {
@@ -303,6 +313,7 @@ function AISummaryCard({ campaigns }: { campaigns: CampaignComparisonData[] }) {
 }
 
 function CampaignComparisonTab({ clientId }: { clientId: string }) {
+  const { formatCurrency } = useCurrencyFormat();
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
   const { data: campaigns, isLoading: campaignsLoading, isError: campaignsError, refetch: refetchCampaigns } = useCampaigns(clientId);
@@ -507,6 +518,7 @@ function AskAICampaignButton({ campaigns }: { campaigns: CampaignComparisonData[
 }
 
 function ComparisonTable({ campaigns }: { campaigns: CampaignComparisonData[] }) {
+  const { currency } = useCurrencyFormat();
   const { perMetric } = computeWinners(campaigns);
   const winnerMap = new Map(perMetric.map((p) => [p.metric, p.winnerId]));
 
@@ -563,7 +575,7 @@ function ComparisonTable({ campaigns }: { campaigns: CampaignComparisonData[] })
                     return (
                       <TableCell key={c.campaignId} className="py-2.5">
                         <div className="flex flex-col gap-0.5">
-                          <span className={cn("text-[13px] tabular-nums", isBest ? "text-emerald-700 font-semibold" : "text-ink")}>{m.format(val)}</span>
+                          <span className={cn("text-[13px] tabular-nums", isBest ? "text-emerald-700 font-semibold" : "text-ink")}>{m.format(val, currency)}</span>
                           {m.key !== "totalSpend" && delta !== 0 && (
                             <span className={cn("text-[11px] tabular-nums",
                               (m.best === "high" ? delta >= 0 : delta <= 0) ? "text-emerald-600" : "text-red-500"
@@ -593,6 +605,7 @@ function ComparisonTable({ campaigns }: { campaigns: CampaignComparisonData[] })
 }
 
 function PeriodComparisonTab({ clientId }: { clientId: string }) {
+  const { formatCurrency } = useCurrencyFormat();
   const globalDateRange = useAppStore((s) => s.dateRange);
   const [periodA, setPeriodA] = useState({ start: globalDateRange.start, end: globalDateRange.end });
   const daysDiff = Math.round((new Date(periodA.end).getTime() - new Date(periodA.start).getTime()) / (1000 * 60 * 60 * 24));

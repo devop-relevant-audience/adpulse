@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { buildReport } from "@/lib/report/builder";
+import { currencySymbol } from "@/lib/format";
 import { db } from "@/lib/db";
 import { clients, reportSchedules } from "@/lib/db/schema";
 import { keysToCamel, keysToSnake } from "@/lib/db/case";
@@ -188,6 +189,8 @@ async function handleSendNow(request: NextRequest) {
     endDate: dateRange.end,
   });
 
+  const sym = currencySymbol(reportData.currency);
+
   const subject = (schedule.subject_template as string)
     .replace("{{clientName}}", clientName)
     .replace("{{dateRange}}", `${dateRange.start} to ${dateRange.end}`);
@@ -201,9 +204,9 @@ async function handleSendNow(request: NextRequest) {
     reportData.narratives.executive,
     "",
     "--- Key Metrics ---",
-    `Spend: $${reportData.comparison.current.totalSpend.toLocaleString()}`,
+    `Spend: ${sym}${reportData.comparison.current.totalSpend.toLocaleString()}`,
     `Conversions: ${reportData.comparison.current.totalConversions.toLocaleString()}`,
-    `CPA: $${reportData.comparison.current.avgCpa}`,
+    `CPA: ${sym}${reportData.comparison.current.avgCpa}`,
     `CTR: ${reportData.comparison.current.avgCtr}%`,
     "",
     `Health Score: ${reportData.healthScore.overallScore}/100 (Grade ${reportData.healthScore.grade})`,

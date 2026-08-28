@@ -1,5 +1,5 @@
 import type { ReportData } from "./builder";
-import { formatCurrency, formatNumber as formatNum } from "@/lib/format";
+import { currencySymbol, formatCurrency, formatNumber as formatNum } from "@/lib/format";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -120,21 +120,23 @@ function buildHealthGaugeSvg(score: number, grade: string): string {
 }
 
 export function generatePdfHtml(data: ReportData): string {
+  const fmt = (n: number) => formatCurrency(n, data.currency);
+  const sym = currencySymbol(data.currency);
   const { comparison, trendSummary, platformBreakdown, funnel, campaignBreakdown, healthScore, narratives } = data;
   const c = comparison.current;
   const d = comparison.deltas;
 
   const heroKpis = [
-    { label: "Total Spend", value: formatCurrency(c.totalSpend), delta: d.totalSpend.percentage },
+    { label: "Total Spend", value: fmt(c.totalSpend), delta: d.totalSpend.percentage },
     { label: "Conversions", value: formatNum(c.totalConversions), delta: d.totalConversions.percentage },
-    { label: "CPA", value: formatCurrency(c.avgCpa), delta: d.avgCpa.percentage, invert: true },
+    { label: "CPA", value: fmt(c.avgCpa), delta: d.avgCpa.percentage, invert: true },
     { label: "CTR", value: `${c.avgCtr}%`, delta: d.avgCtr.percentage },
   ];
   const secondaryKpis = [
     { label: "Clicks", value: formatNum(c.totalClicks), delta: d.totalClicks.percentage },
     { label: "Impressions", value: formatNum(c.totalImpressions), delta: d.totalImpressions.percentage },
-    { label: "CPC", value: formatCurrency(c.avgCpc), delta: d.avgCpc.percentage, invert: true },
-    { label: "CPM", value: formatCurrency(c.avgCpm), delta: d.avgCpm.percentage, invert: true },
+    { label: "CPC", value: fmt(c.avgCpc), delta: d.avgCpc.percentage, invert: true },
+    { label: "CPM", value: fmt(c.avgCpm), delta: d.avgCpm.percentage, invert: true },
   ];
 
   const sortedPlatforms = [...platformBreakdown].sort((a, b) => b.spend - a.spend);
@@ -286,7 +288,7 @@ export function generatePdfHtml(data: ReportData): string {
       <div class="trend-grid">
         <div class="trend-card">
           <div class="card-label">Daily Spend Trend</div>
-          <div class="card-value">Avg. ${formatCurrency(trendSummary.avgDailySpend)}/day</div>
+          <div class="card-value">Avg. ${fmt(trendSummary.avgDailySpend)}/day</div>
           ${buildSparklineSvg(spendData, "#2563eb")}
         </div>
         <div class="trend-card">
@@ -308,7 +310,7 @@ export function generatePdfHtml(data: ReportData): string {
         </div>
         <div class="stat-pill" style="background:#eff6ff;border-color:#bfdbfe">
           <div class="stat-label" style="color:#2563eb">Avg Daily Spend</div>
-          <div class="stat-value">${formatCurrency(trendSummary.avgDailySpend)}</div>
+          <div class="stat-value">${fmt(trendSummary.avgDailySpend)}</div>
         </div>
         <div class="stat-pill" style="background:#fffbeb;border-color:#fde68a">
           <div class="stat-label" style="color:#d97706">Volatility</div>
@@ -327,14 +329,14 @@ export function generatePdfHtml(data: ReportData): string {
       <div class="platform-grid">
         <div style="background:#f8f7f6;border-radius:12px;padding:16px">
           <div class="sub-label">Spend Distribution</div>
-          ${buildDonutSvg(donutSegments, formatCurrency(c.totalSpend), "Total")}
+          ${buildDonutSvg(donutSegments, fmt(c.totalSpend), "Total")}
         </div>
         <div style="background:#f8f7f6;border-radius:12px;padding:16px">
           <div class="sub-label">Conversions by Platform</div>
           ${sortedPlatforms.map((p) => {
             const maxConv = Math.max(...sortedPlatforms.map((x) => x.conversions));
             const pct = maxConv > 0 ? (p.conversions / maxConv) * 100 : 0;
-            return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${PLATFORM_COLORS[p.platform] || "#888"};flex-shrink:0"></span><span style="font-size:11px;font-weight:500;color:#1a1a1a">${esc(PLATFORM_LABELS[p.platform] || p.platform)}</span></div><span style="font-size:11px;font-weight:600;color:#1a1a1a">${formatNum(p.conversions)} at ${formatCurrency(p.cpa)} CPA</span></div><div style="height:7px;background:#e8e8e8;border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${PLATFORM_COLORS[p.platform] || "#888"};border-radius:4px;opacity:0.8"></div></div></div>`;
+            return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${PLATFORM_COLORS[p.platform] || "#888"};flex-shrink:0"></span><span style="font-size:11px;font-weight:500;color:#1a1a1a">${esc(PLATFORM_LABELS[p.platform] || p.platform)}</span></div><span style="font-size:11px;font-weight:600;color:#1a1a1a">${formatNum(p.conversions)} at ${fmt(p.cpa)} CPA</span></div><div style="height:7px;background:#e8e8e8;border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${PLATFORM_COLORS[p.platform] || "#888"};border-radius:4px;opacity:0.8"></div></div></div>`;
           }).join("")}
         </div>
       </div>
@@ -343,8 +345,8 @@ export function generatePdfHtml(data: ReportData): string {
           <div class="pd-head"><span class="pd-dot" style="background:${PLATFORM_COLORS[p.platform] || "#888"}"></span><span class="pd-name">${esc(PLATFORM_LABELS[p.platform] || p.platform)}</span></div>
           <div class="pd-metrics">
             <div><div class="pd-metric-label">CTR</div><div class="pd-metric-value">${p.ctr}%</div></div>
-            <div><div class="pd-metric-label">CPA</div><div class="pd-metric-value">${formatCurrency(p.cpa)}</div></div>
-            <div><div class="pd-metric-label">CPC</div><div class="pd-metric-value">${formatCurrency(p.cpc)}</div></div>
+            <div><div class="pd-metric-label">CPA</div><div class="pd-metric-value">${fmt(p.cpa)}</div></div>
+            <div><div class="pd-metric-label">CPC</div><div class="pd-metric-value">${fmt(p.cpc)}</div></div>
             <div><div class="pd-metric-label">Share</div><div class="pd-metric-value">${p.pctOfSpend}%</div></div>
           </div>
         </div>`).join("")}
@@ -376,8 +378,8 @@ export function generatePdfHtml(data: ReportData): string {
           <div class="camp-info"><div class="camp-name">${esc(camp.campaignName)}</div><span class="camp-platform">${esc(camp.platform)}</span></div>
           <div class="camp-stats">
             <div class="camp-stat"><div class="camp-stat-label">Conv.</div><div class="camp-stat-value">${camp.conversions}</div></div>
-            <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">${formatCurrency(camp.cpa)}</div></div>
-            <div class="camp-stat"><div class="camp-stat-label">Spend</div><div class="camp-stat-value">${formatCurrency(camp.spend)}</div></div>
+            <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">${fmt(camp.cpa)}</div></div>
+            <div class="camp-stat"><div class="camp-stat-label">Spend</div><div class="camp-stat-value">${fmt(camp.spend)}</div></div>
           </div>
         </div>`).join("")}
       </div>` : ""}
@@ -388,7 +390,7 @@ export function generatePdfHtml(data: ReportData): string {
           <div class="camp-info"><div class="camp-name">${esc(camp.campaignName)}</div><span class="camp-platform">${esc(camp.platform)}</span></div>
           <div class="camp-stats">
             <div class="camp-stat"><div class="camp-stat-label">CTR</div><div class="camp-stat-value" style="color:#d97706">${camp.ctr}%</div></div>
-            <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">${formatCurrency(camp.cpa)}</div></div>
+            <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">${fmt(camp.cpa)}</div></div>
           </div>
         </div>`).join("")}
       </div>` : ""}
@@ -427,7 +429,7 @@ export function generatePdfHtml(data: ReportData): string {
       <div class="kpi-grid">
         <div class="kpi-card"><div class="label">Total Creatives</div><div class="value">${data.creatives.totalCreatives}</div><div style="font-size:10px;color:#615d59;margin-top:4px">${data.creatives.activeCount} active, ${data.creatives.fatiguedCount} fatigued</div></div>
         <div class="kpi-card"><div class="label">Avg CTR</div><div class="value">${data.creatives.avgCtr}%</div></div>
-        <div class="kpi-card"><div class="label">Avg CPA</div><div class="value">$${data.creatives.avgCpa}</div></div>
+        <div class="kpi-card"><div class="label">Avg CPA</div><div class="value">${sym}${data.creatives.avgCpa}</div></div>
         <div class="kpi-card" ${data.creatives.fatiguedCount > 0 ? 'style="border-color:#fde68a"' : ""}><div class="label">Fatigued</div><div class="value" ${data.creatives.fatiguedCount > 0 ? 'style="color:#d97706"' : ""}>${data.creatives.fatiguedCount}</div>${data.creatives.fatiguedCount > 0 ? '<div style="font-size:10px;color:#d97706;margin-top:4px">needs refresh</div>' : ""}</div>
       </div>
       ${data.creatives.byType.length > 0 ? `<div class="sub-label" style="margin-top:16px">Performance by Creative Type</div>
@@ -435,7 +437,7 @@ export function generatePdfHtml(data: ReportData): string {
         <div style="flex:1"><div style="font-size:12px;font-weight:600;color:#1a1a1a;text-transform:capitalize">${esc(t.type)}</div><div style="font-size:10px;color:#615d59">${t.count} creatives</div></div>
         <div style="display:flex;gap:16px;flex-shrink:0">
           <div style="text-align:right"><div style="font-size:8px;text-transform:uppercase;color:#a39e98">CTR</div><div style="font-size:12px;font-weight:600">${t.avgCtr}%</div></div>
-          <div style="text-align:right"><div style="font-size:8px;text-transform:uppercase;color:#a39e98">CPA</div><div style="font-size:12px;font-weight:600">$${t.avgCpa}</div></div>
+          <div style="text-align:right"><div style="font-size:8px;text-transform:uppercase;color:#a39e98">CPA</div><div style="font-size:12px;font-weight:600">${sym}${t.avgCpa}</div></div>
           <div style="text-align:right"><div style="font-size:8px;text-transform:uppercase;color:#a39e98">Conv.</div><div style="font-size:12px;font-weight:600">${formatNum(t.totalConversions)}</div></div>
         </div>
       </div>`).join("")}` : ""}
@@ -445,7 +447,7 @@ export function generatePdfHtml(data: ReportData): string {
         <div class="camp-info"><div class="camp-name">${esc(cr.headline)}</div><span class="camp-platform">${esc(cr.platform)} / ${esc(cr.type)}</span></div>
         <div class="camp-stats">
           <div class="camp-stat"><div class="camp-stat-label">Conv.</div><div class="camp-stat-value">${cr.conversions}</div></div>
-          <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">${formatCurrency(cr.cpa)}</div></div>
+          <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">${fmt(cr.cpa)}</div></div>
           <div class="camp-stat"><div class="camp-stat-label">CTR</div><div class="camp-stat-value">${cr.ctr}%</div></div>
         </div>
       </div>`).join("")}</div>` : ""}
@@ -455,49 +457,9 @@ export function generatePdfHtml(data: ReportData): string {
         <div class="camp-stats">
           <div class="camp-stat"><div class="camp-stat-label">Fatigue</div><div class="camp-stat-value" style="color:#d97706">${f.fatigueScore.toFixed(0)}</div></div>
           <div class="camp-stat"><div class="camp-stat-label">CTR</div><div class="camp-stat-value">${f.ctr}%</div></div>
-          <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">$${f.cpa}</div></div>
+          <div class="camp-stat"><div class="camp-stat-label">CPA</div><div class="camp-stat-value">${sym}${f.cpa}</div></div>
         </div>
       </div>`).join("")}</div>` : ""}
-    </div>` : ""}
-
-    <!-- Budget Optimization -->
-    ${data.optimizer && data.optimizer.platforms.length > 0 ? `<div class="section">
-      <div class="section-title">
-        <div class="icon" style="background:linear-gradient(135deg,#06b6d4,#38bdf8)">&#9878;</div>
-        <h2>Budget Optimization</h2>
-      </div>
-      <p class="narrative">${esc(narratives.optimizer || "")}</p>
-      <div class="platform-grid">
-        <div style="background:#f8f7f6;border-radius:12px;padding:16px">
-          <div class="sub-label">Current Allocation</div>
-          ${data.optimizer.platforms.map((p) => `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${PLATFORM_COLORS[p.platform] || "#888"}"></span><span style="font-size:11px;font-weight:500;text-transform:capitalize">${esc(p.platform)}</span></div><span style="font-size:11px;font-weight:600">${p.currentAllocation}%</span></div><div style="height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden"><div style="height:100%;width:${p.currentAllocation}%;background:${PLATFORM_COLORS[p.platform] || "#888"};opacity:0.7;border-radius:3px"></div></div></div>`).join("")}
-        </div>
-        <div style="background:#f8f7f6;border-radius:12px;padding:16px">
-          <div class="sub-label">Recommended Allocation</div>
-          ${data.optimizer.platforms.map((p) => {
-            const rec = data.optimizer.recommendedAllocation[p.platform] ?? p.currentAllocation;
-            const diff = rec - p.currentAllocation;
-            return `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${PLATFORM_COLORS[p.platform] || "#888"}"></span><span style="font-size:11px;font-weight:500;text-transform:capitalize">${esc(p.platform)}</span></div><span style="font-size:11px;font-weight:600">${rec.toFixed(1)}% ${diff !== 0 ? `<span style="color:${diff > 0 ? "#16a34a" : "#dc2626"};font-size:10px">(${diff > 0 ? "+" : ""}${diff.toFixed(1)}%)</span>` : ""}</span></div><div style="height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden"><div style="height:100%;width:${rec}%;background:${PLATFORM_COLORS[p.platform] || "#888"};border-radius:3px"></div></div></div>`;
-          }).join("")}
-        </div>
-      </div>
-      <div class="sub-label" style="margin-top:12px">Channel Efficiency Ranking</div>
-      ${data.optimizer.platforms.map((p, i) => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <div style="width:22px;height:22px;border-radius:6px;background:${i === 0 ? "#06b6d4" : i === 1 ? "#67e8f9" : "#a5f3fc"};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">${i + 1}</div>
-        <div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:11px;font-weight:500;text-transform:capitalize">${esc(p.platform)}</span><span style="font-size:11px;font-weight:700;color:${scoreColor(p.efficiencyScore)}">${p.efficiencyScore}/100</span></div><div style="height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden"><div style="height:100%;width:${p.efficiencyScore}%;background:${scoreColor(p.efficiencyScore)};border-radius:3px"></div></div></div>
-        <div style="display:flex;gap:12px;flex-shrink:0;text-align:right">
-          <div><div style="font-size:8px;text-transform:uppercase;color:#a39e98">CPA</div><div style="font-size:11px;font-weight:600">${formatCurrency(p.cpa)}</div></div>
-          <div><div style="font-size:8px;text-transform:uppercase;color:#a39e98">Trend</div><div style="font-size:11px;font-weight:600;color:${p.recentCpaTrend <= 0 ? "#16a34a" : "#dc2626"}">${p.recentCpaTrend > 0 ? "+" : ""}${p.recentCpaTrend}%</div></div>
-        </div>
-      </div>`).join("")}
-      ${data.optimizer.projectedImpact.additionalConversions > 0 || data.optimizer.projectedImpact.cpaReduction > 0 ? `
-      <div style="background:linear-gradient(135deg,#ecfeff,#cffafe);border:1px solid #a5f3fc;border-radius:12px;padding:16px;margin-top:14px">
-        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#0e7490;margin-bottom:8px">Projected Impact of Reallocation</div>
-        <div style="display:flex;gap:24px">
-          ${data.optimizer.projectedImpact.additionalConversions > 0 ? `<div><div style="font-size:18px;font-weight:700;color:#0e7490">+${data.optimizer.projectedImpact.additionalConversions}</div><div style="font-size:10px;color:#0891b2">additional conversions</div></div>` : ""}
-          ${data.optimizer.projectedImpact.cpaReduction > 0 ? `<div><div style="font-size:18px;font-weight:700;color:#0e7490">-${data.optimizer.projectedImpact.cpaReduction}%</div><div style="font-size:10px;color:#0891b2">CPA reduction</div></div>` : ""}
-        </div>
-      </div>` : ""}
     </div>` : ""}
 
     <!-- Recommendations -->

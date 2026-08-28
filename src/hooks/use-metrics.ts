@@ -2,8 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Platform, AttributionModel, CampaignPerformanceRow, ClientRow, AlertRuleRow, AlertHistoryRow, AlertRuleInsert, ReportScheduleRow, ReportScheduleInsert, ReportRow, AdCreativeRow, CreativeStatus } from "@/lib/types/database";
-import type { ComparisonResult, AnomalyPoint, FunnelData, PacingData, FatigueAnalysisItem } from "@/lib/data/queries";
-import type { ChannelMixAnalysis } from "@/lib/data/optimizer";
+import type { ComparisonResult, FunnelData, PacingData, FatigueAnalysisItem } from "@/lib/data/queries";
 import type { HealthScoreResult } from "@/lib/data/health-score";
 
 export function useClients() {
@@ -22,6 +21,8 @@ export function useMetrics(params: {
   startDate: string;
   endDate: string;
   platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }) {
   return useQuery<CampaignPerformanceRow[]>({
     queryKey: ["metrics", params],
@@ -32,6 +33,8 @@ export function useMetrics(params: {
         endDate: params.endDate,
       });
       if (params.platform) sp.set("platform", params.platform);
+      if (params.platforms?.length) sp.set("platforms", params.platforms.join(","));
+      if (params.campaignIds?.length) sp.set("campaignIds", params.campaignIds.join(","));
 
       const res = await fetch(`/api/metrics?${sp}`);
       if (!res.ok) throw new Error("Failed to fetch metrics");
@@ -48,6 +51,8 @@ export function useComparison(params: {
   previousStart: string;
   previousEnd: string;
   platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }) {
   return useQuery<ComparisonResult>({
     queryKey: ["comparison", params],
@@ -61,6 +66,8 @@ export function useComparison(params: {
         previousEnd: params.previousEnd,
       });
       if (params.platform) sp.set("platform", params.platform);
+      if (params.platforms?.length) sp.set("platforms", params.platforms.join(","));
+      if (params.campaignIds?.length) sp.set("campaignIds", params.campaignIds.join(","));
 
       const res = await fetch(`/api/metrics?${sp}`);
       if (!res.ok) throw new Error("Failed to fetch comparison");
@@ -75,6 +82,8 @@ export function useDailyTrend(params: {
   startDate: string;
   endDate: string;
   platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }) {
   return useQuery<
     Array<{
@@ -97,6 +106,8 @@ export function useDailyTrend(params: {
         endDate: params.endDate,
       });
       if (params.platform) sp.set("platform", params.platform);
+      if (params.platforms?.length) sp.set("platforms", params.platforms.join(","));
+      if (params.campaignIds?.length) sp.set("campaignIds", params.campaignIds.join(","));
 
       const res = await fetch(`/api/metrics?${sp}`);
       if (!res.ok) throw new Error("Failed to fetch trend");
@@ -120,36 +131,13 @@ export function useCampaigns(clientId: string | null) {
   });
 }
 
-export function useAnomalies(params: {
-  clientId: string | null;
-  startDate: string;
-  endDate: string;
-  platform?: Platform;
-}) {
-  return useQuery<AnomalyPoint[]>({
-    queryKey: ["anomalies", params],
-    queryFn: async () => {
-      const sp = new URLSearchParams({
-        action: "anomalies",
-        clientId: params.clientId!,
-        startDate: params.startDate,
-        endDate: params.endDate,
-      });
-      if (params.platform) sp.set("platform", params.platform);
-
-      const res = await fetch(`/api/metrics?${sp}`);
-      if (!res.ok) throw new Error("Failed to fetch anomalies");
-      return res.json();
-    },
-    enabled: !!params.clientId,
-  });
-}
-
 export function useFunnel(params: {
   clientId: string | null;
   startDate: string;
   endDate: string;
   platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }) {
   return useQuery<FunnelData>({
     queryKey: ["funnel", params],
@@ -161,6 +149,8 @@ export function useFunnel(params: {
         endDate: params.endDate,
       });
       if (params.platform) sp.set("platform", params.platform);
+      if (params.platforms?.length) sp.set("platforms", params.platforms.join(","));
+      if (params.campaignIds?.length) sp.set("campaignIds", params.campaignIds.join(","));
 
       const res = await fetch(`/api/metrics?${sp}`);
       if (!res.ok) throw new Error("Failed to fetch funnel data");
@@ -193,32 +183,13 @@ export function usePacing(params: {
   });
 }
 
-export function useOptimizer(params: {
-  clientId: string | null;
-  startDate: string;
-  endDate: string;
-}) {
-  return useQuery<ChannelMixAnalysis>({
-    queryKey: ["optimizer", params],
-    queryFn: async () => {
-      const sp = new URLSearchParams({
-        clientId: params.clientId!,
-        startDate: params.startDate,
-        endDate: params.endDate,
-      });
-
-      const res = await fetch(`/api/optimizer?${sp}`);
-      if (!res.ok) throw new Error("Failed to fetch optimizer data");
-      return res.json();
-    },
-    enabled: !!params.clientId,
-  });
-}
-
 export function useHealthScore(params: {
   clientId: string | null;
   startDate: string;
   endDate: string;
+  platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }) {
   return useQuery<HealthScoreResult>({
     queryKey: ["health-score", params],
@@ -229,6 +200,9 @@ export function useHealthScore(params: {
         startDate: params.startDate,
         endDate: params.endDate,
       });
+      if (params.platform) sp.set("platform", params.platform);
+      if (params.platforms?.length) sp.set("platforms", params.platforms.join(","));
+      if (params.campaignIds?.length) sp.set("campaignIds", params.campaignIds.join(","));
 
       const res = await fetch(`/api/metrics?${sp}`);
       if (!res.ok) throw new Error("Failed to fetch health score");

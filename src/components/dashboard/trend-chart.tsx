@@ -18,24 +18,26 @@ import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Panel } from "@/components/ui/panel";
 import { SERIES_PALETTE, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/dashboard/chart-theme";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 // Colors are drawn deterministically from the canonical SERIES_PALETTE (blue,
 // violet, cyan, pink, teal, indigo, fuchsia) — one entry per metric, by index.
 // The palette deliberately excludes red/green/amber, so no metric line ever
 // reads as a good/bad semantic signal (CTR isn't red, CPA isn't an alarm).
 const METRICS = [
-  { key: "spend", label: "Spend", color: SERIES_PALETTE[0], prefix: "$", yAxisId: "left" },
-  { key: "conversions", label: "Conversions", color: SERIES_PALETTE[1], prefix: "", yAxisId: "right" },
-  { key: "clicks", label: "Clicks", color: SERIES_PALETTE[2], prefix: "", yAxisId: "right" },
-  { key: "impressions", label: "Impressions", color: SERIES_PALETTE[3], prefix: "", yAxisId: "right" },
-  { key: "ctr", label: "CTR", color: SERIES_PALETTE[4], prefix: "", suffix: "%", yAxisId: "right" },
-  { key: "cpc", label: "CPC", color: SERIES_PALETTE[5], prefix: "$", yAxisId: "right" },
-  { key: "cpa", label: "CPA", color: SERIES_PALETTE[6], prefix: "$", yAxisId: "right" },
+  { key: "spend", label: "Spend", color: SERIES_PALETTE[0], isCurrency: true, yAxisId: "left" },
+  { key: "conversions", label: "Conversions", color: SERIES_PALETTE[1], isCurrency: false, yAxisId: "right" },
+  { key: "clicks", label: "Clicks", color: SERIES_PALETTE[2], isCurrency: false, yAxisId: "right" },
+  { key: "impressions", label: "Impressions", color: SERIES_PALETTE[3], isCurrency: false, yAxisId: "right" },
+  { key: "ctr", label: "CTR", color: SERIES_PALETTE[4], isCurrency: false, suffix: "%", yAxisId: "right" },
+  { key: "cpc", label: "CPC", color: SERIES_PALETTE[5], isCurrency: true, yAxisId: "right" },
+  { key: "cpa", label: "CPA", color: SERIES_PALETTE[6], isCurrency: true, yAxisId: "right" },
 ] as const;
 
 type MetricKey = (typeof METRICS)[number]["key"];
 
 export function TrendChart() {
+  const { symbol } = useCurrencyFormat();
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
@@ -120,7 +122,7 @@ export function TrendChart() {
   const primaryMetric = METRICS.find((m) => m.key === activeMetrics[0])!;
 
   const formatYValue = (value: number, metric: (typeof METRICS)[number]) => {
-    const prefix = metric.prefix || "";
+    const prefix = metric.isCurrency ? symbol : "";
     const suffix = "suffix" in metric ? (metric as { suffix: string }).suffix : "";
     if (value >= 1_000_000) return `${prefix}${(value / 1_000_000).toFixed(1)}M${suffix}`;
     if (value >= 1_000) return `${prefix}${(value / 1_000).toFixed(0)}K${suffix}`;
@@ -227,7 +229,7 @@ export function TrendChart() {
               formatter={(value, name) => {
                 const metric = METRICS.find((m) => m.key === name);
                 if (!metric) return [String(value), String(name)];
-                const prefix = metric.prefix || "";
+                const prefix = metric.isCurrency ? symbol : "";
                 const suffix = "suffix" in metric ? (metric as { suffix: string }).suffix : "";
                 return [`${prefix}${Number(value).toLocaleString()}${suffix}`, metric.label];
               }}

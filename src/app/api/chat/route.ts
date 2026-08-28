@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getMetrics, compareMetrics, listCampaigns, getDailyTrend, detectAnomalies, getFunnelData, getCreatives, getCreativeFatigueAnalysis } from '@/lib/data/queries';
-import { getChannelMixAnalysis } from '@/lib/data/optimizer';
+import { getClientCurrency, getMetrics, compareMetrics, listCampaigns, getDailyTrend, getFunnelData, getCreatives, getCreativeFatigueAnalysis } from '@/lib/data/queries';
 import { calculateHealthScore } from '@/lib/data/health-score';
 import { addMessage, createSession, getMessages, getSession } from '@/lib/data/chat';
 import type { ChatSessionSummary } from '@/lib/data/chat';
@@ -10,6 +9,7 @@ import { withRoute } from '@/lib/http/with-route';
 import { logger } from '@/lib/log';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import type { Platform } from '@/lib/types/database';
+import { currencySymbol } from '@/lib/format';
 import { format, subDays } from 'date-fns';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -117,24 +117,6 @@ const TOOL_DEFINITIONS = [
 	{
 		type: 'function' as const,
 		function: {
-			name: 'detectAnomalies',
-			description:
-				'Detect anomalies in campaign metrics using Z-score analysis over a 7-day rolling window. Returns spikes and drops in spend, CTR, CPC, CPA, and conversions with severity levels.',
-			parameters: {
-				type: 'object',
-				properties: {
-					clientId: { type: 'string' },
-					startDate: { type: 'string' },
-					endDate: { type: 'string' },
-					platform: { type: 'string' },
-				},
-				required: ['clientId', 'startDate', 'endDate'],
-			},
-		},
-	},
-	{
-		type: 'function' as const,
-		function: {
 			name: 'getFunnelData',
 			description:
 				'Get conversion funnel data showing impressions -> clicks -> conversions with drop-off rates. Includes per-platform breakdown.',
@@ -145,23 +127,6 @@ const TOOL_DEFINITIONS = [
 					startDate: { type: 'string' },
 					endDate: { type: 'string' },
 					platform: { type: 'string' },
-				},
-				required: ['clientId', 'startDate', 'endDate'],
-			},
-		},
-	},
-	{
-		type: 'function' as const,
-		function: {
-			name: 'getChannelMixAnalysis',
-			description:
-				'Analyze cross-platform channel efficiency and get budget reallocation recommendations. Returns per-platform CPA, ROAS, efficiency scores, and reallocation suggestions.',
-			parameters: {
-				type: 'object',
-				properties: {
-					clientId: { type: 'string' },
-					startDate: { type: 'string' },
-					endDate: { type: 'string' },
 				},
 				required: ['clientId', 'startDate', 'endDate'],
 			},
@@ -264,29 +229,12 @@ async function executeTool(
 			});
 			return JSON.stringify(data);
 		}
-		case 'detectAnomalies': {
-			const data = await detectAnomalies({
-				clientId: args.clientId,
-				startDate: args.startDate,
-				endDate: args.endDate,
-				platform: args.platform as Platform | undefined,
-			});
-			return JSON.stringify(data.slice(0, 20));
-		}
 		case 'getFunnelData': {
 			const data = await getFunnelData({
 				clientId: args.clientId,
 				startDate: args.startDate,
 				endDate: args.endDate,
 				platform: args.platform as Platform | undefined,
-			});
-			return JSON.stringify(data);
-		}
-		case 'getChannelMixAnalysis': {
-			const data = await getChannelMixAnalysis({
-				clientId: args.clientId,
-				startDate: args.startDate,
-				endDate: args.endDate,
 			});
 			return JSON.stringify(data);
 		}
@@ -487,6 +435,7 @@ export const POST = withRoute('chat.POST', async (request: NextRequest) => {
 
 		const today = format(new Date(), 'yyyy-MM-dd');
 		const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+		const currency = await getClientCurrency(clientId);
 
 		let systemPrompt = `You are AdPulse AI, a helpful analytics assistant for advertising data. You help media buyers and account managers understand their ad campaign performance across Google Ads, Meta Ads, and TikTok Ads.
 
@@ -497,8 +446,7 @@ IMPORTANT RULES:
 - Be specific with numbers — cite exact values from the data
 - When comparing periods, explain what changed and offer plausible reasons
 - Keep answers concise but insightful
-- Format currency values with $ and use K/M abbreviations for large numbers
-- If data shows anomalies (sudden drops or spikes), highlight them and suggest causes
+- All monetary values for this client are in ${currency}: format them with the ${currencySymbol(currency)} symbol and use K/M abbreviations for large numbers
 - You have access to creative-level analytics. Use getCreatives to see individual ad performance and getCreativeFatigueAnalysis to identify ads suffering from creative fatigue (declining CTR, rising CPA over time). When asked about fatiguing creatives, always use the fatigue analysis tool.
 - The client ID for this conversation is: ${clientId}`;
 
@@ -631,7 +579,7 @@ async function handleWithoutAI(sessionId: string, clientId: string, _referenceCo
 	try {
 		const today = format(new Date(), 'yyyy-MM-dd');
 
-		const [campaigns, comparison] = await Promise.all([
+		const [campaigns, comparison, currency] = await Promise.all([
 			listCampaigns(clientId),
 			compareMetrics({
 				clientId,
@@ -640,13 +588,15 @@ async function handleWithoutAI(sessionId: string, clientId: string, _referenceCo
 				previousStart: format(subDays(new Date(), 28), 'yyyy-MM-dd'),
 				previousEnd: format(subDays(new Date(), 15), 'yyyy-MM-dd'),
 			}),
+			getClientCurrency(clientId),
 		]);
+		const sym = currencySymbol(currency);
 
 		let response = `Here's a quick overview based on your data:\n\n`;
 		response += `**Performance Summary (Last 14 days vs. Prior 14 days)**\n`;
 		response += `- Impressions: ${comparison.current.totalImpressions.toLocaleString()} (${comparison.deltas.totalImpressions.percentage > 0 ? '+' : ''}${comparison.deltas.totalImpressions.percentage}%)\n`;
 		response += `- Clicks: ${comparison.current.totalClicks.toLocaleString()} (${comparison.deltas.totalClicks.percentage > 0 ? '+' : ''}${comparison.deltas.totalClicks.percentage}%)\n`;
-		response += `- Spend: $${comparison.current.totalSpend.toLocaleString()} (${comparison.deltas.totalSpend.percentage > 0 ? '+' : ''}${comparison.deltas.totalSpend.percentage}%)\n`;
+		response += `- Spend: ${sym}${comparison.current.totalSpend.toLocaleString()} (${comparison.deltas.totalSpend.percentage > 0 ? '+' : ''}${comparison.deltas.totalSpend.percentage}%)\n`;
 		response += `- Conversions: ${comparison.current.totalConversions.toLocaleString()} (${comparison.deltas.totalConversions.percentage > 0 ? '+' : ''}${comparison.deltas.totalConversions.percentage}%)\n`;
 		response += `\n${campaigns.length} active campaigns across ${new Set(campaigns.map((c) => c.platform)).size} platforms.\n`;
 		response += `\n_Note: For full AI analysis, add an OpenRouter API key to your environment._`;

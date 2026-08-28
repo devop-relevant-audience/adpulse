@@ -13,7 +13,7 @@ import {
 import { useMetrics } from "@/hooks/use-metrics";
 import { useAppStore } from "@/store/app-store";
 import { PLATFORM_COLORS, PLATFORM_LABELS } from "@/lib/dashboard/chart-theme";
-import { formatCurrencyCompact as formatCurrency } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import type { CampaignPerformanceRow, Platform } from "@/lib/types/database";
 
 function aggregateByPlatform(rows: CampaignPerformanceRow[]) {
@@ -48,6 +48,7 @@ function aggregateByPlatform(rows: CampaignPerformanceRow[]) {
 }
 
 export function PlatformBreakdown() {
+  const { formatCurrencyCompact: formatCurrency } = useCurrencyFormat();
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
 

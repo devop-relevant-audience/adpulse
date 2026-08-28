@@ -1,6 +1,6 @@
 import PptxGenJS from "pptxgenjs";
 import type { ReportData } from "./builder";
-import { formatCurrency, formatNumber as formatNum } from "@/lib/format";
+import { currencySymbol, formatCurrency, formatNumber as formatNum } from "@/lib/format";
 
 const C = {
   primary: "2563EB",
@@ -64,6 +64,8 @@ function truncate(s: string, max: number): string {
 }
 
 export async function exportPptx(data: ReportData): Promise<void> {
+  const fmt = (n: number) => formatCurrency(n, data.currency);
+  const sym = currencySymbol(data.currency);
   const pptx = new PptxGenJS();
   pptx.author = "AdPulse";
   pptx.title = `${data.clientName} \u2014 Performance Report`;
@@ -123,16 +125,16 @@ export async function exportPptx(data: ReportData): Promise<void> {
   addSlideTitle(s3, "KPI Overview", C.blue, `vs. ${data.comparisonRange.start} to ${data.comparisonRange.end}`);
 
   const kpis = [
-    { label: "SPEND", value: formatCurrency(c.totalSpend), delta: d.totalSpend.percentage, invert: false },
+    { label: "SPEND", value: fmt(c.totalSpend), delta: d.totalSpend.percentage, invert: false },
     { label: "CONVERSIONS", value: formatNum(c.totalConversions), delta: d.totalConversions.percentage, invert: false },
-    { label: "CPA", value: formatCurrency(c.avgCpa), delta: d.avgCpa.percentage, invert: true },
+    { label: "CPA", value: fmt(c.avgCpa), delta: d.avgCpa.percentage, invert: true },
     { label: "CTR", value: `${c.avgCtr}%`, delta: d.avgCtr.percentage, invert: false },
   ];
   const kpis2 = [
     { label: "CLICKS", value: formatNum(c.totalClicks), delta: d.totalClicks.percentage, invert: false },
     { label: "IMPRESSIONS", value: formatNum(c.totalImpressions), delta: d.totalImpressions.percentage, invert: false },
-    { label: "CPC", value: formatCurrency(c.avgCpc), delta: d.avgCpc.percentage, invert: true },
-    { label: "CPM", value: formatCurrency(c.avgCpm), delta: d.avgCpm.percentage, invert: true },
+    { label: "CPC", value: fmt(c.avgCpc), delta: d.avgCpc.percentage, invert: true },
+    { label: "CPM", value: fmt(c.avgCpm), delta: d.avgCpm.percentage, invert: true },
   ];
 
   kpis.forEach((kpi, i) => {
@@ -193,7 +195,7 @@ export async function exportPptx(data: ReportData): Promise<void> {
   const trendStats = [
     { label: "BEST DAY", value: data.trendSummary.bestDay.date, sub: `${data.trendSummary.bestDay.conversions} conv.`, bg: C.greenBg, color: C.green },
     { label: "WORST DAY", value: data.trendSummary.worstDay.date, sub: `${data.trendSummary.worstDay.conversions} conv.`, bg: C.redBg, color: C.red },
-    { label: "AVG DAILY SPEND", value: formatCurrency(data.trendSummary.avgDailySpend), sub: "", bg: C.blueBg, color: C.blue },
+    { label: "AVG DAILY SPEND", value: fmt(data.trendSummary.avgDailySpend), sub: "", bg: C.blueBg, color: C.blue },
     { label: "VOLATILITY", value: `${(data.trendSummary.spendVolatility * 100).toFixed(1)}%`, sub: "", bg: C.amberBg, color: C.amber },
   ];
   trendStats.forEach((ts, i) => {
@@ -260,7 +262,7 @@ export async function exportPptx(data: ReportData): Promise<void> {
       x: x + 0.15, y: 2.45, w: Math.max(0.1, (w - 0.3) * spendPct / 100), h: 0.12,
       fill: { color: pColor }, rectRadius: 0.03,
     });
-    s5.addText(`${formatCurrency(p.spend)} (${p.pctOfSpend}%)`, {
+    s5.addText(`${fmt(p.spend)} (${p.pctOfSpend}%)`, {
       x: x + 0.15, y: 2.65, w: w - 0.3, h: 0.25,
       fontSize: 9, color: C.muted, fontFace: FONT,
     });
@@ -268,8 +270,8 @@ export async function exportPptx(data: ReportData): Promise<void> {
     const metrics = [
       { label: "Conversions", value: formatNum(p.conversions) },
       { label: "CTR", value: `${p.ctr}%` },
-      { label: "CPA", value: formatCurrency(p.cpa) },
-      { label: "CPC", value: formatCurrency(p.cpc) },
+      { label: "CPA", value: fmt(p.cpa) },
+      { label: "CPC", value: fmt(p.cpc) },
     ];
     metrics.forEach((m, mi) => {
       const my = 3.1 + mi * 0.42;
@@ -365,11 +367,11 @@ export async function exportPptx(data: ReportData): Promise<void> {
       x: 7.8, y, w: 1.5, h: 0.45,
       fontSize: 10, bold: true, color: C.dark, fontFace: FONT, align: "right", valign: "middle",
     });
-    s7.addText(formatCurrency(camp.cpa), {
+    s7.addText(fmt(camp.cpa), {
       x: 9.5, y, w: 1.2, h: 0.45,
       fontSize: 10, color: C.dark, fontFace: FONT, align: "right", valign: "middle",
     });
-    s7.addText(formatCurrency(camp.spend), {
+    s7.addText(fmt(camp.spend), {
       x: 10.9, y, w: 1.5, h: 0.45,
       fontSize: 10, color: C.dark, fontFace: FONT, align: "right", valign: "middle",
     });
@@ -457,7 +459,7 @@ export async function exportPptx(data: ReportData): Promise<void> {
     const crKpis = [
       { label: "Total Creatives", value: `${data.creatives.totalCreatives}` },
       { label: "Avg CTR", value: `${data.creatives.avgCtr}%` },
-      { label: "Avg CPA", value: `$${data.creatives.avgCpa}` },
+      { label: "Avg CPA", value: `${sym}${data.creatives.avgCpa}` },
       { label: "Fatigued", value: `${data.creatives.fatiguedCount}` },
     ];
 
@@ -506,7 +508,7 @@ export async function exportPptx(data: ReportData): Promise<void> {
           x: 8.4, y: cy, w: 1.5, h: 0.38,
           fontSize: 9, bold: true, color: C.dark, fontFace: FONT, align: "right", valign: "middle",
         });
-        s9.addText(`$${cr.cpa} CPA`, {
+        s9.addText(`${sym}${cr.cpa} CPA`, {
           x: 10.0, y: cy, w: 1.5, h: 0.38,
           fontSize: 9, color: C.dark, fontFace: FONT, align: "right", valign: "middle",
         });
@@ -517,73 +519,6 @@ export async function exportPptx(data: ReportData): Promise<void> {
       });
     }
     addFooter(s9);
-  }
-
-  // ── Slide 10: Budget Optimization ──
-  if (data.optimizer && data.optimizer.platforms.length > 0) {
-    const s10 = pptx.addSlide();
-    s10.background = { color: C.white };
-    addSlideTitle(s10, "Budget Optimization", C.teal);
-
-    s10.addText(truncate(data.narratives.optimizer || "", 350), {
-      x: 0.4, y: 1.0, w: 12.5, h: 1.0,
-      fontSize: 10, color: C.muted, fontFace: FONT, valign: "top", lineSpacingMultiple: 1.5,
-      shrinkText: true,
-    });
-
-    s10.addText("Channel Efficiency", {
-      x: 0.4, y: 2.2, w: 4, h: 0.25,
-      fontSize: 8, bold: true, color: C.faint, fontFace: FONT,
-    });
-
-    data.optimizer.platforms.forEach((p, i) => {
-      const py = 2.5 + i * 0.7;
-      const sc = scoreColor(p.efficiencyScore);
-      s10.addShape("roundRect" as PptxGenJS.ShapeType, {
-        x: 0.4, y: py, w: 6.0, h: 0.6,
-        fill: { color: C.bg }, rectRadius: 0.04,
-      });
-      s10.addText(`${i + 1}. ${p.platform.charAt(0).toUpperCase() + p.platform.slice(1)}`, {
-        x: 0.6, y: py + 0.05, w: 2.5, h: 0.25,
-        fontSize: 10, bold: true, color: C.dark, fontFace: FONT,
-      });
-      s10.addText(`Efficiency: ${p.efficiencyScore}/100`, {
-        x: 3.2, y: py + 0.05, w: 3.0, h: 0.25,
-        fontSize: 9, bold: true, color: sc, fontFace: FONT, align: "right",
-      });
-      s10.addShape("roundRect" as PptxGenJS.ShapeType, {
-        x: 0.6, y: py + 0.38, w: 5.6, h: 0.08,
-        fill: { color: C.border }, rectRadius: 0.02,
-      });
-      s10.addShape("roundRect" as PptxGenJS.ShapeType, {
-        x: 0.6, y: py + 0.38, w: Math.max(0.1, 5.6 * p.efficiencyScore / 100), h: 0.08,
-        fill: { color: sc }, rectRadius: 0.02,
-      });
-    });
-
-    if (data.optimizer.projectedImpact.additionalConversions > 0 || data.optimizer.projectedImpact.cpaReduction > 0) {
-      s10.addShape("roundRect" as PptxGenJS.ShapeType, {
-        x: 7.0, y: 2.5, w: 5.9, h: 1.5,
-        fill: { color: "ECFEFF" }, rectRadius: 0.06,
-        line: { color: "A5F3FC", width: 1 },
-      });
-      s10.addText("Projected Impact", {
-        x: 7.2, y: 2.6, w: 5.5, h: 0.3,
-        fontSize: 8, bold: true, color: "0E7490", fontFace: FONT,
-      });
-      let impactText = "";
-      if (data.optimizer.projectedImpact.additionalConversions > 0) {
-        impactText += `+${data.optimizer.projectedImpact.additionalConversions} additional conversions\n`;
-      }
-      if (data.optimizer.projectedImpact.cpaReduction > 0) {
-        impactText += `-${data.optimizer.projectedImpact.cpaReduction}% CPA reduction`;
-      }
-      s10.addText(impactText, {
-        x: 7.2, y: 2.95, w: 5.5, h: 0.9,
-        fontSize: 14, bold: true, color: "0E7490", fontFace: FONT, valign: "top", lineSpacingMultiple: 1.6,
-      });
-    }
-    addFooter(s10);
   }
 
   // ── Slide: Recommendations ──

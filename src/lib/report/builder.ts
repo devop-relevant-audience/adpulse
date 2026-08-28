@@ -1,9 +1,9 @@
-import { compareMetrics, getMetrics, getDailyTrend, getFunnelData, getCreatives, getCreativeFatigueAnalysis } from "@/lib/data/queries";
+import { compareMetrics, getClientCurrency, getMetrics, getDailyTrend, getFunnelData, getCreatives, getCreativeFatigueAnalysis } from "@/lib/data/queries";
 import { calculateHealthScore } from "@/lib/data/health-score";
-import { getChannelMixAnalysis } from "@/lib/data/optimizer";
 import type { ComparisonResult, FunnelStage } from "@/lib/data/queries";
 import type { HealthScoreResult } from "@/lib/data/health-score";
 import type { Platform, CreativeType, CreativeStatus } from "@/lib/types/database";
+import { currencySymbol } from "@/lib/format";
 import { format, subDays } from "date-fns";
 
 export interface CampaignBreakdownItem {
@@ -81,33 +81,11 @@ export interface CreativeReportData {
   }>;
 }
 
-export interface OptimizerReportData {
-  currentAllocation: Record<string, number>;
-  recommendedAllocation: Record<string, number>;
-  platforms: Array<{
-    platform: Platform;
-    efficiencyScore: number;
-    cpa: number;
-    ctr: number;
-    currentAllocation: number;
-    recentCpaTrend: number;
-  }>;
-  suggestions: Array<{
-    from: Platform;
-    to: Platform;
-    shiftPercent: number;
-    projectedAdditionalConversions: number;
-    rationale: string;
-  }>;
-  projectedImpact: {
-    additionalConversions: number;
-    cpaReduction: number;
-  };
-}
-
 export interface ReportData {
   id?: string;
   clientName: string;
+  /** ISO 4217 code of the client's ad account; every amount below is in it. */
+  currency: string;
   dateRange: { start: string; end: string };
   comparisonRange: { start: string; end: string };
   generatedAt: string;
@@ -119,7 +97,6 @@ export interface ReportData {
   campaignBreakdown: CampaignBreakdownItem[];
   healthScore: HealthScoreResult;
   creatives: CreativeReportData;
-  optimizer: OptimizerReportData;
 
   narratives: {
     executive: string;
@@ -129,7 +106,6 @@ export interface ReportData {
     campaigns: string;
     health: string;
     creatives: string;
-    optimizer: string;
     recommendations: string;
   };
 }
@@ -140,13 +116,14 @@ export async function buildReport(params: {
   startDate: string;
   endDate: string;
 }): Promise<ReportData> {
+  const currency = await getClientCurrency(params.clientId);
   const daysDiff = Math.round(
     (new Date(params.endDate).getTime() - new Date(params.startDate).getTime()) / (1000 * 60 * 60 * 24)
   );
   const previousEnd = format(subDays(new Date(params.startDate), 1), "yyyy-MM-dd");
   const previousStart = format(subDays(new Date(params.startDate), daysDiff + 1), "yyyy-MM-dd");
 
-  const [comparison, dailyTrend, rawMetrics, funnelData, healthScore, allCreatives, fatigueAnalysis, channelMix] = await Promise.all([
+  const [comparison, dailyTrend, rawMetrics, funnelData, healthScore, allCreatives, fatigueAnalysis] = await Promise.all([
     compareMetrics({
       clientId: params.clientId,
       currentStart: params.startDate,
@@ -176,11 +153,6 @@ export async function buildReport(params: {
     }),
     getCreatives({ clientId: params.clientId }),
     getCreativeFatigueAnalysis(params.clientId),
-    getChannelMixAnalysis({
-      clientId: params.clientId,
-      startDate: params.startDate,
-      endDate: params.endDate,
-    }),
   ]);
 
   // Campaign breakdown
@@ -320,25 +292,10 @@ export async function buildReport(params: {
     fatiguedCreatives: fatiguedForReport,
   };
 
-  // Optimizer data
-  const optimizer: OptimizerReportData = {
-    currentAllocation: channelMix.currentAllocation,
-    recommendedAllocation: channelMix.recommendedAllocation,
-    platforms: channelMix.platforms.map((p) => ({
-      platform: p.platform,
-      efficiencyScore: p.efficiencyScore,
-      cpa: p.cpa,
-      ctr: p.ctr,
-      currentAllocation: p.currentAllocation,
-      recentCpaTrend: p.recentCpaTrend,
-    })),
-    suggestions: channelMix.suggestions,
-    projectedImpact: channelMix.projectedImpact,
-  };
-
   // Generate narratives
   const narratives = await generateNarratives({
     clientName: params.clientName,
+    currency,
     startDate: params.startDate,
     endDate: params.endDate,
     comparison,
@@ -348,11 +305,11 @@ export async function buildReport(params: {
     funnelData,
     healthScore,
     creatives,
-    optimizer,
   });
 
   return {
     clientName: params.clientName,
+    currency,
     dateRange: { start: params.startDate, end: params.endDate },
     comparisonRange: { start: previousStart, end: previousEnd },
     generatedAt: new Date().toISOString(),
@@ -363,13 +320,14 @@ export async function buildReport(params: {
     campaignBreakdown,
     healthScore,
     creatives,
-    optimizer,
     narratives,
   };
 }
 
 interface NarrativeContext {
   clientName: string;
+  /** ISO 4217 code of the client's ad account; every amount below is in it. */
+  currency: string;
   startDate: string;
   endDate: string;
   comparison: ComparisonResult;
@@ -379,7 +337,6 @@ interface NarrativeContext {
   funnelData: { overall: FunnelStage[]; byPlatform: Record<string, FunnelStage[]> };
   healthScore: HealthScoreResult;
   creatives: CreativeReportData;
-  optimizer: OptimizerReportData;
 }
 
 async function generateNarratives(ctx: NarrativeContext): Promise<ReportData["narratives"]> {
@@ -427,7 +384,6 @@ async function generateNarratives(ctx: NarrativeContext): Promise<ReportData["na
         campaigns: parsed.campaigns || fallback.campaigns,
         health: parsed.health || fallback.health,
         creatives: parsed.creatives || fallback.creatives,
-        optimizer: parsed.optimizer || fallback.optimizer,
         recommendations: parsed.recommendations || fallback.recommendations,
       };
     } catch {
@@ -439,43 +395,42 @@ async function generateNarratives(ctx: NarrativeContext): Promise<ReportData["na
 }
 
 function buildFullPrompt(ctx: NarrativeContext): string {
-  const { clientName, startDate, endDate, comparison, campaignBreakdown, platformBreakdown, trendSummary, funnelData, healthScore, creatives, optimizer } = ctx;
+  const { clientName, currency, startDate, endDate, comparison, campaignBreakdown, platformBreakdown, trendSummary, funnelData, healthScore, creatives } = ctx;
   const c = comparison.current;
   const d = comparison.deltas;
+  const sym = currencySymbol(currency);
 
   const topCampaigns = [...campaignBreakdown].sort((a, b) => b.conversions - a.conversions).slice(0, 5);
   const worstCampaigns = [...campaignBreakdown].sort((a, b) => a.ctr - b.ctr).slice(0, 3);
 
   return `You are a senior media strategist writing a comprehensive client performance report for ${clientName}.
 Period: ${startDate} to ${endDate}
+All monetary figures below are in ${currency}; write every amount using the ${sym} symbol and never use "$" unless ${currency} is USD.
 
 DATA:
 
 Period-over-period changes:
 ${Object.entries(d).map(([key, v]) => `${key}: ${v.percentage > 0 ? "+" : ""}${v.percentage}%`).join("\n")}
 
-Current totals: ${c.totalImpressions.toLocaleString()} impressions, ${c.totalClicks.toLocaleString()} clicks, $${c.totalSpend.toLocaleString()} spend, ${c.totalConversions.toLocaleString()} conversions, ${c.avgCtr}% CTR, $${c.avgCpc} CPC, $${c.avgCpa} CPA
+Current totals: ${c.totalImpressions.toLocaleString()} impressions, ${c.totalClicks.toLocaleString()} clicks, ${sym}${c.totalSpend.toLocaleString()} spend, ${c.totalConversions.toLocaleString()} conversions, ${c.avgCtr}% CTR, ${sym}${c.avgCpc} CPC, ${sym}${c.avgCpa} CPA
 
 Platform breakdown:
-${platformBreakdown.map((p) => `- ${p.platform}: $${p.spend.toFixed(0)} spend (${p.pctOfSpend}%), ${p.ctr}% CTR, $${p.cpa} CPA, ${p.conversions} conv`).join("\n")}
+${platformBreakdown.map((p) => `- ${p.platform}: ${sym}${p.spend.toFixed(0)} spend (${p.pctOfSpend}%), ${p.ctr}% CTR, ${sym}${p.cpa} CPA, ${p.conversions} conv`).join("\n")}
 
-Trend: best day ${trendSummary.bestDay.date} (${trendSummary.bestDay.conversions} conv), worst ${trendSummary.worstDay.date} (${trendSummary.worstDay.conversions} conv), avg daily spend $${trendSummary.avgDailySpend.toFixed(0)}, volatility ${(trendSummary.spendVolatility * 100).toFixed(0)}%
+Trend: best day ${trendSummary.bestDay.date} (${trendSummary.bestDay.conversions} conv), worst ${trendSummary.worstDay.date} (${trendSummary.worstDay.conversions} conv), avg daily spend ${sym}${trendSummary.avgDailySpend.toFixed(0)}, volatility ${(trendSummary.spendVolatility * 100).toFixed(0)}%
 
 Funnel: ${funnelData.overall.map((s) => `${s.stage}: ${s.volume} (${s.percentOfFirst}%)`).join(" → ")}
 
-Top campaigns: ${topCampaigns.map((c) => `${c.campaignName}(${c.platform}): ${c.conversions} conv, $${c.cpa} CPA`).join("; ")}
+Top campaigns: ${topCampaigns.map((c) => `${c.campaignName}(${c.platform}): ${c.conversions} conv, ${sym}${c.cpa} CPA`).join("; ")}
 Worst CTR: ${worstCampaigns.map((c) => `${c.campaignName}: ${c.ctr}% CTR`).join("; ")}
 
 Health: ${healthScore.overallScore}/100 (Grade ${healthScore.grade}). Sub-scores: ${healthScore.subScores.map((s) => `${s.name}: ${s.score}`).join(", ")}
 
-Creatives: ${creatives.totalCreatives} total (${creatives.activeCount} active, ${creatives.fatiguedCount} fatigued, ${creatives.pausedCount} paused). Avg CTR ${creatives.avgCtr}%, Avg CPA $${creatives.avgCpa}.
-By type: ${creatives.byType.map((t) => `${t.type}: ${t.count} creatives, ${t.avgCtr}% CTR, $${t.avgCpa} CPA`).join("; ")}
-Top creatives: ${creatives.topPerformers.slice(0, 3).map((cr) => `"${cr.headline}" (${cr.platform}/${cr.type}): ${cr.conversions} conv, $${cr.cpa} CPA`).join("; ")}
+Creatives: ${creatives.totalCreatives} total (${creatives.activeCount} active, ${creatives.fatiguedCount} fatigued, ${creatives.pausedCount} paused). Avg CTR ${creatives.avgCtr}%, Avg CPA ${sym}${creatives.avgCpa}.
+By type: ${creatives.byType.map((t) => `${t.type}: ${t.count} creatives, ${t.avgCtr}% CTR, ${sym}${t.avgCpa} CPA`).join("; ")}
+Top creatives: ${creatives.topPerformers.slice(0, 3).map((cr) => `"${cr.headline}" (${cr.platform}/${cr.type}): ${cr.conversions} conv, ${sym}${cr.cpa} CPA`).join("; ")}
 ${creatives.fatiguedCount > 0 ? `Fatigued: ${creatives.fatiguedCreatives.slice(0, 3).map((f) => `"${f.headline}" ${f.daysRunning}d running, fatigue score ${f.fatigueScore}`).join("; ")}` : ""}
 
-Budget Optimizer: ${optimizer.platforms.map((p) => `${p.platform}: efficiency ${p.efficiencyScore}/100, current allocation ${p.currentAllocation}%, CPA trend ${p.recentCpaTrend > 0 ? "+" : ""}${p.recentCpaTrend}%`).join("; ")}
-${optimizer.suggestions.length > 0 ? `Suggestions: ${optimizer.suggestions.map((s) => `Shift ${s.shiftPercent}% from ${s.from} to ${s.to} (+${s.projectedAdditionalConversions} projected conv)`).join("; ")}` : "No reallocation needed."}
-Projected impact: +${optimizer.projectedImpact.additionalConversions} conversions, ${optimizer.projectedImpact.cpaReduction}% CPA reduction.
 
 TASK: Return a JSON object with these keys, each being 2-4 sentences of professional analysis:
 - "executive": Overall performance summary
@@ -485,26 +440,26 @@ TASK: Return a JSON object with these keys, each being 2-4 sentences of professi
 - "campaigns": Campaign highlights and lowlights
 - "health": Health score interpretation
 - "creatives": Creative performance analysis including fatigue insights and recommendations by creative type
-- "optimizer": Budget allocation analysis with efficiency insights and reallocation recommendations
 - "recommendations": 3-5 actionable recommendations as a paragraph
 
 Use specific numbers. Professional but approachable tone. No markdown.`;
 }
 
 function generateFallbackNarratives(ctx: NarrativeContext): ReportData["narratives"] {
-  const { clientName, startDate, endDate, comparison, campaignBreakdown, platformBreakdown, trendSummary, funnelData, healthScore, creatives, optimizer } = ctx;
+  const { clientName, currency, startDate, endDate, comparison, campaignBreakdown, platformBreakdown, trendSummary, funnelData, healthScore, creatives } = ctx;
   const c = comparison.current;
   const d = comparison.deltas;
+  const sym = currencySymbol(currency);
 
   const topCampaign = [...campaignBreakdown].sort((a, b) => b.conversions - a.conversions)[0];
   const topPlatform = [...platformBreakdown].sort((a, b) => b.conversions - a.conversions)[0];
 
-  const executive = `For ${startDate} to ${endDate}, ${clientName} generated ${c.totalImpressions.toLocaleString()} impressions, ${c.totalClicks.toLocaleString()} clicks, and ${c.totalConversions.toLocaleString()} conversions on $${c.totalSpend.toLocaleString()} spend. Compared to the prior period, conversions ${d.totalConversions.percentage >= 0 ? "increased" : "decreased"} by ${Math.abs(d.totalConversions.percentage)}% while spend ${d.totalSpend.percentage >= 0 ? "rose" : "fell"} by ${Math.abs(d.totalSpend.percentage)}%. Overall CPA is $${c.avgCpa}, ${d.avgCpa.percentage < 0 ? "an improvement" : "a regression"} of ${Math.abs(d.avgCpa.percentage)}% from the prior period.`;
+  const executive = `For ${startDate} to ${endDate}, ${clientName} generated ${c.totalImpressions.toLocaleString()} impressions, ${c.totalClicks.toLocaleString()} clicks, and ${c.totalConversions.toLocaleString()} conversions on ${sym}${c.totalSpend.toLocaleString()} spend. Compared to the prior period, conversions ${d.totalConversions.percentage >= 0 ? "increased" : "decreased"} by ${Math.abs(d.totalConversions.percentage)}% while spend ${d.totalSpend.percentage >= 0 ? "rose" : "fell"} by ${Math.abs(d.totalSpend.percentage)}%. Overall CPA is ${sym}${c.avgCpa}, ${d.avgCpa.percentage < 0 ? "an improvement" : "a regression"} of ${Math.abs(d.avgCpa.percentage)}% from the prior period.`;
 
-  const trends = `Average daily spend was $${trendSummary.avgDailySpend.toFixed(0)} with a volatility coefficient of ${(trendSummary.spendVolatility * 100).toFixed(0)}%. The best-performing day was ${trendSummary.bestDay.date} with ${trendSummary.bestDay.conversions} conversions, while the weakest was ${trendSummary.worstDay.date} with ${trendSummary.worstDay.conversions} conversions. ${trendSummary.spendVolatility > 0.3 ? "High spend variance suggests inconsistent budget delivery — consider setting more stable daily caps." : "Spend delivery is relatively consistent, indicating healthy budget pacing."}`;
+  const trends = `Average daily spend was ${sym}${trendSummary.avgDailySpend.toFixed(0)} with a volatility coefficient of ${(trendSummary.spendVolatility * 100).toFixed(0)}%. The best-performing day was ${trendSummary.bestDay.date} with ${trendSummary.bestDay.conversions} conversions, while the weakest was ${trendSummary.worstDay.date} with ${trendSummary.worstDay.conversions} conversions. ${trendSummary.spendVolatility > 0.3 ? "High spend variance suggests inconsistent budget delivery — consider setting more stable daily caps." : "Spend delivery is relatively consistent, indicating healthy budget pacing."}`;
 
   const platforms = topPlatform
-    ? `${topPlatform.platform} leads with ${topPlatform.pctOfSpend}% of total spend and ${topPlatform.conversions} conversions at $${topPlatform.cpa} CPA. ${platformBreakdown.length > 1 ? `Across ${platformBreakdown.length} active platforms, CTR ranges from ${Math.min(...platformBreakdown.map((p) => p.ctr))}% to ${Math.max(...platformBreakdown.map((p) => p.ctr))}%.` : ""} Consider shifting budget toward platforms with lower CPA and higher conversion rates.`
+    ? `${topPlatform.platform} leads with ${topPlatform.pctOfSpend}% of total spend and ${topPlatform.conversions} conversions at ${sym}${topPlatform.cpa} CPA. ${platformBreakdown.length > 1 ? `Across ${platformBreakdown.length} active platforms, CTR ranges from ${Math.min(...platformBreakdown.map((p) => p.ctr))}% to ${Math.max(...platformBreakdown.map((p) => p.ctr))}%.` : ""} Consider shifting budget toward platforms with lower CPA and higher conversion rates.`
     : "No platform data available for this period.";
 
   const funnel = funnelData.overall.length >= 3
@@ -512,7 +467,7 @@ function generateFallbackNarratives(ctx: NarrativeContext): ReportData["narrativ
     : "Insufficient funnel data for this period.";
 
   const campaigns = topCampaign
-    ? `The top campaign is "${topCampaign.campaignName}" (${topCampaign.platform}) with ${topCampaign.conversions} conversions at $${topCampaign.cpa} CPA and ${topCampaign.ctr}% CTR. ${campaignBreakdown.length} campaigns are active in total. The bottom performers by CTR should be reviewed for creative fatigue or audience mismatch.`
+    ? `The top campaign is "${topCampaign.campaignName}" (${topCampaign.platform}) with ${topCampaign.conversions} conversions at ${sym}${topCampaign.cpa} CPA and ${topCampaign.ctr}% CTR. ${campaignBreakdown.length} campaigns are active in total. The bottom performers by CTR should be reviewed for creative fatigue or audience mismatch.`
     : "No campaign data available.";
 
   const health = `Account health score is ${healthScore.overallScore}/100 (Grade ${healthScore.grade}). ${healthScore.insight} ${healthScore.subScores.length > 0 ? `Strongest dimension: ${[...healthScore.subScores].sort((a, b) => b.score - a.score)[0].name} (${[...healthScore.subScores].sort((a, b) => b.score - a.score)[0].score}/100). Weakest: ${[...healthScore.subScores].sort((a, b) => a.score - b.score)[0].name} (${[...healthScore.subScores].sort((a, b) => a.score - b.score)[0].score}/100).` : ""}`;
@@ -520,15 +475,10 @@ function generateFallbackNarratives(ctx: NarrativeContext): ReportData["narrativ
   const topCreative = creatives.topPerformers[0];
   const bestType = [...creatives.byType].sort((a, b) => a.avgCpa - b.avgCpa)[0];
   const creativesNarrative = creatives.totalCreatives > 0
-    ? `The account has ${creatives.totalCreatives} creatives across ${creatives.byType.length} formats: ${creatives.activeCount} active, ${creatives.fatiguedCount} fatigued, and ${creatives.pausedCount} paused. Average creative CTR is ${creatives.avgCtr}% with an average CPA of $${creatives.avgCpa}. ${topCreative ? `Top performer is "${topCreative.headline}" (${topCreative.platform}/${topCreative.type}) with ${topCreative.conversions} conversions at $${topCreative.cpa} CPA.` : ""} ${creatives.fatiguedCount > 0 ? `${creatives.fatiguedCount} creatives are showing fatigue and should be refreshed or rotated.` : "No significant creative fatigue detected."} ${bestType ? `${bestType.type.charAt(0).toUpperCase() + bestType.type.slice(1)} ads deliver the lowest CPA at $${bestType.avgCpa}.` : ""}`
+    ? `The account has ${creatives.totalCreatives} creatives across ${creatives.byType.length} formats: ${creatives.activeCount} active, ${creatives.fatiguedCount} fatigued, and ${creatives.pausedCount} paused. Average creative CTR is ${creatives.avgCtr}% with an average CPA of ${sym}${creatives.avgCpa}. ${topCreative ? `Top performer is "${topCreative.headline}" (${topCreative.platform}/${topCreative.type}) with ${topCreative.conversions} conversions at ${sym}${topCreative.cpa} CPA.` : ""} ${creatives.fatiguedCount > 0 ? `${creatives.fatiguedCount} creatives are showing fatigue and should be refreshed or rotated.` : "No significant creative fatigue detected."} ${bestType ? `${bestType.type.charAt(0).toUpperCase() + bestType.type.slice(1)} ads deliver the lowest CPA at ${sym}${bestType.avgCpa}.` : ""}`
     : "No creative data available for this period.";
 
-  const bestPlatform = optimizer.platforms[0];
-  const optimizerNarrative = optimizer.platforms.length > 0
-    ? `Channel efficiency analysis shows ${bestPlatform ? `${bestPlatform.platform} as the most efficient channel (score: ${bestPlatform.efficiencyScore}/100, CPA: $${bestPlatform.cpa})` : "balanced efficiency across platforms"}. Current allocation: ${optimizer.platforms.map((p) => `${p.platform} ${p.currentAllocation}%`).join(", ")}. ${optimizer.suggestions.length > 0 ? `Recommendation: shift ${optimizer.suggestions[0].shiftPercent}% of budget from ${optimizer.suggestions[0].from} to ${optimizer.suggestions[0].to}, projecting +${optimizer.suggestions[0].projectedAdditionalConversions} additional conversions.` : "Current allocation is well-balanced; no major shifts recommended."} ${optimizer.projectedImpact.cpaReduction > 0 ? `Implementing suggested changes could reduce blended CPA by ${optimizer.projectedImpact.cpaReduction}%.` : ""}`
-    : "Insufficient data for budget optimization analysis.";
+  const recommendations = `Based on the data: 1) ${d.avgCpa.percentage > 0 ? "CPA is rising — review bid strategies and pause underperforming ad groups" : "CPA efficiency is improving — maintain current optimization cadence"}. 2) ${trendSummary.spendVolatility > 0.3 ? "Stabilize daily budgets to reduce delivery volatility" : "Budget pacing is healthy — continue current allocation"}. 3) ${healthScore.overallScore < 60 ? "Address the lowest health sub-score urgently to prevent further degradation" : "Focus on incremental testing to push health score higher"}. 4) ${creatives.fatiguedCount > 0 ? `Refresh the ${creatives.fatiguedCount} fatigued creatives — prioritize those running 45+ days` : "Refresh creatives on campaigns with declining CTR"}. 5) Consider reallocating budget toward the platform with the lowest CPA.`;
 
-  const recommendations = `Based on the data: 1) ${d.avgCpa.percentage > 0 ? "CPA is rising — review bid strategies and pause underperforming ad groups" : "CPA efficiency is improving — maintain current optimization cadence"}. 2) ${trendSummary.spendVolatility > 0.3 ? "Stabilize daily budgets to reduce delivery volatility" : "Budget pacing is healthy — continue current allocation"}. 3) ${healthScore.overallScore < 60 ? "Address the lowest health sub-score urgently to prevent further degradation" : "Focus on incremental testing to push health score higher"}. 4) ${creatives.fatiguedCount > 0 ? `Refresh the ${creatives.fatiguedCount} fatigued creatives — prioritize those running 45+ days` : "Refresh creatives on campaigns with declining CTR"}. 5) ${optimizer.suggestions.length > 0 ? `Reallocate ${optimizer.suggestions[0].shiftPercent}% from ${optimizer.suggestions[0].from} to ${optimizer.suggestions[0].to} for projected CPA improvement` : "Consider reallocating budget toward the platform with the lowest CPA"}.`;
-
-  return { executive, trends, platforms, funnel, campaigns, health, creatives: creativesNarrative, optimizer: optimizerNarrative, recommendations };
+  return { executive, trends, platforms, funnel, campaigns, health, creatives: creativesNarrative, recommendations };
 }

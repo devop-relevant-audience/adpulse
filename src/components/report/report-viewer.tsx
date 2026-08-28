@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { BiTrendingUp, BiTrendingDown, BiPulse, BiChevronRight, BiSolidMagicWand, BiBulb, BiMessageRounded, BiImage, BiVideo, BiCarousel, BiError, BiFilterAlt, BiBroadcast, BiSliderAlt } from "react-icons/bi";
+import { BiTrendingUp, BiTrendingDown, BiPulse, BiChevronRight, BiSolidMagicWand, BiBulb, BiMessageRounded, BiImage, BiVideo, BiCarousel, BiError, BiFilterAlt, BiBroadcast } from "react-icons/bi";
 import { cn } from "@/lib/utils";
 import { Panel } from "@/components/ui/panel";
 import { PLATFORM_COLORS, PLATFORM_LABELS, SERIES_PALETTE, STATUS_COLORS, CHART_AXIS_TEXT } from "@/lib/dashboard/chart-theme";
@@ -229,6 +229,9 @@ interface ReportViewerProps {
 
 export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
   const setReferenceContext = useAppStore((s) => s.setReferenceContext);
+  // Report data carries its own currency: this component also renders public
+  // shared reports, where no client is selected.
+  const fmt = (n: number) => formatCurrency(n, data.currency);
 
   function attachContext(ctx: ReferenceContext) {
     if (!interactive) return;
@@ -242,14 +245,14 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
   const d = data.comparison.deltas;
 
   const allKpis: Array<{ label: string; value: string; delta: number; invert?: boolean }> = [
-    { label: "Spend", value: formatCurrency(c.totalSpend), delta: d.totalSpend.percentage },
+    { label: "Spend", value: fmt(c.totalSpend), delta: d.totalSpend.percentage },
     { label: "Conversions", value: formatNum(c.totalConversions), delta: d.totalConversions.percentage },
-    { label: "CPA", value: formatCurrency(c.avgCpa), delta: d.avgCpa.percentage, invert: true },
+    { label: "CPA", value: fmt(c.avgCpa), delta: d.avgCpa.percentage, invert: true },
     { label: "CTR", value: `${c.avgCtr}%`, delta: d.avgCtr.percentage },
     { label: "Clicks", value: formatNum(c.totalClicks), delta: d.totalClicks.percentage },
     { label: "Impressions", value: formatNum(c.totalImpressions), delta: d.totalImpressions.percentage },
-    { label: "CPC", value: formatCurrency(c.avgCpc), delta: d.avgCpc.percentage, invert: true },
-    { label: "CPM", value: formatCurrency(c.avgCpm), delta: d.avgCpm.percentage, invert: true },
+    { label: "CPC", value: fmt(c.avgCpc), delta: d.avgCpc.percentage, invert: true },
+    { label: "CPM", value: fmt(c.avgCpm), delta: d.avgCpm.percentage, invert: true },
   ];
 
   const platformDonutSegments = data.platformBreakdown
@@ -294,7 +297,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                 "text-left bg-white p-4 group relative transition-colors",
                 interactive && "cursor-pointer hover:bg-canvas-soft/60"
               )}
-              onClick={() => attachContext({ metric: kpi.label, value: parseFloat(String(kpi.value).replace(/[$,%KM]/g, "")) })}
+              onClick={() => attachContext({ metric: kpi.label, value: parseFloat(String(kpi.value).replace(/[^0-9.-]/g, "")) })}
             >
               <p className="text-[12px] font-medium text-ink-muted">{kpi.label}</p>
               <p className="text-lg font-semibold text-ink tabular-nums mt-1">{kpi.value}</p>
@@ -320,7 +323,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Panel className="p-4">
             <p className="text-[12px] font-medium text-ink-muted mb-1">Daily spend trend</p>
-            <p className="text-sm font-semibold text-ink mb-2 tabular-nums">Avg. {formatCurrency(data.trendSummary.avgDailySpend)}/day</p>
+            <p className="text-sm font-semibold text-ink mb-2 tabular-nums">Avg. {fmt(data.trendSummary.avgDailySpend)}/day</p>
             <SparklineChart data={trendSpendData} height={56} color="var(--chart-1)" />
           </Panel>
           <Panel className="p-4">
@@ -343,7 +346,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
           </div>
           <div className="bg-white p-3">
             <p className="text-[12px] font-medium text-ink-muted">Avg daily spend</p>
-            <p className="text-sm font-semibold text-ink mt-1">{formatCurrency(data.trendSummary.avgDailySpend)}</p>
+            <p className="text-sm font-semibold text-ink mt-1">{fmt(data.trendSummary.avgDailySpend)}</p>
           </div>
           <div className="bg-white p-3">
             <p className="text-[12px] font-medium text-ink-muted">Volatility</p>
@@ -366,7 +369,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
             <DonutChart
               segments={platformDonutSegments}
               centerLabel="Total"
-              centerValue={formatCurrency(c.totalSpend)}
+              centerValue={fmt(c.totalSpend)}
             />
           </Panel>
           <Panel className="p-4">
@@ -376,7 +379,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                 label: PLATFORM_LABELS[p.platform] || p.platform,
                 value: p.conversions,
                 color: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT,
-                formatted: `${formatNum(p.conversions)} at ${formatCurrency(p.cpa)} CPA`,
+                formatted: `${formatNum(p.conversions)} at ${fmt(p.cpa)} CPA`,
               }))}
               maxValue={Math.max(...data.platformBreakdown.map((p) => p.conversions))}
             />
@@ -409,11 +412,11 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                 </div>
                 <div>
                   <p className="text-[11px] text-ink-muted">CPA</p>
-                  <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(p.cpa)}</p>
+                  <p className="text-[13px] font-semibold text-ink tabular-nums">{fmt(p.cpa)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-ink-muted">CPC</p>
-                  <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(p.cpc)}</p>
+                  <p className="text-[13px] font-semibold text-ink tabular-nums">{fmt(p.cpc)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-ink-muted">Spend</p>
@@ -478,11 +481,11 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                     </div>
                     <div className="text-right">
                       <p className="text-[11px] text-ink-muted">CPA</p>
-                      <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(camp.cpa)}</p>
+                      <p className="text-[13px] font-semibold text-ink tabular-nums">{fmt(camp.cpa)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[11px] text-ink-muted">Spend</p>
-                      <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(camp.spend)}</p>
+                      <p className="text-[13px] font-semibold text-ink tabular-nums">{fmt(camp.spend)}</p>
                     </div>
                     {interactive && (
                       <BiMessageRounded className="w-3.5 h-3.5 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -522,7 +525,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                     </div>
                     <div className="text-right">
                       <p className="text-[11px] text-ink-muted">CPA</p>
-                      <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(camp.cpa)}</p>
+                      <p className="text-[13px] font-semibold text-ink tabular-nums">{fmt(camp.cpa)}</p>
                     </div>
                     <BiChevronRight className="w-4 h-4 text-ink-faint" />
                   </div>
@@ -640,7 +643,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                         </div>
                         <div>
                           <p className="text-[11px] text-ink-muted">Spend</p>
-                          <p className="text-[12px] font-semibold text-ink tabular-nums">{formatCurrency(t.totalSpend)}</p>
+                          <p className="text-[12px] font-semibold text-ink tabular-nums">{fmt(t.totalSpend)}</p>
                         </div>
                       </div>
                     </div>
@@ -674,7 +677,7 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                       </div>
                       <div className="text-right">
                         <p className="text-[11px] text-ink-muted">CPA</p>
-                        <p className="text-[13px] font-semibold text-ink tabular-nums">{formatCurrency(cr.cpa)}</p>
+                        <p className="text-[13px] font-semibold text-ink tabular-nums">{fmt(cr.cpa)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[11px] text-ink-muted">CTR</p>
@@ -719,135 +722,6 @@ export function ReportViewer({ data, interactive = false }: ReportViewerProps) {
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Budget Optimizer */}
-      {data.optimizer && data.optimizer.platforms.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-3">
-            <BiSliderAlt className="w-4 h-4 text-ink-muted shrink-0" />
-            <h3 className="text-[15px] font-semibold text-ink">Budget optimization</h3>
-          </div>
-          <p className="text-[13px] leading-relaxed text-ink-muted mb-4">{data.narratives.optimizer}</p>
-
-          {/* Allocation comparison */}
-          <Panel className="p-5 mb-4">
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-[12px] font-medium text-ink-muted mb-3">Current allocation</p>
-                <div className="space-y-2">
-                  {data.optimizer.platforms.map((p) => (
-                    <div key={`cur-${p.platform}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT }} />
-                          <span className="text-[12px] font-medium text-ink capitalize">{p.platform}</span>
-                        </div>
-                        <span className="text-[12px] font-semibold text-ink tabular-nums">{p.currentAllocation}%</span>
-                      </div>
-                      <div className="h-2 bg-canvas-soft rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${p.currentAllocation}%`, backgroundColor: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT, opacity: 0.7 }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-[12px] font-medium text-ink-muted mb-3">Recommended allocation</p>
-                <div className="space-y-2">
-                  {data.optimizer.platforms.map((p) => {
-                    const recommended = data.optimizer.recommendedAllocation[p.platform] ?? p.currentAllocation;
-                    const diff = recommended - p.currentAllocation;
-                    return (
-                      <div key={`rec-${p.platform}`}>
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT }} />
-                            <span className="text-[12px] font-medium text-ink capitalize">{p.platform}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[12px] font-semibold text-ink tabular-nums">{recommended.toFixed(1)}%</span>
-                            {diff !== 0 && (
-                              <span className={cn("text-[11px] font-medium", diff > 0 ? "text-emerald-600" : "text-red-500")}>
-                                {diff > 0 ? "+" : ""}{diff.toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="h-2 bg-canvas-soft rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${recommended}%`, backgroundColor: PLATFORM_COLORS[p.platform] || CHART_AXIS_TEXT }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </Panel>
-
-          {/* Platform Efficiency Scores */}
-          <Panel className="p-4 mb-4">
-            <p className="text-[12px] font-medium text-ink-muted mb-3">Channel efficiency ranking</p>
-            <div className="space-y-2.5">
-              {data.optimizer.platforms.map((p, i) => {
-                const color = getScoreColor(p.efficiencyScore);
-                return (
-                  <div key={p.platform} className="flex items-center gap-3">
-                    <span className="w-6 text-center text-[13px] font-semibold text-ink-muted tabular-nums shrink-0">{i + 1}</span>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[12px] font-medium text-ink capitalize">{p.platform}</span>
-                        <span className="text-[12px] font-bold tabular-nums" style={{ color }}>{p.efficiencyScore}/100</span>
-                      </div>
-                      <div className="h-2 bg-canvas-soft rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${p.efficiencyScore}%`, backgroundColor: color }} />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 text-right">
-                      <div>
-                        <p className="text-[11px] text-ink-muted">CPA</p>
-                        <p className="text-[12px] font-semibold text-ink tabular-nums">{formatCurrency(p.cpa)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] text-ink-muted">Trend</p>
-                        <p className={cn("text-[12px] font-semibold tabular-nums", p.recentCpaTrend <= 0 ? "text-emerald-600" : "text-red-500")}>
-                          {p.recentCpaTrend > 0 ? "+" : ""}{p.recentCpaTrend}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Panel>
-
-          {/* Projected Impact */}
-          {(data.optimizer.projectedImpact.additionalConversions > 0 || data.optimizer.projectedImpact.cpaReduction > 0) && (
-            <div className="rounded-xl border border-hairline bg-emerald-50/40 p-4">
-              <p className="text-[12px] font-medium text-emerald-800 mb-2">Projected impact of reallocation</p>
-              <div className="flex items-center gap-6">
-                {data.optimizer.projectedImpact.additionalConversions > 0 && (
-                  <div>
-                    <p className="text-lg font-semibold text-emerald-700">+{data.optimizer.projectedImpact.additionalConversions}</p>
-                    <p className="text-[11px] text-emerald-700">additional conversions</p>
-                  </div>
-                )}
-                {data.optimizer.projectedImpact.cpaReduction > 0 && (
-                  <div>
-                    <p className="text-lg font-semibold text-emerald-700">-{data.optimizer.projectedImpact.cpaReduction}%</p>
-                    <p className="text-[11px] text-emerald-700">CPA reduction</p>
-                  </div>
-                )}
               </div>
             </div>
           )}

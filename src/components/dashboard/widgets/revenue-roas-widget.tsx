@@ -7,9 +7,10 @@ import { useSelectedClient } from "@/hooks/use-selected-client";
 import { DemoOnlyWidgetPlaceholder } from "@/components/dashboard/demo-only";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
-import { formatCurrency } from "@/lib/format";
+import { useCurrencyFormat } from "@/hooks/use-currency-format";
 
 export function RevenueRoasWidget() {
+  const { formatCurrency } = useCurrencyFormat();
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
