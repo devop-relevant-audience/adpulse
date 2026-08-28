@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Platform, AttributionModel, CampaignPerformanceRow, ClientRow, AlertRuleRow, AlertHistoryRow, AlertRuleInsert, ReportScheduleRow, ReportScheduleInsert, ReportRow, AdCreativeRow, CreativeStatus } from "@/lib/types/database";
 import type { ComparisonResult, FunnelData, PacingData, FatigueAnalysisItem } from "@/lib/data/queries";
 import type { HealthScoreResult } from "@/lib/data/health-score";
+import type { MetricQueryParams, MetricQueryResult } from "@/lib/dashboard/custom-widget";
 
 export function useClients() {
   return useQuery<ClientRow[]>({
@@ -209,6 +210,36 @@ export function useHealthScore(params: {
       return res.json();
     },
     enabled: !!params.clientId,
+  });
+}
+
+// --- Custom widget aggregation ---
+
+export function useMetricQuery(
+  params: Omit<MetricQueryParams, "clientId"> & { clientId: string | null; enabled?: boolean }
+) {
+  return useQuery<MetricQueryResult>({
+    queryKey: ["metric-query", params],
+    queryFn: async () => {
+      const sp = new URLSearchParams({
+        action: "query",
+        clientId: params.clientId!,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        groupBy: params.groupBy,
+        timeBucket: params.timeBucket,
+      });
+      if (params.platforms?.length) sp.set("platforms", params.platforms.join(","));
+      if (params.campaignIds?.length) sp.set("campaignIds", params.campaignIds.join(","));
+      if (params.limit !== undefined) sp.set("limit", String(params.limit));
+      if (params.sortBy) sp.set("sortBy", params.sortBy);
+      if (params.sortDir) sp.set("sortDir", params.sortDir);
+
+      const res = await fetch(`/api/metrics?${sp}`);
+      if (!res.ok) throw new Error("Failed to fetch metric query");
+      return res.json();
+    },
+    enabled: !!params.clientId && (params.enabled ?? true),
   });
 }
 

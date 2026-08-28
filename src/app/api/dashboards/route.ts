@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDashboard, upsertDashboard } from "@/lib/data/dashboards";
 import { DASHBOARD_CONFIG_VERSION } from "@/lib/dashboard/types";
+import { validateWidgetConfig } from "@/lib/dashboard/widget-schemas";
 import { requireAgencyRole, requireClientAccess, requireUser } from "@/lib/auth/guard";
 import { withRoute } from "@/lib/http/with-route";
 
@@ -73,6 +74,20 @@ export const PUT = withRoute("dashboards.PUT", async (request: NextRequest) => {
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid dashboard payload", details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  // Per-widget config validation (strict for "custom", shared `filters` shape
+  // for every other known type). Keyed by widget instance id.
+  const widgetIssues: Record<string, string[]> = {};
+  for (const widget of parsed.data.config.widgets) {
+    const result = validateWidgetConfig(widget.type, widget.config);
+    if (!result.ok) widgetIssues[widget.i] = result.issues;
+  }
+  if (Object.keys(widgetIssues).length > 0) {
+    return NextResponse.json(
+      { error: "Invalid widget config", details: widgetIssues },
       { status: 400 }
     );
   }

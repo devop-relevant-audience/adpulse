@@ -11,13 +11,14 @@ import { WIDGET_LIST, type WidgetDefinition } from "@/lib/dashboard/widget-regis
 import type { NewWidgetSpec } from "@/store/dashboard-store";
 
 const CATEGORY_LABELS: Record<WidgetDefinition["category"], string> = {
+  custom: "Custom",
   metrics: "Metrics",
   charts: "Charts",
   attribution: "Attribution & Revenue",
   other: "Other",
 };
 
-const CATEGORY_ORDER: WidgetDefinition["category"][] = ["metrics", "charts", "attribution", "other"];
+const CATEGORY_ORDER: WidgetDefinition["category"][] = ["custom", "metrics", "charts", "attribution", "other"];
 
 interface WidgetCatalogDialogProps {
   open: boolean;

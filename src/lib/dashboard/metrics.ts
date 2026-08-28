@@ -4,15 +4,15 @@
 import type { PeriodSummary } from "@/lib/data/queries";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 
-export type MetricFormat = "currency" | "number" | "percent";
+export type MetricFormat = "currency" | "number" | "percent" | "ratio";
 
 export interface MetricOption {
   value: string;
   label: string;
   /** Key into ComparisonResult.current / .previous (PeriodSummary). */
   summaryKey: keyof PeriodSummary;
-  /** Key into the daily-trend row (getDailyTrend). */
-  trendKey: "spend" | "conversions" | "clicks" | "impressions" | "ctr" | "cpc" | "cpa";
+  /** Key into the daily-trend row (getDailyTrend). Undefined = the trend endpoint has no per-day series for this metric. */
+  trendKey?: "spend" | "conversions" | "clicks" | "impressions" | "ctr" | "cpc" | "cpa";
   format: MetricFormat;
   /** For metrics where lower is better (CPA/CPC/CPM), a decrease is "good". */
   invert: boolean;
@@ -28,7 +28,9 @@ export const METRIC_OPTIONS: MetricOption[] = [
   { value: "cpc", label: "CPC", summaryKey: "avgCpc", trendKey: "cpc", format: "currency", invert: true, color: "#ec4899" },
   { value: "clicks", label: "Clicks", summaryKey: "totalClicks", trendKey: "clicks", format: "number", invert: false, color: "#06b6d4" },
   { value: "impressions", label: "Impressions", summaryKey: "totalImpressions", trendKey: "impressions", format: "number", invert: false, color: "#64748b" },
-  { value: "cpm", label: "CPM", summaryKey: "avgCpm", trendKey: "cpc", format: "currency", invert: true, color: "#f97316" },
+  { value: "cpm", label: "CPM", summaryKey: "avgCpm", trendKey: undefined, format: "currency", invert: true, color: "#f97316" },
+  { value: "revenue", label: "Revenue", summaryKey: "totalRevenue", trendKey: undefined, format: "currency", invert: false, color: "#0d9488" },
+  { value: "roas", label: "ROAS", summaryKey: "avgRoas", trendKey: undefined, format: "ratio", invert: false, color: "#7c3aed" },
 ];
 
 export function getMetricOption(value: string): MetricOption {
@@ -43,5 +45,7 @@ export function formatMetric(value: number, format: MetricFormat, currency?: str
       return formatPercent(value);
     case "number":
       return formatNumber(value);
+    case "ratio":
+      return Number.isFinite(value) ? `${value.toFixed(2)}x` : "—";
   }
 }

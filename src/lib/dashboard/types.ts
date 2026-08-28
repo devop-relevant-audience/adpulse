@@ -16,6 +16,7 @@ export const WIDGET_TYPES = [
   "attribution-mini",
   "ltv-cac",
   "note",
+  "custom",
 ] as const;
 
 export type WidgetType = (typeof WIDGET_TYPES)[number];

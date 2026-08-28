@@ -1,6 +1,6 @@
 "use client";
 
-import { BiHash, BiLineChart, BiBarChartAlt2, BiNote, BiTable, BiPulse, BiFilterAlt, BiDollar, BiGitBranch, BiGroup } from "react-icons/bi";
+import { BiHash, BiLineChart, BiBarChartAlt2, BiNote, BiTable, BiPulse, BiFilterAlt, BiDollar, BiGitBranch, BiGroup, BiSliderAlt } from "react-icons/bi";
 import type {
   WidgetType,
   WidgetRenderProps,
@@ -19,8 +19,14 @@ import { FunnelWidget } from "@/components/dashboard/widgets/funnel-widget";
 import { RevenueRoasWidget } from "@/components/dashboard/widgets/revenue-roas-widget";
 import { AttributionMiniWidget } from "@/components/dashboard/widgets/attribution-mini-widget";
 import { LtvCacWidget } from "@/components/dashboard/widgets/ltv-cac-widget";
+import { CustomWidget, CustomWidgetConfigForm } from "@/components/dashboard/widgets/custom-widget";
+import {
+  DEFAULT_CUSTOM_CONFIG,
+  describeCustomWidget,
+  normalizeCustomConfig,
+} from "@/lib/dashboard/custom-widget";
 
-export type WidgetCategory = "metrics" | "charts" | "attribution" | "other";
+export type WidgetCategory = "custom" | "metrics" | "charts" | "attribution" | "other";
 
 export interface WidgetDefinition {
   type: WidgetType;
@@ -37,11 +43,30 @@ export interface WidgetDefinition {
   getTitle?: (config: Record<string, unknown>) => string;
   /** Widget reads config.filters via useWidgetScope; the config dialog shows the shared filter form. */
   supportsFilters?: boolean;
+  /** Config dialog width; "xl" for builders with a live preview. Defaults to "md". */
+  configDialogSize?: "md" | "xl";
 }
 
 // Registered widgets. Stage 2 appends the remaining catalog entries
 // (campaign table, health gauge, funnel, revenue/ROAS, attribution, LTV).
 export const WIDGET_LIST: WidgetDefinition[] = [
+  {
+    type: "custom",
+    title: "Custom widget",
+    description: "Pick metrics, split by platform or campaign, show as number, line, bar or table.",
+    icon: BiSliderAlt,
+    category: "custom",
+    defaultSize: { w: 6, h: 7, minW: 3, minH: 3 },
+    defaultConfig: { ...DEFAULT_CUSTOM_CONFIG },
+    Render: CustomWidget,
+    ConfigForm: CustomWidgetConfigForm,
+    supportsFilters: true,
+    configDialogSize: "xl",
+    getTitle: (c) => {
+      const cfg = normalizeCustomConfig(c);
+      return cfg.title ?? describeCustomWidget(cfg);
+    },
+  },
   {
     type: "kpi",
     title: "KPI Stat",
@@ -57,6 +82,7 @@ export const WIDGET_LIST: WidgetDefinition[] = [
       const map: Record<string, string> = {
         spend: "Spend", conversions: "Conversions", cpa: "CPA", ctr: "CTR",
         cpc: "CPC", clicks: "Clicks", impressions: "Impressions", cpm: "CPM",
+        revenue: "Revenue", roas: "ROAS",
       };
       return map[String(c.metric)] ?? "KPI";
     },

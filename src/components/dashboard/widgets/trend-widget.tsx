@@ -19,8 +19,8 @@ import { METRIC_OPTIONS, getMetricOption } from "@/lib/dashboard/metrics";
 import type { WidgetRenderProps, WidgetConfigFormProps } from "@/lib/dashboard/types";
 
 // Trend uses the daily-trend row keys, so only metrics with a real per-day
-// series are offered (excludes CPM, which the trend endpoint doesn't return).
-const TREND_METRICS = METRIC_OPTIONS.filter((m) => m.value !== "cpm");
+// series are offered (excludes CPM/revenue/ROAS, which the trend endpoint doesn't return).
+const TREND_METRICS = METRIC_OPTIONS.filter((m) => m.trendKey);
 
 function readMetrics(config: Record<string, unknown>): string[] {
   const raw = config.metrics;
@@ -32,7 +32,7 @@ function readMetrics(config: Record<string, unknown>): string[] {
 export function TrendWidget({ config }: WidgetRenderProps) {
   const { clientId, dateRange, platforms, campaignIds } = useWidgetScope(config);
 
-  const metrics = readMetrics(config).map(getMetricOption);
+  const metrics = readMetrics(config).map(getMetricOption).filter((m) => m.trendKey);
 
   const { data, isLoading, isError, refetch } = useDailyTrend({
     clientId,
@@ -76,7 +76,7 @@ export function TrendWidget({ config }: WidgetRenderProps) {
               <Line
                 key={m.value}
                 type="monotone"
-                dataKey={m.trendKey}
+                dataKey={m.trendKey ?? m.value}
                 name={m.label}
                 stroke={m.color}
                 strokeWidth={2}

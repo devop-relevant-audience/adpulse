@@ -47,10 +47,13 @@ export function WidgetConfigDialog({
   const def = getWidget(instance.type);
   const ConfigForm = def?.ConfigForm;
   const supportsFilters = def?.supportsFilters === true;
+  // DialogContent bakes in `sm:max-w-sm`, so the wide variant must override at
+  // the same breakpoint or it is ignored on desktop.
+  const sizeClass = def?.configDialogSize === "xl" ? "max-w-4xl sm:max-w-4xl" : "max-w-md";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className={sizeClass}>
         <DialogHeader>
           <DialogTitle>Configure {def?.title ?? "widget"}</DialogTitle>
         </DialogHeader>

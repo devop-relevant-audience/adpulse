@@ -5,6 +5,23 @@ import { z } from "zod";
 import { requireClientAccess, requireUser } from "@/lib/auth/guard";
 import { withRoute } from "@/lib/http/with-route";
 import type { Platform } from "@/lib/types/database";
+import { runMetricQuery } from "@/lib/data/metric-query";
+import {
+  QUERY_GROUP_BYS,
+  QUERY_MAX_LIMIT,
+  QUERY_METRICS,
+  QUERY_SORT_DIRS,
+  QUERY_TIME_BUCKETS,
+} from "@/lib/dashboard/custom-widget";
+
+// Extra params for `action=query` (custom widget aggregation).
+const querySchema = z.object({
+  groupBy: z.enum(QUERY_GROUP_BYS).default("none"),
+  timeBucket: z.enum(QUERY_TIME_BUCKETS).default("none"),
+  limit: z.coerce.number().int().min(1).max(QUERY_MAX_LIMIT).optional(),
+  sortBy: z.enum(QUERY_METRICS).optional(),
+  sortDir: z.enum(QUERY_SORT_DIRS).optional(),
+});
 
 const metricsSchema = z.object({
   clientId: z.string().uuid(),
@@ -115,6 +132,35 @@ export const GET = withRoute("metrics.GET", async (request: NextRequest) => {
     case "health": {
       const health = await calculateHealthScore(params);
       return NextResponse.json(health);
+    }
+
+    case "query": {
+      const query = querySchema.safeParse({
+        groupBy: searchParams.get("groupBy") || undefined,
+        timeBucket: searchParams.get("timeBucket") || undefined,
+        limit: searchParams.get("limit") || undefined,
+        sortBy: searchParams.get("sortBy") || undefined,
+        sortDir: searchParams.get("sortDir") || undefined,
+      });
+      if (!query.success) {
+        return NextResponse.json(
+          { error: "Invalid query parameters", details: query.error.flatten() },
+          { status: 400 }
+        );
+      }
+      const result = await runMetricQuery({
+        clientId: params.clientId,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        platforms: params.platforms,
+        campaignIds: params.campaignIds,
+        groupBy: query.data.groupBy,
+        timeBucket: query.data.timeBucket,
+        limit: query.data.limit,
+        sortBy: query.data.sortBy,
+        sortDir: query.data.sortDir,
+      });
+      return NextResponse.json(result);
     }
 
     case "compare-campaigns": {
