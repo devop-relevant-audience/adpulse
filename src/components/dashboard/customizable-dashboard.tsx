@@ -5,6 +5,7 @@ import "react-resizable/css/styles.css";
 import "./dashboard-grid.css";
 
 import { useEffect, useMemo, useState } from "react";
+import type { NewWidgetSpec } from "@/store/dashboard-store";
 import {
   ResponsiveGridLayout,
   useContainerWidth,
@@ -60,6 +61,35 @@ export function CustomizableDashboard() {
 
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [configuringId, setConfiguringId] = useState<string | null>(null);
+  // New widgets land at the bottom of the grid, usually below the fold — track
+  // the last-added id so we can scroll it into view and flash it once rendered.
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+
+  function handleAddWidget(spec: NewWidgetSpec) {
+    setJustAddedId(addWidget(spec));
+  }
+
+  // Scroll the freshly added widget into view. RGL renders a new item one
+  // commit after the draft updates (it mirrors layouts into internal state),
+  // so the element may not exist yet when this effect first runs — retry
+  // briefly. The flash class itself is applied declaratively via the
+  // `highlight` prop on WidgetFrame, so RGL re-renders can't wipe it.
+  useEffect(() => {
+    if (!justAddedId) return;
+    let attempts = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const tryScroll = () => {
+      const el = document.querySelector(`[data-widget-id="${CSS.escape(justAddedId)}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      else if (attempts++ < 20) retryTimer = setTimeout(tryScroll, 50);
+    };
+    tryScroll();
+    const flashTimer = setTimeout(() => setJustAddedId(null), 1800);
+    return () => {
+      clearTimeout(flashTimer);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [justAddedId]);
 
   // Leaving edit mode when the client changes avoids editing a stale draft.
   useEffect(() => {
@@ -197,10 +227,11 @@ export function CustomizableDashboard() {
             onLayoutChange={handleLayoutChange}
           >
             {config.widgets.map((w) => (
-              <div key={w.i}>
+              <div key={w.i} data-widget-id={w.i}>
                 <WidgetFrame
                   instance={w}
                   editMode={editMode}
+                  highlight={w.i === justAddedId}
                   onConfigure={setConfiguringId}
                   onRemove={removeWidget}
                 />
@@ -210,7 +241,7 @@ export function CustomizableDashboard() {
         </div>
       )}
 
-      <WidgetCatalogDialog open={catalogOpen} onOpenChange={setCatalogOpen} onAdd={addWidget} />
+      <WidgetCatalogDialog open={catalogOpen} onOpenChange={setCatalogOpen} onAdd={handleAddWidget} />
       <WidgetConfigDialog
         instance={configuring}
         currentWidth={configuringWidth}

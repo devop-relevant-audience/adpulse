@@ -25,7 +25,8 @@ interface DashboardEditState {
   cancelEdit: () => void;
   endEdit: () => void;
   setLayouts: (layouts: DashboardLayouts) => void;
-  addWidget: (spec: NewWidgetSpec) => void;
+  /** Adds the widget to the draft and returns its new instance id. */
+  addWidget: (spec: NewWidgetSpec) => string;
   removeWidget: (i: string) => void;
   updateWidgetConfig: (i: string, config: Record<string, unknown>) => void;
   resizeWidget: (i: string, w: number) => void;
@@ -55,10 +56,10 @@ export const useDashboardStore = create<DashboardEditState>((set) => ({
   setLayouts: (layouts) =>
     set((s) => (s.draft ? { draft: { ...s.draft, layouts }, isDirty: true } : s)),
 
-  addWidget: (spec) =>
+  addWidget: (spec) => {
+    const i = newId(spec.type);
     set((s) => {
       if (!s.draft) return s;
-      const i = newId(spec.type);
       const widgets = [...s.draft.widgets, { i, type: spec.type, config: { ...spec.defaultConfig } }];
 
       // Drop the new item at the bottom of each breakpoint (RGL compacts up).
@@ -78,7 +79,9 @@ export const useDashboardStore = create<DashboardEditState>((set) => ({
         layouts[bp] = [...existing, item];
       }
       return { draft: { ...s.draft, widgets, layouts }, isDirty: true };
-    }),
+    });
+    return i;
+  },
 
   removeWidget: (i) =>
     set((s) => {

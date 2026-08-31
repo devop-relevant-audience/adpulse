@@ -37,11 +37,13 @@ class WidgetErrorBoundary extends React.Component<
 interface WidgetFrameProps {
   instance: WidgetInstance;
   editMode: boolean;
+  /** One-shot "just added" flash (see dashboard-grid.css). */
+  highlight?: boolean;
   onConfigure: (i: string) => void;
   onRemove: (i: string) => void;
 }
 
-export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: WidgetFrameProps) {
+export function WidgetFrame({ instance, editMode, highlight, onConfigure, onRemove }: WidgetFrameProps) {
   const def = getWidget(instance.type);
 
   if (!def) {
@@ -58,7 +60,7 @@ export function WidgetFrame({ instance, editMode, onConfigure, onRemove }: Widge
   const canConfigure = Boolean(def.ConfigForm || def.supportsFilters);
 
   return (
-    <Panel className="h-full w-full flex flex-col overflow-hidden group/widget">
+    <Panel className={cn("h-full w-full flex flex-col overflow-hidden group/widget", highlight && "widget-just-added")}>
       <div
         className={cn(
           "flex items-center gap-1.5 px-3 h-8 shrink-0 border-b border-hairline/60",

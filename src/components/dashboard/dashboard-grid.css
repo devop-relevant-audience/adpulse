@@ -11,6 +11,20 @@
   transition: transform 180ms ease, width 180ms ease, height 180ms ease;
 }
 
+/* One-shot flash on a freshly added widget so the user sees where it landed. */
+.widget-just-added {
+  animation: widget-added-pulse 1.5s ease-out;
+  border-radius: 12px;
+}
+@keyframes widget-added-pulse {
+  0% {
+    box-shadow: 0 0 0 3px var(--color-primary);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
 /* Disable transitions while actively dragging/resizing for snappiness. */
 .react-grid-item.react-draggable-dragging,
 .react-grid-item.resizing {
