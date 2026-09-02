@@ -5,37 +5,13 @@ import { useWidgetScope } from "@/hooks/use-widget-scope";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { formatNumber } from "@/lib/format";
+import type { FunnelStage } from "@/lib/data/queries";
 import type { WidgetRenderProps } from "@/lib/dashboard/types";
 
 const STAGE_COLORS = ["#6366f1", "#f59e0b", "#10b981"];
 
-export function FunnelWidget({ config }: WidgetRenderProps) {
-  const { clientId, dateRange, platforms, campaignIds } = useWidgetScope(config);
-
-  const { data: funnelData, isLoading, isError, refetch } = useFunnel({
-    clientId,
-    startDate: dateRange.start,
-    endDate: dateRange.end,
-    platforms,
-    campaignIds,
-  });
-
-  if (!clientId || isLoading) {
-    return (
-      <div className="h-full w-full flex flex-col justify-center gap-2 px-1">
-        <Skeleton className="h-6 w-full" />
-        <Skeleton className="h-6 w-full" />
-        <Skeleton className="h-6 w-full" />
-      </div>
-    );
-  }
-
-  if (isError) return <QueryError compact onRetry={() => refetch()} />;
-
-  const stages = funnelData?.overall ?? [];
-  if (stages.length === 0)
-    return <div className="h-full grid place-items-center text-xs text-ink-muted">No funnel data</div>;
-
+/** Pure render half — also used by the frozen view-report renderer. */
+export function FunnelStages({ stages }: { stages: FunnelStage[] }) {
   const maxVolume = stages[0].volume || 1;
 
   return (
@@ -65,4 +41,34 @@ export function FunnelWidget({ config }: WidgetRenderProps) {
       })}
     </div>
   );
+}
+
+export function FunnelWidget({ config }: WidgetRenderProps) {
+  const { clientId, dateRange, platforms, campaignIds } = useWidgetScope(config);
+
+  const { data: funnelData, isLoading, isError, refetch } = useFunnel({
+    clientId,
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    platforms,
+    campaignIds,
+  });
+
+  if (!clientId || isLoading) {
+    return (
+      <div className="h-full w-full flex flex-col justify-center gap-2 px-1">
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-full" />
+      </div>
+    );
+  }
+
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
+
+  const stages = funnelData?.overall ?? [];
+  if (stages.length === 0)
+    return <div className="h-full grid place-items-center text-xs text-ink-muted">No funnel data</div>;
+
+  return <FunnelStages stages={stages} />;
 }

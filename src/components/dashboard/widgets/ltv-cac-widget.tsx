@@ -10,6 +10,7 @@ import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
 import { PLATFORM_LABELS_SHORT as PLATFORM_LABELS } from "@/lib/dashboard/chart-theme";
+import type { CohortAnalysis } from "@/lib/data/attribution";
 import type { Platform } from "@/lib/types/database";
 
 // Neutral chart series ramp (blue, teal, violet) — distinguishable and on-brand.
@@ -19,30 +20,16 @@ const PLATFORM_COLORS: Record<Platform, string> = {
   tiktok: "var(--chart-3)",
 };
 
-export function LtvCacWidget() {
-  const { formatCurrency } = useCurrencyFormat();
-  const clientId = useAppStore((s) => s.selectedClientId);
-  const dateRange = useAppStore((s) => s.dateRange);
-  const platform = useAppStore((s) => s.selectedPlatform);
-  // LTV:CAC comes from customer_cohorts, which is fabricated demo data — not
-  // available for live (non-demo) clients yet.
-  const isNonDemo = useSelectedClient()?.is_demo === false;
-
-  const { data, isLoading, isError, refetch } = useCohortAnalysis({
-    clientId: isNonDemo ? null : clientId,
-    startDate: dateRange.start,
-    endDate: dateRange.end,
-    platform,
-  });
-
-  if (isNonDemo) return <DemoOnlyWidgetPlaceholder label="LTV : CAC is demo-only for now" />;
-  if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
-  if (isError) return <QueryError compact onRetry={() => refetch()} />;
-  if (!data || data.cohorts.length === 0)
-    return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
-
-  const byLtvCac = [...data.cohorts].sort((a, b) => b.ltvCacRatio - a.ltvCacRatio);
-  const byDay0Roas = [...data.cohorts].sort((a, b) => b.day0Roas - a.day0Roas);
+/** Pure render half — also used by the frozen view-report renderer. */
+export function LtvCacReadout({
+  analysis,
+  formatCurrency,
+}: {
+  analysis: CohortAnalysis;
+  formatCurrency: (value: number) => string;
+}) {
+  const byLtvCac = [...analysis.cohorts].sort((a, b) => b.ltvCacRatio - a.ltvCacRatio);
+  const byDay0Roas = [...analysis.cohorts].sort((a, b) => b.day0Roas - a.day0Roas);
   const maxRatio = Math.max(...byLtvCac.map((c) => c.ltvCacRatio), 1);
   const leadersDiffer = byLtvCac[0]?.platform !== byDay0Roas[0]?.platform;
 
@@ -84,4 +71,29 @@ export function LtvCacWidget() {
       )}
     </div>
   );
+}
+
+export function LtvCacWidget() {
+  const { formatCurrency } = useCurrencyFormat();
+  const clientId = useAppStore((s) => s.selectedClientId);
+  const dateRange = useAppStore((s) => s.dateRange);
+  const platform = useAppStore((s) => s.selectedPlatform);
+  // LTV:CAC comes from customer_cohorts, which is fabricated demo data — not
+  // available for live (non-demo) clients yet.
+  const isNonDemo = useSelectedClient()?.is_demo === false;
+
+  const { data, isLoading, isError, refetch } = useCohortAnalysis({
+    clientId: isNonDemo ? null : clientId,
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    platform,
+  });
+
+  if (isNonDemo) return <DemoOnlyWidgetPlaceholder label="LTV : CAC is demo-only for now" />;
+  if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
+  if (!data || data.cohorts.length === 0)
+    return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
+
+  return <LtvCacReadout analysis={data} formatCurrency={formatCurrency} />;
 }

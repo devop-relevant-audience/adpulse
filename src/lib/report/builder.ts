@@ -358,7 +358,7 @@ async function generateNarratives(ctx: NarrativeContext): Promise<ReportData["na
         "X-Title": "AdPulse",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-3.7-flash",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
       }),

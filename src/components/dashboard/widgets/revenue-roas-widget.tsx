@@ -8,6 +8,36 @@ import { DemoOnlyWidgetPlaceholder } from "@/components/dashboard/demo-only";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { useCurrencyFormat } from "@/hooks/use-currency-format";
+import type { RevenueOverview } from "@/lib/data/attribution";
+
+/** Pure render half — also used by the frozen view-report renderer. */
+export function RevenueRoasReadout({
+  overview,
+  formatCurrency,
+}: {
+  overview: RevenueOverview;
+  formatCurrency: (value: number) => string;
+}) {
+  return (
+    <div className="h-full w-full flex flex-col justify-center px-1">
+      <p className="text-[12px] font-medium text-ink-muted">Blended ROAS</p>
+      <p className="text-2xl font-semibold tracking-tight text-ink leading-tight truncate mt-1">
+        {overview.blended.roas.toFixed(2)}x
+      </p>
+      <div className="flex items-center gap-2 mt-2 text-[11px] text-ink-muted flex-wrap">
+        <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 font-semibold px-1.5 py-0.5 rounded">
+          <BiTrendingUp className="w-3 h-3" />
+          {formatCurrency(overview.blended.revenue)}
+        </span>
+        <span className="truncate">AOV {formatCurrency(overview.blended.aov)}</span>
+      </div>
+      <p className="flex items-center gap-1 text-[11px] text-amber-600 mt-2 truncate">
+        <BiError className="w-3 h-3 shrink-0" />
+        {overview.overAttribution.inflationPct.toFixed(0)}% over-attributed by platforms
+      </p>
+    </div>
+  );
+}
 
 export function RevenueRoasWidget() {
   const { formatCurrency } = useCurrencyFormat();
@@ -42,23 +72,5 @@ export function RevenueRoasWidget() {
   if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!data) return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
 
-  return (
-    <div className="h-full w-full flex flex-col justify-center px-1">
-      <p className="text-[12px] font-medium text-ink-muted">Blended ROAS</p>
-      <p className="text-2xl font-semibold tracking-tight text-ink leading-tight truncate mt-1">
-        {data.blended.roas.toFixed(2)}x
-      </p>
-      <div className="flex items-center gap-2 mt-2 text-[11px] text-ink-muted flex-wrap">
-        <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 font-semibold px-1.5 py-0.5 rounded">
-          <BiTrendingUp className="w-3 h-3" />
-          {formatCurrency(data.blended.revenue)}
-        </span>
-        <span className="truncate">AOV {formatCurrency(data.blended.aov)}</span>
-      </div>
-      <p className="flex items-center gap-1 text-[11px] text-amber-600 mt-2 truncate">
-        <BiError className="w-3 h-3 shrink-0" />
-        {data.overAttribution.inflationPct.toFixed(0)}% over-attributed by platforms
-      </p>
-    </div>
-  );
+  return <RevenueRoasReadout overview={data} formatCurrency={formatCurrency} />;
 }

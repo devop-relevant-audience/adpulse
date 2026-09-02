@@ -64,7 +64,11 @@ const PRESET: PresetEntry[] = [
 
 export function buildDefaultDashboard(name = "Default"): DashboardConfig {
   return {
+    // No id: this preset is not a saved view until someone saves it.
+    id: null,
     name,
+    visibility: "internal",
+    isDefault: true,
     version: DASHBOARD_CONFIG_VERSION,
     widgets: PRESET.map((p) => ({ ...p.widget, config: { ...p.widget.config } })),
     layouts: {

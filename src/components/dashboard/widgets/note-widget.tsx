@@ -2,6 +2,7 @@
 
 import ReactMarkdown from "react-markdown";
 import { Textarea } from "@/components/ui/textarea";
+import { ConfigSection } from "@/components/dashboard/config-ui";
 import type { WidgetRenderProps, WidgetConfigFormProps } from "@/lib/dashboard/types";
 
 function readText(config: Record<string, unknown>): string {
@@ -26,14 +27,13 @@ export function NoteWidget({ config }: WidgetRenderProps) {
 
 export function NoteConfigForm({ config, onChange }: WidgetConfigFormProps) {
   return (
-    <div className="space-y-2">
-      <label className="text-xs font-medium text-ink-secondary">Note (Markdown supported)</label>
+    <ConfigSection title="Note" hint="Markdown supported">
       <Textarea
         value={readText(config)}
         onChange={(e) => onChange({ ...config, text: e.target.value })}
         placeholder="e.g. **Q3 focus:** shift budget to Google brand search…"
         rows={6}
       />
-    </div>
+    </ConfigSection>
   );
 }

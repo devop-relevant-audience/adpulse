@@ -7,6 +7,7 @@ import { reports } from "@/lib/db/schema";
 import { keysToCamel, keysToSnake } from "@/lib/db/case";
 import { requireAgencyRole, requireUser } from "@/lib/auth/guard";
 import { withRoute } from "@/lib/http/with-route";
+import { isViewSnapshot, stripInternalProvenance } from "@/lib/reports/view-snapshot";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import type { ReportRow } from "@/lib/types/database";
 
@@ -165,5 +166,12 @@ export const GET = withRoute("reports.share.GET", async (request: NextRequest) =
     comparisonRange: { start: report.comparison_start, end: report.comparison_end },
     narrative: report.narrative,
     metricsSummary: report.metrics_summary,
+    // Only reached once the token, expiry and password checks above have all
+    // passed. NULL for a classic report; the public view branches on it. The
+    // reader here is anonymous, so the internal view/layout ids come off it —
+    // the same strip the report list applies to a non-agency reader.
+    viewSnapshot: isViewSnapshot(report.view_snapshot)
+      ? stripInternalProvenance(report.view_snapshot)
+      : report.view_snapshot,
   });
 });

@@ -168,6 +168,113 @@ export async function listCampaigns(clientId: string, platform?: Platform) {
   return Array.from(uniqueMap.values());
 }
 
+export interface ClientDataFacts {
+  /** Distinct platforms with at least one row in the range. */
+  platforms: string[];
+  /** False when every row in the range has NULL revenue (value tracking off). */
+  hasRevenue: boolean;
+  campaignCount: number;
+  rowCount: number;
+  /** The client's whole data span — only looked up when the range is empty. */
+  dataStart: string | null;
+  dataEnd: string | null;
+}
+
+/**
+ * What data the client actually has in a date range, in one aggregate pass over
+ * the `(client_id, date)` index. Feeds the Builder Assistant's prompt so it does
+ * not offer a revenue chart to a client without revenue tracking, or a platform
+ * breakdown with nothing behind it.
+ */
+export async function getClientDataFacts(params: {
+  clientId: string;
+  startDate: string;
+  endDate: string;
+}): Promise<ClientDataFacts> {
+  const [facts] = await db
+    .select({
+      platforms: sql<string[] | null>`array_agg(distinct ${campaignPerformance.platform})`,
+      hasRevenue: sql<boolean>`coalesce(bool_or(${campaignPerformance.revenue} is not null), false)`,
+      campaignCount: sql<number>`count(distinct ${campaignPerformance.campaignId})::int`.mapWith(Number),
+      rowCount: sql<number>`count(*)::int`.mapWith(Number),
+    })
+    .from(campaignPerformance)
+    .where(
+      and(
+        eq(campaignPerformance.clientId, params.clientId),
+        gte(campaignPerformance.date, params.startDate),
+        lte(campaignPerformance.date, params.endDate)
+      )
+    );
+
+  const rowCount = facts?.rowCount ?? 0;
+  const base: ClientDataFacts = {
+    platforms: facts?.platforms ?? [],
+    hasRevenue: facts?.hasRevenue ?? false,
+    campaignCount: facts?.campaignCount ?? 0,
+    rowCount,
+    dataStart: null,
+    dataEnd: null,
+  };
+  if (rowCount > 0) return base;
+
+  // Only worth a second scan when the range is empty: the answer is then "which
+  // range WOULD work", which needs the client's whole span.
+  const [span] = await db
+    .select({
+      // ::text — a bare date aggregate comes back from the driver as a Date,
+      // and every date in this app is a "YYYY-MM-DD" string.
+      dataStart: sql<string | null>`min(${campaignPerformance.date})::text`,
+      dataEnd: sql<string | null>`max(${campaignPerformance.date})::text`,
+    })
+    .from(campaignPerformance)
+    .where(eq(campaignPerformance.clientId, params.clientId));
+
+  return { ...base, dataStart: span?.dataStart ?? null, dataEnd: span?.dataEnd ?? null };
+}
+
+/** Default cap on the ranked campaign lookup — enough to resolve any name the user types. */
+export const RANKED_CAMPAIGN_LIMIT = 50;
+
+/**
+ * Campaigns ranked by spend over a date range. Deliberately NOT a replacement
+ * for `listCampaigns`: that one feeds the UI filter pickers and the chat
+ * fallback, which need the client's complete, undated campaign list. This one is
+ * for the Builder Assistant, where "my three biggest spenders" has to be
+ * answerable without guessing.
+ */
+export async function listCampaignsBySpend(params: {
+  clientId: string;
+  startDate: string;
+  endDate: string;
+  platform?: Platform;
+  limit?: number;
+}) {
+  const conditions = [
+    eq(campaignPerformance.clientId, params.clientId),
+    gte(campaignPerformance.date, params.startDate),
+    lte(campaignPerformance.date, params.endDate),
+  ];
+  if (params.platform) {
+    conditions.push(eq(campaignPerformance.platform, params.platform));
+  }
+
+  const spend = sql<number>`coalesce(sum(${campaignPerformance.spend}), 0)`;
+  return db
+    .select({
+      campaign_id: campaignPerformance.campaignId,
+      // A campaign can be renamed mid-range; one row per campaign_id either way.
+      campaign_name: sql<string>`max(${campaignPerformance.campaignName})`,
+      platform: sql<string>`min(${campaignPerformance.platform})`,
+      spend: spend.mapWith(Number),
+    })
+    .from(campaignPerformance)
+    .where(and(...conditions))
+    .groupBy(campaignPerformance.campaignId)
+    .orderBy(desc(spend))
+    .limit(params.limit ?? RANKED_CAMPAIGN_LIMIT);
+}
+
 export interface PeriodSummary {
   totalImpressions: number;
   totalClicks: number;

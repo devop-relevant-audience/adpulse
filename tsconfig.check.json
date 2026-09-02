@@ -1,0 +1,16 @@
+// Typecheck config for `npm run check`.
+//
+// Identical to tsconfig.json except that it does NOT read Next's generated
+// route-type validators out of `.next/`. Those files are written by the running
+// dev server, so a CLI typecheck can catch them mid-write and fail on a syntax
+// error in generated code that has nothing to do with the change being checked.
+// The editor still uses tsconfig.json (with the Next plugin), so route-type
+// feedback is not lost where it is actually useful.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.mts"],
+  "exclude": ["node_modules", ".next"]
+}

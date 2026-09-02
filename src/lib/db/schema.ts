@@ -27,7 +27,13 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import type { DashboardLayouts, WidgetInstance } from "@/lib/dashboard/types";
+import type {
+  DashboardLayouts,
+  DashboardVisibility,
+  WidgetInstance,
+  WidgetType,
+} from "@/lib/dashboard/types";
+import type { ViewSnapshot } from "@/lib/reports/view-snapshot";
 
 // All AdPulse-owned tables live in this schema, isolated from Atlas's `public`.
 export const adpulseSchema = pgSchema("adpulse");
@@ -212,6 +218,10 @@ export const reports = adpulseSchema.table("reports", {
   shareToken: text("share_token"),
   sharePasswordHash: text("share_password_hash"),
   shareExpiresAt: timestamp("share_expires_at", { withTimezone: true, mode: "string" }),
+  // NULL = a classic narrative report. Set = a frozen snapshot of a dashboard
+  // view (layouts + inlined widget config + precomputed data); the renderer
+  // reads only this and never re-queries, so the numbers never move.
+  viewSnapshot: jsonb("view_snapshot").$type<ViewSnapshot>(),
 }, (table) => [
   index("idx_reports_client").on(table.clientId),
   uniqueIndex("idx_reports_share_token").on(table.shareToken).where(sql`${table.shareToken} IS NOT NULL`),
@@ -417,20 +427,99 @@ export const customerCohorts = adpulseSchema.table(
 );
 
 // --- Customizable dashboards ---
-// Per-client saved dashboard layouts. `layouts`/`widgets` are nested JSON that
-// crosses the case boundary untouched (their inner keys stay camelCase).
+// Per-client saved dashboard views (many named views per client).
+// `visibility` decides whether a client_user can see the view; `isDefault`
+// marks the one view a client opens on, enforced by a partial unique index.
+// `layouts`/`widgets` are nested JSON that crosses the case boundary untouched
+// (their inner keys stay camelCase).
 export const dashboards = adpulseSchema.table("dashboards", {
   id: uuid("id").primaryKey().defaultRandom(),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   name: text("name").notNull().default("Default"),
-  isDefault: boolean("is_default").notNull().default(true),
+  visibility: text("visibility").$type<DashboardVisibility>().notNull().default("internal"),
+  isDefault: boolean("is_default").notNull().default(false),
   layouts: jsonb("layouts").$type<DashboardLayouts>().notNull().default({ lg: [], md: [], sm: [] }),
   widgets: jsonb("widgets").$type<WidgetInstance[]>().notNull().default([]),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
 }, (table) => [
+  check("dashboards_visibility_check", sql`(${table.visibility} = ANY (ARRAY['internal'::text, 'client'::text]))`),
   uniqueIndex("dashboards_client_name_idx").on(table.clientId, table.name),
+  uniqueIndex("dashboards_client_default_idx").on(table.clientId).where(sql`${table.isDefault}`),
+  // Usage lookups do `widgets @> '[{"savedWidgetId":"…"}]'` containment.
+  index("dashboards_widgets_gin_idx").using("gin", sql`${table.widgets} jsonb_path_ops`),
+]);
+
+// Agency-wide library of reusable widgets. A dashboard instance that links to
+// one stores `{ i, type, savedWidgetId }` and NO config: the library row is the
+// single source of truth, hydrated into the view on read. Not client-scoped.
+export const savedWidgets = adpulseSchema.table("saved_widgets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  widgetType: text("widget_type").$type<WidgetType>().notNull(),
+  config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("saved_widgets_name_idx").on(sql`lower(${table.name})`),
+]);
+
+// Agency-wide dashboard templates: a snapshot of one view's layouts + widgets,
+// not tied to any client, used to stamp the same view onto a new client.
+// `widgets` is the STORED form (a linked instance keeps only its
+// `savedWidgetId` pointer), so a view created from a template stays linked to
+// the library row.
+export const dashboardTemplates = adpulseSchema.table("dashboard_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  layouts: jsonb("layouts").$type<DashboardLayouts>().notNull(),
+  widgets: jsonb("widgets").$type<WidgetInstance[]>().notNull(),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("dashboard_templates_name_idx").on(sql`lower(${table.name})`),
+  // Saved-widget usage/detach does `widgets @> '[{"savedWidgetId":"…"}]'`.
+  index("dashboard_templates_widgets_gin_idx").using("gin", sql`${table.widgets} jsonb_path_ops`),
+]);
+
+// --- Report builder ---
+// A report layout is the editable structure of a report for one client — the
+// same grid vocabulary as a dashboard view, in the same STORED widget form
+// (linked instances keep only their `savedWidgetId` pointer). Unlike dashboards
+// there is no visibility and no default: layouts are agency-internal, and what
+// a client sees is the generated report (reports.view_snapshot).
+export const reportLayouts = adpulseSchema.table("report_layouts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  layouts: jsonb("layouts").$type<DashboardLayouts>().notNull(),
+  widgets: jsonb("widgets").$type<WidgetInstance[]>().notNull(),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("report_layouts_client_name_idx").on(table.clientId, table.name),
+  // Saved-widget usage/detach does `widgets @> '[{"savedWidgetId":"…"}]'`.
+  index("report_layouts_widgets_gin_idx").using("gin", sql`${table.widgets} jsonb_path_ops`),
+]);
+
+// Agency-wide report templates: a snapshot of one report layout's structure,
+// not tied to any client. Mirrors dashboardTemplates.
+export const reportTemplates = adpulseSchema.table("report_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  layouts: jsonb("layouts").$type<DashboardLayouts>().notNull(),
+  widgets: jsonb("widgets").$type<WidgetInstance[]>().notNull(),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("report_templates_name_idx").on(sql`lower(${table.name})`),
+  index("report_templates_widgets_gin_idx").using("gin", sql`${table.widgets} jsonb_path_ops`),
 ]);
 
 // --- Auth & tenancy ---

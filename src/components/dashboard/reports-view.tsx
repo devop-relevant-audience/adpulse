@@ -35,9 +35,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { BiFile, BiTime, BiPlus, BiTrash, BiSend, BiX, BiCalendar, BiRefresh, BiEnvelope, BiPencil } from "react-icons/bi";
+import { BiFile, BiTime, BiPlus, BiTrash, BiSend, BiX, BiCalendar, BiRefresh, BiEnvelope, BiPencil, BiArrowBack, BiLink } from "react-icons/bi";
 import { format, parseISO } from "date-fns";
-import type { ReportScheduleRow, ReportScheduleInsert, ScheduleFrequency, DateRangeType } from "@/lib/types/database";
+import { useSelectedClient } from "@/hooks/use-selected-client";
+import { NewViewReportDialog } from "@/components/reports/new-view-report-dialog";
+import { GenerateReportDialog } from "@/components/reports/generate-report-dialog";
+import { ReportLayoutEditor } from "@/components/reports/report-layout-editor";
+import { ReportLayoutsPanel } from "@/components/reports/report-layouts-panel";
+import { ViewReport, ViewReportHeader } from "@/components/reports/view-report";
+import { ShareDialog } from "@/components/report/share-dialog";
+import { isViewSnapshot } from "@/lib/reports/view-snapshot";
+import type { ReportLayoutSummary } from "@/lib/dashboard/types";
+import type { ReportRow, ReportScheduleRow, ReportScheduleInsert, ScheduleFrequency, DateRangeType } from "@/lib/types/database";
 
 const FREQUENCY_LABELS: Record<ScheduleFrequency, string> = {
   daily: "Daily", weekly: "Weekly", biweekly: "Biweekly",
@@ -291,9 +300,20 @@ export function ReportsView() {
   // Scheduled deliveries are managed via agency-only APIs. A client_user keeps
   // report viewing + export, but never the schedules tab.
   const canManageSchedules = isAgencyRole(me?.profile.role);
+  // Share links are written by the agency-only reports/share API.
+  const canShare = isAgencyRole(me?.profile.role);
+  // Report layouts and templates are agency-internal on every verb.
+  const canManageLayouts = isAgencyRole(me?.profile.role);
+  const client = useSelectedClient();
   const [tab, setTab] = useState<"reports" | "schedules">("reports");
   const [showForm, setShowForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ReportScheduleRow | undefined>();
+  const [showViewReportForm, setShowViewReportForm] = useState(false);
+  const [openReport, setOpenReport] = useState<ReportRow | null>(null);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  // The layout whose blocks are being edited — the editor replaces this view.
+  const [editingLayout, setEditingLayout] = useState<ReportLayoutSummary | null>(null);
+  const [generatingLayout, setGeneratingLayout] = useState<ReportLayoutSummary | null>(null);
 
   const { data: reports, isLoading: reportsLoading, isError: reportsError, refetch: refetchReports } = useGeneratedReports(clientId);
   const { data: schedules, isLoading: schedulesLoading, isError: schedulesError, refetch: refetchSchedules } = useReportSchedules(clientId);
@@ -303,6 +323,63 @@ export function ReportsView() {
 
   if (!clientId) {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-[300px] w-full" /></div>;
+  }
+
+  // Editing a layout takes over the whole view (no route of its own).
+  if (canManageLayouts && editingLayout) {
+    return (
+      <ReportLayoutEditor
+        clientId={clientId}
+        layoutId={editingLayout.id}
+        layoutName={editingLayout.name}
+        onBack={() => setEditingLayout(null)}
+      />
+    );
+  }
+
+  const openSnapshot = isViewSnapshot(openReport?.view_snapshot) ? openReport.view_snapshot : null;
+
+  if (openReport && openSnapshot) {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 shrink-0"
+              onClick={() => { setOpenReport(null); setShowShareDialog(false); }}
+            >
+              <BiArrowBack className="w-3.5 h-3.5" /> Back
+            </Button>
+            <ViewReportHeader title={openReport.title} snapshot={openSnapshot} />
+          </div>
+          {canShare && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 shrink-0"
+              onClick={() => setShowShareDialog(true)}
+            >
+              <BiLink className="w-3.5 h-3.5" /> Share link
+            </Button>
+          )}
+        </div>
+
+        <ViewReport snapshot={openSnapshot} />
+
+        {showShareDialog && (
+          <ShareDialog
+            target={{
+              kind: "view",
+              reportId: openReport.id,
+              clientName: client?.name ?? openReport.title,
+            }}
+            onClose={() => setShowShareDialog(false)}
+          />
+        )}
+      </div>
+    );
   }
 
   return (
@@ -333,8 +410,21 @@ export function ReportsView() {
         </div>
       )}
 
+      {tab === "reports" && canManageLayouts && (
+        <ReportLayoutsPanel
+          clientId={clientId}
+          onEdit={setEditingLayout}
+          onGenerate={setGeneratingLayout}
+        />
+      )}
+
       {tab === "reports" && (
         <div className="space-y-3">
+          <div className="flex items-center justify-end">
+            <Button size="sm" onClick={() => setShowViewReportForm(true)} className="gap-1.5">
+              <BiPlus className="w-3.5 h-3.5" /> New report from view
+            </Button>
+          </div>
           {reportsLoading && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
           {!reportsLoading && reportsError && (
             <QueryError onRetry={() => refetchReports()} message="Couldn't load reports" />
@@ -346,20 +436,35 @@ export function ReportsView() {
               <p className="text-[12px] text-ink-muted mt-1">Use the Export Report button on the dashboard to generate one.</p>
             </div>
           )}
-          {reports?.map((report) => (
-            <Panel key={report.id} className="p-4 flex items-center gap-4">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <BiFile className="w-4 h-4 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-[14px] font-medium text-ink truncate">{report.title}</h4>
-                <p className="text-[12px] text-ink-muted">
-                  {format(parseISO(report.date_range_start), "MMM d")} — {format(parseISO(report.date_range_end), "MMM d, yyyy")}
-                  {" "}&middot;{" "}Generated {format(parseISO(report.created_at), "MMM d, yyyy")}
-                </p>
-              </div>
-            </Panel>
-          ))}
+          {reports?.map((report) => {
+            // Only view reports are openable — a classic report has no stored
+            // body to render, it exists to be exported or shared.
+            const snapshot = isViewSnapshot(report.view_snapshot) ? report.view_snapshot : null;
+            return (
+              <Panel key={report.id} className="p-4 flex items-center gap-4">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <BiFile className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-[14px] font-medium text-ink truncate">{report.title}</h4>
+                  <p className="text-[12px] text-ink-muted">
+                    {format(parseISO(report.date_range_start), "MMM d")} — {format(parseISO(report.date_range_end), "MMM d, yyyy")}
+                    {" "}&middot;{" "}Generated {format(parseISO(report.created_at), "MMM d, yyyy")}
+                  </p>
+                </div>
+                {snapshot && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setOpenReport(report)}
+                  >
+                    Open
+                  </Button>
+                )}
+              </Panel>
+            );
+          })}
         </div>
       )}
 
@@ -464,6 +569,32 @@ export function ReportsView() {
           clientId={clientId}
           initial={editingSchedule}
           onClose={() => setShowForm(false)}
+        />
+      )}
+
+      {generatingLayout && (
+        <GenerateReportDialog
+          clientId={clientId}
+          layoutId={generatingLayout.id}
+          layoutName={generatingLayout.name}
+          onClose={() => setGeneratingLayout(null)}
+          onCreated={(report) => {
+            setGeneratingLayout(null);
+            refetchReports();
+            setOpenReport(report);
+          }}
+        />
+      )}
+
+      {showViewReportForm && (
+        <NewViewReportDialog
+          clientId={clientId}
+          onClose={() => setShowViewReportForm(false)}
+          onCreated={(report) => {
+            setShowViewReportForm(false);
+            refetchReports();
+            setOpenReport(report);
+          }}
         />
       )}
     </div>

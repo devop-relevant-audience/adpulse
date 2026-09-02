@@ -13,7 +13,7 @@ import { currencySymbol } from '@/lib/format';
 import { format, subDays } from 'date-fns';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'google/gemini-3-flash-preview';
+const MODEL = 'google/gemini-3.7-flash';
 
 // Abort any single OpenRouter request that stalls past this window so a hung
 // upstream can't wedge the route (which is itself bounded by maxDuration below).

@@ -2,12 +2,17 @@
 
 import { useMemo } from "react";
 import { useAppStore } from "@/store/app-store";
-import { hasWidgetFilters, readWidgetFilters } from "@/lib/dashboard/filters";
+import {
+  hasWidgetFilters,
+  readWidgetFilters,
+  resolveWidgetDateRange,
+} from "@/lib/dashboard/filters";
 import type { WidgetFilters } from "@/lib/dashboard/types";
 import type { Platform } from "@/lib/types/database";
 
 export interface WidgetScope {
   clientId: string | null;
+  /** Effective range: the widget's pinned override, else the page's date picker. */
   dateRange: { start: string; end: string };
   /** Effective platform filter: widget override, else the global selector wrapped in an array, else undefined. */
   platforms: Platform[] | undefined;
@@ -21,11 +26,13 @@ export interface WidgetScope {
 /**
  * Combines the page-level selection (client, date range, platform) with the
  * widget's own `config.filters`. A non-empty widget platform list replaces the
- * global platform selector; campaign ids only ever come from the widget.
+ * global platform selector, a pinned `dateRange` replaces the page range
+ * (presets resolve on every render, so they stay rolling); campaign ids only
+ * ever come from the widget.
  */
 export function useWidgetScope(config: Record<string, unknown>): WidgetScope {
   const clientId = useAppStore((s) => s.selectedClientId);
-  const dateRange = useAppStore((s) => s.dateRange);
+  const pageDateRange = useAppStore((s) => s.dateRange);
   const selectedPlatform = useAppStore((s) => s.selectedPlatform);
 
   return useMemo<WidgetScope>(() => {
@@ -38,12 +45,12 @@ export function useWidgetScope(config: Record<string, unknown>): WidgetScope {
     const platform = platforms && platforms.length === 1 ? platforms[0] : undefined;
     return {
       clientId,
-      dateRange,
+      dateRange: resolveWidgetDateRange(filters.dateRange) ?? pageDateRange,
       platforms,
       platform,
       campaignIds: filters.campaignIds,
       filters,
       hasWidgetFilters: hasWidgetFilters(filters),
     };
-  }, [config, clientId, dateRange, selectedPlatform]);
+  }, [config, clientId, pageDateRange, selectedPlatform]);
 }

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { format, subDays } from "date-fns";
 import type { Platform } from "@/lib/types/database";
+import type { CompareMode } from "@/lib/dashboard/date-presets";
 
 export const VIEWS = {
   dashboard: "dashboard",
@@ -48,37 +49,54 @@ export interface ReferenceContext {
 interface AppState {
   selectedClientId: string | null;
   dateRange: { start: string; end: string };
+  compareMode: CompareMode;
   selectedPlatform: Platform | undefined;
   referenceContext: ReferenceContext | null;
+  /**
+   * The two right-hand panels share one fixed slot (and the <main> margin that
+   * pushes the page aside), so at most one is ever open: every setter below
+   * closes the other.
+   */
   isChatOpen: boolean;
+  isBuilderOpen: boolean;
 
   setSelectedClientId: (id: string) => void;
   setDateRange: (range: { start: string; end: string }) => void;
+  setCompareMode: (mode: CompareMode) => void;
   setSelectedPlatform: (platform: Platform | undefined) => void;
   setReferenceContext: (ctx: ReferenceContext | null) => void;
   toggleChat: () => void;
   setChatOpen: (open: boolean) => void;
+  setBuilderOpen: (open: boolean) => void;
 }
 
+// 30 days ending yesterday — presets never include today's partial data.
 function getDefaultDateRange() {
   const today = new Date();
   return {
     start: format(subDays(today, 30), "yyyy-MM-dd"),
-    end: format(today, "yyyy-MM-dd"),
+    end: format(subDays(today, 1), "yyyy-MM-dd"),
   };
 }
 
 export const useAppStore = create<AppState>((set) => ({
   selectedClientId: null,
   dateRange: getDefaultDateRange(),
+  compareMode: "none",
   selectedPlatform: undefined,
   referenceContext: null,
   isChatOpen: false,
+  isBuilderOpen: false,
 
   setSelectedClientId: (id) => set({ selectedClientId: id }),
   setDateRange: (range) => set({ dateRange: range }),
+  setCompareMode: (mode) => set({ compareMode: mode }),
   setSelectedPlatform: (platform) => set({ selectedPlatform: platform }),
-  setReferenceContext: (ctx) => set({ referenceContext: ctx, isChatOpen: true }),
-  toggleChat: () => set((s) => ({ isChatOpen: !s.isChatOpen })),
-  setChatOpen: (open) => set({ isChatOpen: open }),
+  setReferenceContext: (ctx) =>
+    set({ referenceContext: ctx, isChatOpen: true, isBuilderOpen: false }),
+  toggleChat: () =>
+    set((s) => (s.isChatOpen ? { isChatOpen: false } : { isChatOpen: true, isBuilderOpen: false })),
+  setChatOpen: (open) => set(open ? { isChatOpen: true, isBuilderOpen: false } : { isChatOpen: false }),
+  setBuilderOpen: (open) =>
+    set(open ? { isBuilderOpen: true, isChatOpen: false } : { isBuilderOpen: false }),
 }));

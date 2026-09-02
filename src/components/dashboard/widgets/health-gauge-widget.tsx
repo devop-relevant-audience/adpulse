@@ -69,6 +69,27 @@ function MiniGauge({ score, grade }: { score: number; grade: HealthScoreResult["
   );
 }
 
+/** Pure render half — also used by the frozen view-report renderer. */
+export function HealthGaugeReadout({ health }: { health: HealthScoreResult }) {
+  const topRecommendations = health.recommendations.slice(0, 2);
+
+  return (
+    <div className="h-full w-full flex flex-col items-center justify-center gap-2 overflow-auto py-1">
+      <MiniGauge score={health.overallScore} grade={health.grade} />
+      {topRecommendations.length > 0 && (
+        <div className="w-full space-y-1 px-1">
+          {topRecommendations.map((rec, i) => (
+            <div key={i} className="flex items-start gap-1.5 text-left">
+              <BiSolidMagicWand className="w-3 h-3 text-primary mt-0.5 shrink-0" />
+              <p className="text-[11px] text-ink-muted leading-snug line-clamp-2">{rec}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function HealthGaugeWidget({ config }: WidgetRenderProps) {
   const { clientId, dateRange, platforms, campaignIds } = useWidgetScope(config);
 
@@ -92,21 +113,5 @@ export function HealthGaugeWidget({ config }: WidgetRenderProps) {
   if (isError) return <QueryError compact onRetry={() => refetch()} />;
   if (!healthData) return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
 
-  const topRecommendations = healthData.recommendations.slice(0, 2);
-
-  return (
-    <div className="h-full w-full flex flex-col items-center justify-center gap-2 overflow-auto py-1">
-      <MiniGauge score={healthData.overallScore} grade={healthData.grade} />
-      {topRecommendations.length > 0 && (
-        <div className="w-full space-y-1 px-1">
-          {topRecommendations.map((rec, i) => (
-            <div key={i} className="flex items-start gap-1.5 text-left">
-              <BiSolidMagicWand className="w-3 h-3 text-primary mt-0.5 shrink-0" />
-              <p className="text-[11px] text-ink-muted leading-snug line-clamp-2">{rec}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  return <HealthGaugeReadout health={healthData} />;
 }

@@ -231,7 +231,12 @@ export function TrendChart() {
                 if (!metric) return [String(value), String(name)];
                 const prefix = metric.isCurrency ? symbol : "";
                 const suffix = "suffix" in metric ? (metric as { suffix: string }).suffix : "";
-                return [`${prefix}${Number(value).toLocaleString()}${suffix}`, metric.label];
+                // At most one decimal (none from 100 up) — no raw float noise.
+                const n = Number(value);
+                const rounded = n.toLocaleString(undefined, {
+                  maximumFractionDigits: Math.abs(n) >= 100 ? 0 : 1,
+                });
+                return [`${prefix}${rounded}${suffix}`, metric.label];
               }}
             />
 

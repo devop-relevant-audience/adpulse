@@ -9,6 +9,7 @@ import { DemoOnlyWidgetPlaceholder } from "@/components/dashboard/demo-only";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryError } from "@/components/ui/query-error";
 import { PLATFORM_COLORS, PLATFORM_LABELS_SHORT } from "@/lib/dashboard/chart-theme";
+import type { AttributionComparison } from "@/lib/data/attribution";
 import type { WidgetRenderProps } from "@/lib/dashboard/types";
 import type { Platform, AttributionModel } from "@/lib/types/database";
 
@@ -23,49 +24,42 @@ const chartTooltipStyle = {
   padding: "8px 12px",
 };
 
-function readModel(config: Record<string, unknown>, key: string, fallback: AttributionModel): AttributionModel {
+export function readModel(
+  config: Record<string, unknown>,
+  key: string,
+  fallback: AttributionModel
+): AttributionModel {
   const v = config[key];
   return typeof v === "string" ? (v as AttributionModel) : fallback;
 }
 
-export function AttributionMiniWidget({ config }: WidgetRenderProps) {
-  const clientId = useAppStore((s) => s.selectedClientId);
-  const dateRange = useAppStore((s) => s.dateRange);
-  const platform = useAppStore((s) => s.selectedPlatform);
+/** Pure render half — also used by the frozen view-report renderer. */
+export function AttributionMiniChart({
+  comparison,
+  modelA,
+  modelB,
+}: {
+  comparison: AttributionComparison;
+  modelA: AttributionModel;
+  modelB: AttributionModel;
+}) {
+  const a = comparison.models.find((m) => m.model === modelA);
+  const b = comparison.models.find((m) => m.model === modelB);
+  const labelA = a?.label ?? "First Touch";
+  const labelB = b?.label ?? "Last Touch";
 
-  const modelA = readModel(config, "modelA", "first_touch");
-  const modelB = readModel(config, "modelB", "last_touch");
-  // Multi-touch attribution comes from attribution_journeys, which is
-  // fabricated demo data — not available for live (non-demo) clients yet.
-  const isNonDemo = useSelectedClient()?.is_demo === false;
-
-  const { data, isLoading, isError, refetch } = useAttributionComparison({
-    clientId: isNonDemo ? null : clientId,
-    startDate: dateRange.start,
-    endDate: dateRange.end,
-    platform,
-  });
-
-  const chartData = useMemo(() => {
-    if (!data) return [];
-    const a = data.models.find((m) => m.model === modelA);
-    const b = data.models.find((m) => m.model === modelB);
-    return PLATFORMS.map((p) => ({
-      platform: PLATFORM_LABELS_SHORT[p],
-      color: PLATFORM_COLORS[p],
-      [a?.label ?? "Model A"]: Number((a?.credit.find((c) => c.platform === p)?.sharePct ?? 0).toFixed(1)),
-      [b?.label ?? "Model B"]: Number((b?.credit.find((c) => c.platform === p)?.sharePct ?? 0).toFixed(1)),
-    }));
-  }, [data, modelA, modelB]);
-
-  const labelA = data?.models.find((m) => m.model === modelA)?.label ?? "First Touch";
-  const labelB = data?.models.find((m) => m.model === modelB)?.label ?? "Last Touch";
-
-  if (isNonDemo) return <DemoOnlyWidgetPlaceholder label="Attribution models are demo-only for now" />;
-  if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
-  if (isError) return <QueryError compact onRetry={() => refetch()} />;
-  if (!data || chartData.length === 0)
-    return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
+  // Recharts re-renders the whole chart when `data` is a new array, so keep it
+  // stable across the parent's unrelated renders.
+  const chartData = useMemo(
+    () =>
+      PLATFORMS.map((p) => ({
+        platform: PLATFORM_LABELS_SHORT[p],
+        color: PLATFORM_COLORS[p],
+        [labelA]: Number((a?.credit.find((c) => c.platform === p)?.sharePct ?? 0).toFixed(1)),
+        [labelB]: Number((b?.credit.find((c) => c.platform === p)?.sharePct ?? 0).toFixed(1)),
+      })),
+    [a, b, labelA, labelB]
+  );
 
   return (
     <div className="h-full w-full flex flex-col">
@@ -100,4 +94,30 @@ export function AttributionMiniWidget({ config }: WidgetRenderProps) {
       </div>
     </div>
   );
+}
+
+export function AttributionMiniWidget({ config }: WidgetRenderProps) {
+  const clientId = useAppStore((s) => s.selectedClientId);
+  const dateRange = useAppStore((s) => s.dateRange);
+  const platform = useAppStore((s) => s.selectedPlatform);
+
+  const modelA = readModel(config, "modelA", "first_touch");
+  const modelB = readModel(config, "modelB", "last_touch");
+  // Multi-touch attribution comes from attribution_journeys, which is
+  // fabricated demo data — not available for live (non-demo) clients yet.
+  const isNonDemo = useSelectedClient()?.is_demo === false;
+
+  const { data, isLoading, isError, refetch } = useAttributionComparison({
+    clientId: isNonDemo ? null : clientId,
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    platform,
+  });
+
+  if (isNonDemo) return <DemoOnlyWidgetPlaceholder label="Attribution models are demo-only for now" />;
+  if (!clientId || isLoading) return <Skeleton className="h-full w-full" />;
+  if (isError) return <QueryError compact onRetry={() => refetch()} />;
+  if (!data) return <div className="h-full grid place-items-center text-xs text-ink-muted">No data</div>;
+
+  return <AttributionMiniChart comparison={data} modelA={modelA} modelB={modelB} />;
 }

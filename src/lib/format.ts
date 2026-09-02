@@ -47,13 +47,27 @@ export function currencySymbol(currency: string = DEFAULT_CURRENCY): string {
 
 /**
  * Human-readable count. Abbreviates thousands (K) and millions (M); smaller
- * values fall back to locale grouping. Non-finite input renders as "—".
+ * values fall back to locale grouping, rounded to at most one decimal (none
+ * from 100 up) so fractional conversions never print float noise like
+ * "7.366099999999999". Non-finite input renders as "—".
  */
 export function formatNumber(n: number): string {
   if (!Number.isFinite(n)) return "—";
   if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
+  return n.toLocaleString(undefined, { maximumFractionDigits: Math.abs(n) >= 100 ? 0 : 1 });
+}
+
+/**
+ * Drop the still-accumulating current day from a dated series. A chart whose
+ * range ends today would otherwise always end in a steep fake dropoff (today
+ * only has a few hours of data). "Today" is the runtime's local date — the
+ * viewer's browser date on the client, the server date inside report
+ * snapshots. Rows without a date (un-bucketed totals) pass through untouched.
+ */
+export function excludeCurrentDay<T extends { date?: string | null }>(rows: T[]): T[] {
+  const today = new Date().toLocaleDateString("en-CA"); // yyyy-MM-dd
+  return rows.filter((r) => r.date !== today);
 }
 
 /**

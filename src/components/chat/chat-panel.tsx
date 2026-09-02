@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -400,41 +401,43 @@ export function ChatPanel() {
                 New chat
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel>Recent chats</DropdownMenuLabel>
-              {sessions.length === 0 ? (
-                <div className="px-1.5 py-1.5 text-[12px] text-ink-muted">
-                  No past chats
-                </div>
-              ) : (
-                sessions.map((s) => (
-                  <div
-                    key={s.id}
-                    className={cn(
-                      "group/session flex items-center gap-1 rounded-md pl-1.5 pr-1 py-1 text-sm",
-                      s.id === sessionId
-                        ? "bg-accent text-accent-foreground"
-                        : "hover:bg-accent/60"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => switchSession(s.id)}
-                      className="flex-1 min-w-0 truncate text-left text-[13px] text-ink hover:text-ink"
-                      title={s.title}
-                    >
-                      {s.title || "Untitled chat"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteSession(s.id)}
-                      aria-label={`Delete chat: ${s.title || "Untitled chat"}`}
-                      className="shrink-0 p-1 rounded text-ink-muted opacity-0 group-hover/session:opacity-100 hover:text-destructive transition-opacity"
-                    >
-                      <BiTrash className="w-3.5 h-3.5" />
-                    </button>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Recent chats</DropdownMenuLabel>
+                {sessions.length === 0 ? (
+                  <div className="px-1.5 py-1.5 text-[12px] text-ink-muted">
+                    No past chats
                   </div>
-                ))
-              )}
+                ) : (
+                  sessions.map((s) => (
+                    <div
+                      key={s.id}
+                      className={cn(
+                        "group/session flex items-center gap-1 rounded-md pl-1.5 pr-1 py-1 text-sm",
+                        s.id === sessionId
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-accent/60"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => switchSession(s.id)}
+                        className="flex-1 min-w-0 truncate text-left text-[13px] text-ink hover:text-ink"
+                        title={s.title}
+                      >
+                        {s.title || "Untitled chat"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteSession(s.id)}
+                        aria-label={`Delete chat: ${s.title || "Untitled chat"}`}
+                        className="shrink-0 p-1 rounded text-ink-muted opacity-0 group-hover/session:opacity-100 hover:text-destructive transition-opacity"
+                      >
+                        <BiTrash className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button

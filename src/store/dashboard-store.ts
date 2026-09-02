@@ -1,122 +1,49 @@
 import { create } from "zustand";
-import type {
-  DashboardConfig,
-  DashboardLayouts,
-  GridItem,
-  WidgetType,
-} from "@/lib/dashboard/types";
-import { BREAKPOINTS, DASHBOARD_CONFIG_VERSION } from "@/lib/dashboard/types";
+import type { DashboardConfig } from "@/lib/dashboard/types";
+import { DASHBOARD_CONFIG_VERSION } from "@/lib/dashboard/types";
+import { createGridEditSlice, type GridEditState } from "@/store/grid-edit-store";
 
-// A widget definition, minus the React bits — passed in by the catalog so this
-// store never imports the (client-only) widget registry.
-export interface NewWidgetSpec {
-  type: WidgetType;
-  defaultSize: { w: number; h: number; minW: number; minH: number };
-  defaultConfig: Record<string, unknown>;
-}
+// The dashboard's edit state: the shared grid-edit slice (draft/dirty/add/
+// remove/resize — see `grid-edit-store.ts`) plus the one thing that is
+// dashboard-only, the per-client view selection.
 
-interface DashboardEditState {
-  editMode: boolean;
-  /** Working copy while editing; null when viewing (render the saved config). */
-  draft: DashboardConfig | null;
-  isDirty: boolean;
+export type { NewWidgetSpec, WidgetLinkChange } from "@/store/grid-edit-store";
 
-  beginEdit: (config: DashboardConfig) => void;
-  cancelEdit: () => void;
-  endEdit: () => void;
-  setLayouts: (layouts: DashboardLayouts) => void;
-  /** Adds the widget to the draft and returns its new instance id. */
-  addWidget: (spec: NewWidgetSpec) => string;
-  removeWidget: (i: string) => void;
-  updateWidgetConfig: (i: string, config: Record<string, unknown>) => void;
-  resizeWidget: (i: string, w: number) => void;
-}
-
-function clone(config: DashboardConfig): DashboardConfig {
-  return JSON.parse(JSON.stringify(config)) as DashboardConfig;
-}
-
-function newId(type: WidgetType): string {
-  const rand =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID().slice(0, 8)
-      : Math.random().toString(36).slice(2, 10);
-  return `${type}-${rand}`;
+interface DashboardEditState extends GridEditState<DashboardConfig> {
+  /**
+   * Which saved view the dashboard shows, PER CLIENT. A missing entry (or
+   * `null`) = that client's default view, resolved server-side. Keyed by client
+   * so switching clients yields the new client's own selection during render —
+   * no effect, so no request ever goes out with client B and a view id from A.
+   */
+  selectedViewByClient: Record<string, string | null>;
+  selectView: (clientId: string | null, id: string | null) => void;
 }
 
 export const useDashboardStore = create<DashboardEditState>((set) => ({
-  editMode: false,
-  draft: null,
-  isDirty: false,
+  ...createGridEditSlice<DashboardConfig>(set),
 
-  beginEdit: (config) => set({ editMode: true, draft: clone(config), isDirty: false }),
-  cancelEdit: () => set({ editMode: false, draft: null, isDirty: false }),
-  endEdit: () => set({ editMode: false, draft: null, isDirty: false }),
+  selectedViewByClient: {},
 
-  setLayouts: (layouts) =>
-    set((s) => (s.draft ? { draft: { ...s.draft, layouts }, isDirty: true } : s)),
-
-  addWidget: (spec) => {
-    const i = newId(spec.type);
-    set((s) => {
-      if (!s.draft) return s;
-      const widgets = [...s.draft.widgets, { i, type: spec.type, config: { ...spec.defaultConfig } }];
-
-      // Drop the new item at the bottom of each breakpoint (RGL compacts up).
-      const layouts = { ...s.draft.layouts };
-      for (const bp of BREAKPOINTS) {
-        const existing = s.draft.layouts[bp] ?? [];
-        const maxY = existing.reduce((m, it) => Math.max(m, it.y + it.h), 0);
-        const item: GridItem = {
-          i,
-          x: 0,
-          y: maxY,
-          w: spec.defaultSize.w,
-          h: spec.defaultSize.h,
-          minW: spec.defaultSize.minW,
-          minH: spec.defaultSize.minH,
-        };
-        layouts[bp] = [...existing, item];
-      }
-      return { draft: { ...s.draft, widgets, layouts }, isDirty: true };
-    });
-    return i;
-  },
-
-  removeWidget: (i) =>
-    set((s) => {
-      if (!s.draft) return s;
-      const widgets = s.draft.widgets.filter((w) => w.i !== i);
-      const layouts = { ...s.draft.layouts };
-      for (const bp of BREAKPOINTS) {
-        layouts[bp] = (s.draft.layouts[bp] ?? []).filter((it) => it.i !== i);
-      }
-      return { draft: { ...s.draft, widgets, layouts }, isDirty: true };
-    }),
-
-  updateWidgetConfig: (i, config) =>
-    set((s) => {
-      if (!s.draft) return s;
-      const widgets = s.draft.widgets.map((w) => (w.i === i ? { ...w, config } : w));
-      return { draft: { ...s.draft, widgets }, isDirty: true };
-    }),
-
-  resizeWidget: (i, w) =>
-    set((s) => {
-      if (!s.draft) return s;
-      const layouts = { ...s.draft.layouts };
-      for (const bp of BREAKPOINTS) {
-        layouts[bp] = (s.draft.layouts[bp] ?? []).map((it) =>
-          it.i === i ? { ...it, w: Math.min(w, bp === "lg" ? 12 : bp === "md" ? 8 : 4) } : it
-        );
-      }
-      return { draft: { ...s.draft, layouts }, isDirty: true };
-    }),
+  // Switching views drops any in-progress edit — the draft belongs to the view
+  // that was open when editing started.
+  selectView: (clientId, id) =>
+    set((s) => ({
+      selectedViewByClient: clientId
+        ? { ...s.selectedViewByClient, [clientId]: id }
+        : s.selectedViewByClient,
+      editMode: false,
+      draft: null,
+      isDirty: false,
+    })),
 }));
 
 export function emptyDashboard(name = "My Dashboard"): DashboardConfig {
   return {
+    id: null,
     name,
+    visibility: "internal",
+    isDefault: false,
     version: DASHBOARD_CONFIG_VERSION,
     widgets: [],
     layouts: { lg: [], md: [], sm: [] },

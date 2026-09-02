@@ -12,6 +12,7 @@ import {
   QUERY_METRICS,
   QUERY_SORT_DIRS,
   QUERY_TIME_BUCKETS,
+  parseThreshold,
 } from "@/lib/dashboard/custom-widget";
 
 // Extra params for `action=query` (custom widget aggregation).
@@ -148,6 +149,14 @@ export const GET = withRoute("metrics.GET", async (request: NextRequest) => {
           { status: 400 }
         );
       }
+      // Malformed rather than absent: charting the unfiltered groups would
+      // quietly answer a different question than the widget asked.
+      const thresholdRaw = searchParams.get("threshold");
+      const threshold = parseThreshold(thresholdRaw);
+      if (thresholdRaw && !threshold) {
+        return NextResponse.json({ error: "Invalid threshold" }, { status: 400 });
+      }
+
       const result = await runMetricQuery({
         clientId: params.clientId,
         startDate: params.startDate,
@@ -159,6 +168,7 @@ export const GET = withRoute("metrics.GET", async (request: NextRequest) => {
         limit: query.data.limit,
         sortBy: query.data.sortBy,
         sortDir: query.data.sortDir,
+        ...(threshold ? { threshold } : {}),
       });
       return NextResponse.json(result);
     }

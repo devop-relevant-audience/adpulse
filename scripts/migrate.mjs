@@ -26,7 +26,9 @@ import postgres from "postgres";
 
 loadEnv({ path: ".env.local" });
 
-const { DATABASE_URL } = process.env;
+// DDL prefers the direct (unpooled) Neon endpoint when one is configured; the
+// pooled endpoint works too but transaction-mode pooling is a poor fit for DDL.
+const DATABASE_URL = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   console.error("DATABASE_URL is not set (check .env.local).");
   process.exit(1);

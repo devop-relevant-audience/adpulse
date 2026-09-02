@@ -757,7 +757,10 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
                   <CartesianGrid stroke={CHART_GRID} strokeDasharray="none" vertical={false} />
                   <XAxis dataKey="day" tick={{ fontSize: 10, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: CHART_AXIS_TEXT }} axisLine={false} tickLine={false} width={55} tickFormatter={(v) => chartMetric === "spend" ? formatCurrency(v) : formatNum(v)} />
-                  <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #e6e6e6", borderRadius: "10px", fontSize: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "10px 14px" }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "white", border: "1px solid #e6e6e6", borderRadius: "10px", fontSize: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "10px 14px" }}
+                    formatter={(value) => (chartMetric === "spend" ? formatCurrency(Number(value)) : formatNum(Number(value)))}
+                  />
                   <Area type="monotone" dataKey="periodA" stroke="#0075de" strokeWidth={2} fill="url(#period-a-grad)" dot={false} activeDot={{ r: 4, fill: "#0075de", stroke: "white", strokeWidth: 2 }} name="Period A" connectNulls />
                   <Line type="monotone" dataKey="periodB" stroke="#16a34a" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 4, fill: "#16a34a", stroke: "white", strokeWidth: 2 }} name="Period B" connectNulls />
                 </ComposedChart>

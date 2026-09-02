@@ -31,15 +31,23 @@ export const PLATFORM_LABELS_SHORT: Record<Platform, string> = {
  * attribution models). Deliberately excludes red / green / amber, which are
  * reserved for good/bad status signaling below — so a series color never
  * reads as an alarm.
+ *
+ * Ten slots so a top-10 campaign breakdown gets distinct colors. Assign by
+ * index in this fixed order (validated so consecutive entries stay apart for
+ * normal vision); identity is always backed by a labeled legend + tooltip,
+ * never color alone.
  */
 export const SERIES_PALETTE = [
   "#2563eb", // blue
-  "#7c3aed", // violet
-  "#0891b2", // cyan
   "#db2777", // pink
   "#0d9488", // teal
-  "#4f46e5", // indigo
+  "#7c3aed", // violet
+  "#0891b2", // cyan
   "#c026d3", // fuchsia
+  "#4f46e5", // indigo
+  "#9d174d", // dark rose
+  "#0e7490", // dark cyan
+  "#a21caf", // dark fuchsia
 ];
 
 // Semantic status colors — use ONLY to signal good / warning / bad.

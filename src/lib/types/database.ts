@@ -1,3 +1,5 @@
+import type { ViewSnapshot } from "@/lib/reports/view-snapshot";
+
 export interface ClientRow {
   id: string;
   name: string;
@@ -192,6 +194,8 @@ export interface ReportRow {
   share_token: string | null;
   share_password_hash: string | null;
   share_expires_at: string | null;
+  // NULL = classic narrative report; set = frozen dashboard-view snapshot.
+  view_snapshot: ViewSnapshot | null;
   created_at: string;
 }
 
@@ -208,6 +212,7 @@ export interface ReportInsert {
   share_token?: string | null;
   share_password_hash?: string | null;
   share_expires_at?: string | null;
+  view_snapshot?: ViewSnapshot | null;
   created_at?: string;
 }
 
@@ -508,6 +513,8 @@ export interface DashboardRow {
   id: string;
   client_id: string;
   name: string;
+  /** 'internal' = agency only; 'client' = published to the client. */
+  visibility: string;
   is_default: boolean;
   layouts: unknown;
   widgets: unknown;
@@ -520,7 +527,109 @@ export interface DashboardInsert {
   id?: string;
   client_id: string;
   name?: string;
+  visibility?: string;
   is_default?: boolean;
+  layouts: unknown;
+  widgets: unknown;
+  version?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// --- Saved widget library ---
+// Agency-wide (NOT client-scoped) reusable widgets. Dashboard views reference a
+// row by id and store no inline config, so an edit here changes every view.
+// `config` is a nested JSON blob (same widget config shape the dashboard uses).
+export interface SavedWidgetRow {
+  id: string;
+  name: string;
+  /** A `WidgetType` value; typed loosely here to avoid a types↔dashboard cycle. */
+  widget_type: string;
+  config: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedWidgetInsert {
+  id?: string;
+  name: string;
+  widget_type: string;
+  config?: unknown;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// --- Dashboard templates ---
+// Agency-wide (NOT client-scoped) snapshots of a whole view, used to create a
+// view for any client. `widgets` is the stored form, so linked saved widgets
+// stay pointers and a view stamped from a template stays in sync with them.
+export interface DashboardTemplateRow {
+  id: string;
+  name: string;
+  description: string;
+  layouts: unknown;
+  widgets: unknown;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DashboardTemplateInsert {
+  id?: string;
+  name: string;
+  description?: string;
+  layouts: unknown;
+  widgets: unknown;
+  version?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// --- Report builder ---
+// Per-client report layouts: the editable block structure of a report, in the
+// same grid/widget vocabulary as a dashboard view but agency-internal (no
+// visibility, no default). `layouts`/`widgets` are nested JSON blobs, typed as
+// unknown at the DB boundary to avoid a types↔dashboard import cycle.
+export interface ReportLayoutRow {
+  id: string;
+  client_id: string;
+  name: string;
+  layouts: unknown;
+  widgets: unknown;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportLayoutInsert {
+  id?: string;
+  client_id: string;
+  name: string;
+  layouts: unknown;
+  widgets: unknown;
+  version?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Agency-wide (NOT client-scoped) snapshots of a whole report layout, used to
+// create a layout for any client. `widgets` is the stored form, so linked saved
+// widgets stay pointers.
+export interface ReportTemplateRow {
+  id: string;
+  name: string;
+  description: string;
+  layouts: unknown;
+  widgets: unknown;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportTemplateInsert {
+  id?: string;
+  name: string;
+  description?: string;
   layouts: unknown;
   widgets: unknown;
   version?: number;
@@ -542,6 +651,26 @@ export interface Database {
         Row: DashboardRow;
         Insert: DashboardInsert;
         Update: Partial<DashboardInsert>;
+      };
+      saved_widgets: {
+        Row: SavedWidgetRow;
+        Insert: SavedWidgetInsert;
+        Update: Partial<SavedWidgetInsert>;
+      };
+      dashboard_templates: {
+        Row: DashboardTemplateRow;
+        Insert: DashboardTemplateInsert;
+        Update: Partial<DashboardTemplateInsert>;
+      };
+      report_layouts: {
+        Row: ReportLayoutRow;
+        Insert: ReportLayoutInsert;
+        Update: Partial<ReportLayoutInsert>;
+      };
+      report_templates: {
+        Row: ReportTemplateRow;
+        Insert: ReportTemplateInsert;
+        Update: Partial<ReportTemplateInsert>;
       };
       attribution_journeys: {
         Row: AttributionJourneyRow;

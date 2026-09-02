@@ -13,13 +13,23 @@ import { BiLink, BiRefresh, BiCopy, BiCheck, BiShield } from "react-icons/bi";
 import type { ReportData } from "@/lib/report/builder";
 import { useAppStore } from "@/store/app-store";
 
+/**
+ * What to share. A classic report posts its freshly built `ReportData` (the row
+ * may not exist yet). A view report already exists and owns its frozen
+ * snapshot, so only its id is sent and nothing is re-posted.
+ */
+export type ShareTarget =
+  | { kind: "classic"; reportData: ReportData }
+  | { kind: "view"; reportId: string; clientName: string };
+
 interface ShareDialogProps {
-  reportData: ReportData;
+  target: ShareTarget;
   onClose: () => void;
 }
 
-export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
+export function ShareDialog({ target, onClose }: ShareDialogProps) {
   const clientId = useAppStore((s) => s.selectedClientId);
+  const clientName = target.kind === "classic" ? target.reportData.clientName : target.clientName;
   const [password, setPassword] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -36,27 +46,32 @@ export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
     setError(null);
 
     try {
+      const payload =
+        target.kind === "view"
+          ? { password, reportId: target.reportId }
+          : {
+              password,
+              reportId: target.reportData.id || undefined,
+              clientId: clientId || undefined,
+              clientName: target.reportData.clientName,
+              dateRange: target.reportData.dateRange,
+              comparisonRange: target.reportData.comparisonRange,
+              narrative: target.reportData.narratives.executive,
+              metricsSummary: {
+                comparison: target.reportData.comparison,
+                campaignBreakdown: target.reportData.campaignBreakdown,
+                platformBreakdown: target.reportData.platformBreakdown,
+                trendSummary: target.reportData.trendSummary,
+                funnel: target.reportData.funnel,
+                healthScore: target.reportData.healthScore,
+                narratives: target.reportData.narratives,
+              },
+            };
+
       const res = await fetch("/api/reports/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          password,
-          reportId: reportData.id || undefined,
-          clientId: clientId || undefined,
-          clientName: reportData.clientName,
-          dateRange: reportData.dateRange,
-          comparisonRange: reportData.comparisonRange,
-          narrative: reportData.narratives.executive,
-          metricsSummary: {
-            comparison: reportData.comparison,
-            campaignBreakdown: reportData.campaignBreakdown,
-            platformBreakdown: reportData.platformBreakdown,
-            trendSummary: reportData.trendSummary,
-            funnel: reportData.funnel,
-            healthScore: reportData.healthScore,
-            narratives: reportData.narratives,
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -95,7 +110,7 @@ export function ShareDialog({ reportData, onClose }: ShareDialogProps) {
             <p className="text-[12px] text-ink-muted">
               <BiShield className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
               This will create a password-protected link that only shows data for{" "}
-              <strong className="text-ink">{reportData.clientName}</strong>. Recipients will need the password to view.
+              <strong className="text-ink">{clientName}</strong>. Recipients will need the password to view.
             </p>
           </div>
 

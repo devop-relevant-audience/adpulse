@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Platform } from "@/lib/types/database";
+import { isCompareMode, type CompareMode } from "@/lib/dashboard/date-presets";
 
 const PLATFORMS: Platform[] = ["google", "meta", "tiktok"];
 
@@ -13,17 +14,20 @@ export function isPlatform(value: string | null | undefined): value is Platform 
 /**
  * Reads the shared dashboard filters out of the URL search params. `start`/`end`
  * fall back to `null` when absent (callers keep the store default in that case);
- * `platform` is `undefined` for the "all platforms" state.
+ * `platform` is `undefined` for the "all platforms" state; `compare` is
+ * `"none"` when absent or unrecognized.
  */
 export function useUrlFilters() {
   const sp = useSearchParams();
   const start = sp.get("start");
   const end = sp.get("end");
   const platformRaw = sp.get("platform");
+  const compareRaw = sp.get("compare");
   return {
     start: start || null,
     end: end || null,
     platform: isPlatform(platformRaw) ? platformRaw : undefined,
+    compare: isCompareMode(compareRaw) ? compareRaw : ("none" as CompareMode),
   };
 }
 
@@ -57,15 +61,26 @@ export function useSetUrlFilters() {
     [router, pathname, sp]
   );
 
-  return { setDateRange, setPlatform };
+  const setCompareMode = useCallback(
+    (mode: CompareMode) => {
+      const next = new URLSearchParams(sp.toString());
+      if (mode === "none") next.delete("compare");
+      else next.set("compare", mode);
+      router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    },
+    [router, pathname, sp]
+  );
+
+  return { setDateRange, setPlatform, setCompareMode };
 }
 
-/** Builds a `?start&end&platform` query string from the current filters, for
- * carrying filter state across nav links. Returns "" when nothing is set. */
+/** Builds a `?start&end&platform&compare` query string from the current
+ * filters, for carrying filter state across nav links. Returns "" when nothing
+ * is set. */
 export function useFilterQuery() {
   const sp = useSearchParams();
   const next = new URLSearchParams();
-  for (const key of ["start", "end", "platform"]) {
+  for (const key of ["start", "end", "platform", "compare"]) {
     const v = sp.get(key);
     if (v) next.set(key, v);
   }

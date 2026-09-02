@@ -180,7 +180,7 @@ export function ReportGenerator() {
 
       {showShareDialog && reportData && (
         <ShareDialog
-          reportData={reportData}
+          target={{ kind: "classic", reportData }}
           onClose={() => setShowShareDialog(false)}
         />
       )}

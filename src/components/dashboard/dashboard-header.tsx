@@ -1,7 +1,6 @@
 "use client";
 
-import { DateRangePicker } from "./date-range-picker";
-import { PlatformFilter } from "./platform-filter";
+import { PageFilters } from "./page-filters";
 import { ReportGenerator } from "@/components/report/report-generator";
 import { useAppStore } from "@/store/app-store";
 import { useClients } from "@/hooks/use-metrics";
@@ -39,9 +38,7 @@ export function DashboardHeader() {
       </div>
 
       <div className="flex items-center gap-2.5 flex-wrap">
-        <DateRangePicker />
-        <div className="h-5 w-px bg-hairline mx-1" />
-        <PlatformFilter />
+        <PageFilters />
       </div>
     </div>
   );

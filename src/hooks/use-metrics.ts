@@ -4,7 +4,27 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Platform, AttributionModel, CampaignPerformanceRow, ClientRow, AlertRuleRow, AlertHistoryRow, AlertRuleInsert, ReportScheduleRow, ReportScheduleInsert, ReportRow, AdCreativeRow, CreativeStatus } from "@/lib/types/database";
 import type { ComparisonResult, FunnelData, PacingData, FatigueAnalysisItem } from "@/lib/data/queries";
 import type { HealthScoreResult } from "@/lib/data/health-score";
+import { encodeThreshold } from "@/lib/dashboard/custom-widget";
 import type { MetricQueryParams, MetricQueryResult } from "@/lib/dashboard/custom-widget";
+import { excludeCurrentDay } from "@/lib/format";
+
+// Stable `select` transforms (module-level so react-query doesn't re-run them
+// every render): charts never plot the partial current day — see excludeCurrentDay.
+export type TrendRow = {
+  date: string;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  conversions: number;
+  ctr: number;
+  cpc: number;
+  cpa: number;
+};
+const selectTrendRows = (rows: TrendRow[]) => excludeCurrentDay(rows);
+const selectMetricQuery = (result: MetricQueryResult): MetricQueryResult => ({
+  ...result,
+  rows: excludeCurrentDay(result.rows),
+});
 
 export function useClients() {
   return useQuery<ClientRow[]>({
@@ -85,20 +105,12 @@ export function useDailyTrend(params: {
   platform?: Platform;
   platforms?: Platform[];
   campaignIds?: string[];
+  /** Defaults to true. Set false to hold the query (e.g. a compare series while comparison is off). */
+  enabled?: boolean;
 }) {
-  return useQuery<
-    Array<{
-      date: string;
-      impressions: number;
-      clicks: number;
-      spend: number;
-      conversions: number;
-      ctr: number;
-      cpc: number;
-      cpa: number;
-    }>
-  >({
+  return useQuery<TrendRow[]>({
     queryKey: ["trend", params],
+    select: selectTrendRows,
     queryFn: async () => {
       const sp = new URLSearchParams({
         action: "trend",
@@ -114,7 +126,7 @@ export function useDailyTrend(params: {
       if (!res.ok) throw new Error("Failed to fetch trend");
       return res.json();
     },
-    enabled: !!params.clientId,
+    enabled: !!params.clientId && (params.enabled ?? true),
   });
 }
 
@@ -220,6 +232,7 @@ export function useMetricQuery(
 ) {
   return useQuery<MetricQueryResult>({
     queryKey: ["metric-query", params],
+    select: selectMetricQuery,
     queryFn: async () => {
       const sp = new URLSearchParams({
         action: "query",
@@ -234,6 +247,7 @@ export function useMetricQuery(
       if (params.limit !== undefined) sp.set("limit", String(params.limit));
       if (params.sortBy) sp.set("sortBy", params.sortBy);
       if (params.sortDir) sp.set("sortDir", params.sortDir);
+      if (params.threshold) sp.set("threshold", encodeThreshold(params.threshold));
 
       const res = await fetch(`/api/metrics?${sp}`);
       if (!res.ok) throw new Error("Failed to fetch metric query");
