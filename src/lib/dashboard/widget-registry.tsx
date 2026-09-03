@@ -10,7 +10,7 @@ import type {
 } from "@/lib/dashboard/types";
 import { surfaceAllows } from "@/lib/dashboard/types";
 import { WIDGET_META, type WidgetFootprint } from "@/lib/dashboard/widget-meta";
-import { KpiWidget, KpiConfigForm } from "@/components/dashboard/widgets/kpi-widget";
+import { KpiWidget, KpiConfigForm, KpiTitleForm, kpiTitle } from "@/components/dashboard/widgets/kpi-widget";
 import { TrendWidget, TrendConfigForm } from "@/components/dashboard/widgets/trend-widget";
 import { PlatformBreakdownWidget } from "@/components/dashboard/widgets/platform-breakdown-widget";
 import { NoteWidget, NoteConfigForm } from "@/components/dashboard/widgets/note-widget";
@@ -198,15 +198,9 @@ export const WIDGET_LIST: WidgetDefinition[] = [
     defaultConfig: { metric: "spend" },
     Render: KpiWidget,
     ConfigForm: KpiConfigForm,
+    ConfigFormAside: KpiTitleForm,
     supportsFilters: true,
-    getTitle: (c) => {
-      const map: Record<string, string> = {
-        spend: "Spend", conversions: "Conversions", cpa: "CPA", ctr: "CTR",
-        cpc: "CPC", clicks: "Clicks", impressions: "Impressions", cpm: "CPM",
-        revenue: "Revenue", roas: "ROAS",
-      };
-      return map[String(c.metric)] ?? "KPI";
-    },
+    getTitle: kpiTitle,
   },
   {
     type: "trend",

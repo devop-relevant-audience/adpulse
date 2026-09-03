@@ -10,7 +10,7 @@ import {
   upsertReportLayout,
   type ReportLayoutSource,
 } from "@/lib/data/report-layouts";
-import { getReportTemplate } from "@/lib/data/report-templates";
+import { getMasterReportTemplate, getReportTemplate } from "@/lib/data/report-templates";
 import { DASHBOARD_CONFIG_VERSION } from "@/lib/dashboard/types";
 import {
   MAX_WIDGETS,
@@ -43,19 +43,23 @@ const putSchema = z.object({
   config: configSchema,
 });
 
-// A new layout starts blank, from another layout of the same client, or from an
-// agency report template — never two of those at once.
+// A new layout starts blank, from another layout of the same client, from an
+// agency report template, or from the master — never two of those at once.
 const postSchema = z
   .object({
     clientId: z.string().uuid(),
     name: z.string().min(1).max(120),
     duplicateFromId: z.string().uuid().optional(),
     fromTemplateId: z.string().uuid().optional(),
+    fromMaster: z.literal(true).optional(),
   })
-  .refine((v) => !(v.duplicateFromId && v.fromTemplateId), {
-    message: "Pass duplicateFromId or fromTemplateId, not both",
-    path: ["fromTemplateId"],
-  });
+  .refine(
+    (v) => [v.duplicateFromId, v.fromTemplateId, v.fromMaster].filter(Boolean).length <= 1,
+    {
+      message: "Pass only one of duplicateFromId, fromTemplateId or fromMaster",
+      path: ["fromTemplateId"],
+    }
+  );
 
 const patchSchema = z.object({
   clientId: z.string().uuid(),
@@ -180,6 +184,10 @@ export const POST = withRoute("report-layouts.POST", async (request: NextRequest
     const template = await getReportTemplate(parsed.data.fromTemplateId);
     if (!template) return NextResponse.json({ error: "Report template not found" }, { status: 404 });
     from = template;
+  } else if (parsed.data.fromMaster) {
+    // The master is created from the built-in report preset if it doesn't exist
+    // yet, so this branch always has content to stamp.
+    from = await getMasterReportTemplate();
   }
 
   try {

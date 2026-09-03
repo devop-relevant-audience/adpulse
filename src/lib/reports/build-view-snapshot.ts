@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { clients } from "@/lib/db/schema";
 import { getDashboardById } from "@/lib/data/dashboards";
 import { getReportLayoutById } from "@/lib/data/report-layouts";
+import { getReportTemplateContent } from "@/lib/data/report-templates";
 import { compareMetrics, getClientCurrency } from "@/lib/data/queries";
 import { runMetricQuery } from "@/lib/data/metric-query";
 import { calculateHealthScore } from "@/lib/data/health-score";
@@ -343,8 +344,54 @@ export async function buildReportLayoutSnapshot(params: {
     throw new ViewNotFoundError("Report layout not found");
   }
 
+  return captureReportGrid(
+    { name: layout.name, layouts: layout.layouts, widgets: layout.widgets },
+    { ...params, sourceReportLayoutId: layout.id }
+  );
+}
+
+/**
+ * A PREVIEW of an agency report TEMPLATE against one client's data — same
+ * capture, from the template's blocks instead of a layout's. Nothing is
+ * written: the template belongs to no client, so this only ever answers "what
+ * would this look like for them". `sourceReportLayoutId` is null for the same
+ * reason.
+ *
+ * The caller authorizes `clientId`; a template has no client scope of its own.
+ */
+export async function buildReportTemplateSnapshot(params: {
+  clientId: string;
+  templateId: string;
+  dateRange: DateRange;
+  skipAiSummaries?: boolean;
+}): Promise<ViewSnapshot> {
+  // Hydrated read: a template stores linked blocks as bare pointers, and a
+  // preview that rendered them with an empty config would disagree with the
+  // layout preview beside it.
+  const template = await getReportTemplateContent(params.templateId);
+  if (!template) throw new ViewNotFoundError("Report template not found");
+
+  return captureReportGrid(
+    { name: template.name, layouts: template.layouts, widgets: template.widgets },
+    params
+  );
+}
+
+/**
+ * The shared body of both report captures: freeze every block over the client's
+ * data, then either write the AI summaries or stub them for a preview.
+ */
+async function captureReportGrid(
+  grid: { name: string; layouts: ViewSnapshot["layouts"]; widgets: WidgetInstance[] },
+  params: {
+    clientId: string;
+    dateRange: DateRange;
+    skipAiSummaries?: boolean;
+    sourceReportLayoutId?: string;
+  }
+): Promise<ViewSnapshot> {
   const { ctx, currency } = await buildContext(params.clientId, params.dateRange);
-  const widgets = await captureWidgets(layout.widgets, ctx);
+  const widgets = await captureWidgets(grid.widgets, ctx);
   if (params.skipAiSummaries) {
     for (const block of widgets) {
       if (block.type === "ai-summary") {
@@ -359,14 +406,14 @@ export async function buildReportLayoutSnapshot(params: {
     kind: "view",
     schemaVersion: VIEW_SNAPSHOT_VERSION,
     sourceDashboardId: null,
-    sourceReportLayoutId: layout.id,
+    sourceReportLayoutId: params.sourceReportLayoutId ?? null,
     pageStyle: "document",
-    viewName: layout.name,
+    viewName: grid.name,
     currency,
     dateRange: params.dateRange,
     comparison: ctx.comparison,
     comparisonLabel: DEFAULT_COMPARISON_LABEL,
-    layouts: layout.layouts,
+    layouts: grid.layouts,
     widgets,
   };
 }

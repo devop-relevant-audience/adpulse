@@ -124,3 +124,51 @@ export function findUnsafeSvgContent(bytes: Uint8Array): string | null {
   }
   return null;
 }
+
+// --- Where an upload lives, and which of them a vision model can read -------
+
+/** Path prefix every `POST /api/assets` upload is written under. */
+export const UPLOAD_BLOB_PATH_PREFIX = "adpulse/uploads";
+
+const UPLOAD_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
+
+/**
+ * True only for a URL this app itself uploaded. Anything else — another host,
+ * another prefix, plain http — is not ours.
+ *
+ * Two callers depend on it: `DELETE /api/assets`, so that route cannot become a
+ * delete-any-blob primitive, and the Builder Assistant, which hands image URLs
+ * to the model and stores them on `image` widgets. Without this check a caller
+ * could point either at an arbitrary URL and make the server (or the model's
+ * fetcher) pull it.
+ */
+export function isAdpulseUploadUrl(raw: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+  return (
+    parsed.protocol === "https:" &&
+    parsed.hostname.endsWith(UPLOAD_BLOB_HOST_SUFFIX) &&
+    parsed.pathname.startsWith(`/${UPLOAD_BLOB_PATH_PREFIX}/`)
+  );
+}
+
+/**
+ * The subset of the upload allow-list a vision model can actually read. GIF and
+ * SVG are uploadable (an `image` widget renders both) but are not accepted as
+ * chat attachments: Gemini takes PNG/JPEG/WebP, and an SVG is markup rather
+ * than pixels.
+ */
+export const VISION_IMAGE_CONTENT_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+
+/** For an `<input type="file" accept>` on the Builder Assistant composer. */
+export const VISION_IMAGE_ACCEPT = VISION_IMAGE_CONTENT_TYPES.join(",");
+
+export const VISION_IMAGE_TYPES_LABEL = "PNG, JPEG or WebP";
+
+export function isVisionImageType(contentType: string): boolean {
+  return (VISION_IMAGE_CONTENT_TYPES as readonly string[]).includes(contentType);
+}

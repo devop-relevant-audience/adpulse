@@ -1,7 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DashboardTemplateSummary } from "@/lib/dashboard/types";
+import type {
+  DashboardTemplateSummary,
+  DashboardLayouts,
+  TemplateContent,
+  WidgetInstance,
+} from "@/lib/dashboard/types";
 
 // Agency-wide dashboard templates (/api/templates): named snapshots of a whole
 // view, used to stamp the same layout onto any client. Agency-only, so the list
@@ -16,6 +21,8 @@ async function jsonOrThrow(res: Response, fallback: string) {
 }
 
 export const TEMPLATES_KEY = ["dashboard-templates"] as const;
+/** The master's content. A prefix of TEMPLATES_KEY, so invalidating that hits it too. */
+export const MASTER_TEMPLATE_KEY = ["dashboard-templates", "master"] as const;
 
 export function useTemplates(enabled = true) {
   return useQuery<DashboardTemplateSummary[]>({
@@ -23,6 +30,22 @@ export function useTemplates(enabled = true) {
     queryFn: async () => {
       const res = await fetch("/api/templates");
       return jsonOrThrow(res, "Failed to load templates") as Promise<DashboardTemplateSummary[]>;
+    },
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * The MASTER template's full content — the house dashboard. The server creates
+ * it from the built-in preset on first read, so this never resolves to nothing.
+ */
+export function useMasterTemplate(enabled = true) {
+  return useQuery<TemplateContent>({
+    queryKey: MASTER_TEMPLATE_KEY,
+    queryFn: async () => {
+      const res = await fetch("/api/templates?action=master");
+      return jsonOrThrow(res, "Failed to load the master template") as Promise<TemplateContent>;
     },
     enabled,
     staleTime: 60_000,
@@ -68,6 +91,44 @@ export function useUpdateTemplate() {
       return jsonOrThrow(res, "Failed to update template");
     },
     onSuccess: invalidate,
+  });
+}
+
+/**
+ * Save a template's blocks. Editing the master changes what every client with
+ * no saved view renders, so the dashboard queries go stale with it.
+ */
+export function useSaveTemplateContent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      layouts: DashboardLayouts;
+      widgets: WidgetInstance[];
+      version?: number;
+    }) => {
+      const res = await fetch("/api/templates", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      return jsonOrThrow(res, "Failed to save the template") as Promise<TemplateContent>;
+    },
+    onSuccess: (saved, sent) => {
+      // Cache what the SERVER stored, never the draft: the draft carries the
+      // transient `syncToLibrary` flag and the inline config of linked widgets.
+      if (saved.isMaster) queryClient.setQueryData(MASTER_TEMPLATE_KEY, saved);
+      queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY });
+      queryClient.invalidateQueries({ queryKey: ["saved-widget-usage"] });
+      // A client with no saved view renders the master.
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // An "update everywhere" rewrote a library row, which changes every other
+      // grid that links it.
+      if (sent.widgets.some((w) => w.syncToLibrary)) {
+        queryClient.invalidateQueries({ queryKey: ["saved-widgets"] });
+        queryClient.invalidateQueries({ queryKey: ["report-layout"] });
+      }
+    },
   });
 }
 

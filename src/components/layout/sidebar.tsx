@@ -24,14 +24,17 @@ type NavItem = {
 };
 
 /** Extracts the active client + view from `/[clientId]/[view]` and preserves
- * the current filter query so nav/client links keep date & platform state. */
+ * the current filter query so nav/client links keep date & platform state.
+ * `clientFilterQuery` drops the campaign ids, which only mean something inside
+ * the client they were picked in. */
 function useNavContext() {
   const params = useParams();
   const pathname = usePathname();
   const filterQuery = useFilterQuery();
+  const clientFilterQuery = useFilterQuery({ includeCampaigns: false });
   const clientId = typeof params.clientId === "string" ? params.clientId : "";
   const currentView = pathname.split("/")[2] || VIEWS.dashboard;
-  return { clientId, currentView, filterQuery };
+  return { clientId, currentView, filterQuery, clientFilterQuery };
 }
 
 function SeedControl({ collapsed }: { collapsed: boolean }) {
@@ -95,7 +98,7 @@ function SeedControl({ collapsed }: { collapsed: boolean }) {
 
 function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
   const { data: clients } = useClients();
-  const { clientId, currentView, filterQuery } = useNavContext();
+  const { clientId, currentView, clientFilterQuery } = useNavContext();
   const [isOpen, setIsOpen] = useState(false);
 
   const selectedClient = clients?.find((c) => c.id === clientId);
@@ -166,7 +169,7 @@ function ClientSwitcher({ collapsed }: { collapsed: boolean }) {
           {clients.map((client) => (
             <Link
               key={client.id}
-              href={`/${client.id}/${currentView}${filterQuery}`}
+              href={`/${client.id}/${currentView}${clientFilterQuery}`}
               onClick={() => setIsOpen(false)}
               className={cn(
                 "flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left hover:bg-canvas-soft transition-colors",

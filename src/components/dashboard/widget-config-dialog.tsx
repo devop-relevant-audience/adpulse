@@ -46,26 +46,45 @@ const PREVIEW_DEBOUNCE_MS = 300;
  * almost entirely blank space, which is why the tiers step the height down as
  * well as the width.
  */
-const TIER: Record<WidgetConfigSize, { dialog: string; panes: string; preview: string }> = {
+const TIER: Record<
+  WidgetConfigSize,
+  { dialog: string; panes: string; preview: string; rail: string; pane: string }
+> = {
+  // The small tier is where a cramped dialog shows most: a KPI's settings are
+  // one select plus the filters, and the filter labels ("Date range" and its
+  // "Following the page date picker" hint) share a row, so a 20rem rail wraps
+  // them and the campaign list falls below the fold. It gets a wider rail, a
+  // taller body and looser padding than the bigger tiers, whose content fills
+  // the room on its own.
   sm: {
-    dialog: "sm:max-w-[44rem] h-[min(88vh,34rem)]",
-    panes: "lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]",
-    preview: "min-h-[8rem]",
+    dialog: "sm:max-w-[70rem] h-[min(90vh,50rem)]",
+    panes: "lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]",
+    preview: "min-h-[16rem]",
+    // `--config-pad` / `--config-gap` loosen every ConfigSection card inside
+    // (see config-ui.tsx); the bigger tiers leave them at their defaults.
+    rail: "space-y-5 px-7 py-6 [--config-pad:1.25rem] [--config-gap:1.25rem]",
+    pane: "gap-5 px-7 pb-6 lg:pt-6 [--config-pad:1.25rem] [--config-gap:1.25rem]",
   },
   md: {
     dialog: "sm:max-w-[62rem] h-[min(88vh,42rem)]",
     panes: "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]",
     preview: "min-h-[12rem]",
+    rail: "space-y-3 px-5 py-4",
+    pane: "gap-3 px-5 pb-4 lg:pt-4",
   },
   lg: {
     dialog: "sm:max-w-[80rem] h-[min(88vh,48rem)]",
     panes: "lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]",
     preview: "min-h-[16rem]",
+    rail: "space-y-3 px-5 py-4",
+    pane: "gap-3 px-5 pb-4 lg:pt-4",
   },
   xl: {
     dialog: "sm:max-w-[92.5rem] h-[min(90vh,56rem)]",
     panes: "lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]",
     preview: "min-h-[18rem]",
+    rail: "space-y-3 px-5 py-4",
+    pane: "gap-3 px-5 pb-4 lg:pt-4",
   },
 };
 
@@ -326,13 +345,18 @@ export function WidgetConfigDialog({
             {/* Settings rail: scrolls on its own so the preview stays in view.
                 `@container` lets the form grids adapt to the rail width rather
                 than the viewport. */}
-            <div className="@container min-w-0 space-y-3 px-5 py-4 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-hairline">
+            <div
+              className={cn(
+                "@container min-w-0 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-hairline",
+                tier.rail
+              )}
+            >
               {ConfigForm && <ConfigForm config={draft} onChange={setDraft} />}
               {supportsFilters && <WidgetFiltersForm config={draft} onChange={setDraft} />}
             </div>
             {/* Preview pane: title and size stacked on top, live preview
                 filling whatever height is left. */}
-            <div className="flex min-w-0 flex-col gap-3 px-5 pb-4 pt-0 lg:min-h-0 lg:overflow-y-auto lg:pt-4">
+            <div className={cn("flex min-w-0 flex-col pt-0 lg:min-h-0 lg:overflow-y-auto", tier.pane)}>
               <div className="shrink-0 space-y-3">
                 {AsideForm && <AsideForm config={draft} onChange={setDraft} />}
                 {sizeSection}

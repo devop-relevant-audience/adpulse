@@ -176,6 +176,9 @@ export function useFunnel(params: {
 export function usePacing(params: {
   clientId: string | null;
   month: string;
+  platform?: Platform;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }) {
   return useQuery<PacingData>({
     queryKey: ["pacing", params],
@@ -187,6 +190,9 @@ export function usePacing(params: {
         endDate: `${params.month}-28`,
         month: params.month,
       });
+      if (params.platform) sp.set("platform", params.platform);
+      if (params.platforms?.length) sp.set("platforms", params.platforms.join(","));
+      if (params.campaignIds?.length) sp.set("campaignIds", params.campaignIds.join(","));
 
       const res = await fetch(`/api/metrics?${sp}`);
       if (!res.ok) throw new Error("Failed to fetch pacing data");

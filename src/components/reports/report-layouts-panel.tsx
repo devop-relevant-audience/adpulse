@@ -51,7 +51,7 @@ import { ReportPreviewDialog } from "@/components/reports/report-preview-dialog"
 import type { ReportLayoutSummary } from "@/lib/dashboard/types";
 
 /** Where a new layout's blocks come from. */
-type NewLayoutSource = "blank" | "duplicate" | "template";
+type NewLayoutSource = "master" | "blank" | "duplicate" | "template";
 
 type NameDialogState =
   | { mode: "new" }
@@ -66,10 +66,13 @@ export function ReportLayoutsPanel({
   clientId,
   onEdit,
   onGenerate,
+  onEditMaster,
 }: {
   clientId: string;
   onEdit: (layout: ReportLayoutSummary) => void;
   onGenerate: (layout: ReportLayoutSummary) => void;
+  /** Opens the master report template editor. */
+  onEditMaster: () => void;
 }) {
   const { data: layouts, isLoading, isError, refetch } = useReportLayouts(clientId);
   const createLayout = useCreateReportLayout(clientId);
@@ -79,7 +82,7 @@ export function ReportLayoutsPanel({
 
   const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
   const [name, setName] = useState("");
-  const [source, setSource] = useState<NewLayoutSource>("blank");
+  const [source, setSource] = useState<NewLayoutSource>("master");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ReportLayoutSummary | null>(null);
   const [templateFor, setTemplateFor] = useState<ReportLayoutSummary | null>(null);
@@ -101,7 +104,7 @@ export function ReportLayoutsPanel({
           ? `${state.layout.name} copy`
           : ""
     );
-    setSource(state.mode === "duplicate" ? "duplicate" : "blank");
+    setSource(state.mode === "duplicate" ? "duplicate" : "master");
     setTemplateId(null);
     setNameDialog(state);
   }
@@ -128,6 +131,7 @@ export function ReportLayoutsPanel({
               ? nameDialog.layout.id
               : undefined,
           fromTemplateId: source === "template" ? (templateId ?? undefined) : undefined,
+          fromMaster: source === "master" ? true : undefined,
         });
         setNameDialog(null);
         // A new layout is empty (or a fresh copy) — the next step is always
@@ -185,15 +189,20 @@ export function ReportLayoutsPanel({
             reports you generate.
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1.5 shrink-0"
-          onClick={() => openNameDialog({ mode: "new" })}
-          disabled={busy}
-        >
-          <BiPlus className="w-3.5 h-3.5" /> New layout
-        </Button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={onEditMaster}>
+            <BiWindows className="w-3.5 h-3.5" /> Master report
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => openNameDialog({ mode: "new" })}
+            disabled={busy}
+          >
+            <BiPlus className="w-3.5 h-3.5" /> New layout
+          </Button>
+        </div>
       </div>
 
       {isLoading && <Skeleton className="h-16 w-full" />}
@@ -207,7 +216,8 @@ export function ReportLayoutsPanel({
           <BiFile className="w-8 h-8 text-ink-muted/40 mx-auto mb-2" />
           <p className="text-[13px] text-ink-muted">No report layouts yet.</p>
           <p className="text-[12px] text-ink-muted mt-1">
-            Create one to design a report block by block, then generate it for any period.
+            Create one to design a report block by block, then generate it for any period. New
+            layouts start from the master report template.
           </p>
         </Panel>
       )}
@@ -290,8 +300,8 @@ export function ReportLayoutsPanel({
       {previewFor && (
         <ReportPreviewDialog
           clientId={clientId}
-          layoutId={previewFor.id}
-          layoutName={previewFor.name}
+          source={{ kind: "layout", id: previewFor.id }}
+          name={previewFor.name}
           onClose={() => setPreviewFor(null)}
         />
       )}
@@ -336,6 +346,9 @@ export function ReportLayoutsPanel({
               <div className="space-y-2">
                 <span className="block text-[12px] font-medium text-ink">Start from</span>
                 <ChipRow>
+                  <ChipToggle active={source === "master"} onClick={() => setSource("master")}>
+                    Master report
+                  </ChipToggle>
                   <ChipToggle active={source === "blank"} onClick={() => setSource("blank")}>
                     Blank
                   </ChipToggle>

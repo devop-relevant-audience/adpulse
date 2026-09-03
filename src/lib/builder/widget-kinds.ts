@@ -16,7 +16,7 @@
 
 import { z } from "zod";
 import { widgetFiltersSchema } from "@/lib/dashboard/filters";
-import { METRIC_OPTIONS, getMetricOption } from "@/lib/dashboard/metrics";
+import { KPI_TITLE_MAX, METRIC_OPTIONS, getMetricOption } from "@/lib/dashboard/metrics";
 import { WIDGET_META } from "@/lib/dashboard/widget-meta";
 import {
   CAMPAIGN_TABLE_DEFAULT_LIMIT,
@@ -49,16 +49,38 @@ import {
   SECTION_TITLE_MAX,
   readSectionConfig,
 } from "@/lib/dashboard/section";
-import type { WidgetType } from "@/lib/dashboard/types";
+import {
+  AI_SUMMARY_INSTRUCTIONS_MAX,
+  COVER_SUBTITLE_MAX,
+  COVER_TITLE_MAX,
+  DEFAULT_COVER_CONFIG,
+  readAiSummaryConfig,
+  readCoverConfig,
+} from "@/lib/dashboard/report-blocks";
+import { isAdpulseUploadUrl } from "@/lib/uploads/image-constraints";
+import { surfaceAllows } from "@/lib/dashboard/types";
+import type { WidgetSurface, WidgetType } from "@/lib/dashboard/types";
+// Type-only: erased at compile time, so the client component it lives in is
+// never pulled into this (React-free, server-side) module.
+import type { ImageFit } from "@/components/dashboard/widgets/image-widget";
 
 /**
  * The widget types the assistant may create and edit. `custom` (the chart
  * builder) is the default and covers most asks; the rest are the fixed widgets
  * whose config is small enough to be written from a sentence.
  *
- * Deliberately absent: the three attribution widgets (demo-only data),
- * `image` (needs an upload), and `cover`/`ai-summary` (report-only blocks —
- * `widgetSurface()` keeps them off a dashboard anyway).
+ * `image` is here only because the panel can now upload one: its `url` must be
+ * an image attached to the conversation, which the route checks (the schema
+ * below only proves the URL is an AdPulse upload, not that it is one of THIS
+ * conversation's).
+ *
+ * `cover` and `ai-summary` are the report-only blocks: they are in this list
+ * because the assistant builds report layouts and report templates too, and
+ * kept off a dashboard by SURFACE rather than by absence — every entry point
+ * below takes the grid being edited and filters through `surfaceAllows`, the
+ * same rule the PUT validators enforce.
+ *
+ * Deliberately absent: the three attribution widgets (demo-only data).
  */
 export const BUILDER_WIDGET_TYPES = [
   "custom",
@@ -71,12 +93,30 @@ export const BUILDER_WIDGET_TYPES = [
   "health-gauge",
   "note",
   "section",
+  "image",
+  "cover",
+  "ai-summary",
 ] as const satisfies readonly WidgetType[];
 
 export type BuilderWidgetType = (typeof BUILDER_WIDGET_TYPES)[number];
 
-export function isBuilderWidgetType(type: string): type is BuilderWidgetType {
-  return (BUILDER_WIDGET_TYPES as readonly string[]).includes(type);
+/**
+ * Whether the builder can configure `type` on `surface`. The surface defaults to
+ * the "both" wildcard, which imposes no restriction — pass the grid being edited
+ * so a report block is never offered on a dashboard (or the other way round).
+ */
+export function isBuilderWidgetType(
+  type: string,
+  surface: WidgetSurface = "both"
+): type is BuilderWidgetType {
+  return (
+    (BUILDER_WIDGET_TYPES as readonly string[]).includes(type) && surfaceAllows(type, surface)
+  );
+}
+
+/** The types the assistant may build on one grid, in prompt/tool-enum order. */
+export function builderWidgetTypesFor(surface: WidgetSurface): BuilderWidgetType[] {
+  return BUILDER_WIDGET_TYPES.filter((t) => surfaceAllows(t, surface));
 }
 
 // --- Vocabularies, taken from the widgets' own option lists ----------------
@@ -90,6 +130,10 @@ const TREND_GRANULARITIES = ["day", "week", "month"] as const;
 const PLATFORM_BREAKDOWN_METRICS = ["spend", "conversions"] as const;
 
 const NOTE_TEXT_MAX = 2000;
+
+/** Mirrors IMAGE_FITS in the widget; `satisfies` catches a rename over there. */
+const IMAGE_FIT_VALUES = ["contain", "cover"] as const satisfies readonly ImageFit[];
+const IMAGE_ALT_MAX = 140;
 
 /** `z.enum` wants a non-empty tuple; these lists are derived, so assert it. */
 function enumOf(values: readonly string[]) {
@@ -106,12 +150,20 @@ const filters = { filters: widgetFiltersSchema.optional() };
 // accept the configs already sitting on saved views, which is what keeps those
 // widgets editable rather than demoting them to read-only.
 
-const kpiConfigSchema = z.object({ metric: enumOf(KPI_METRICS).optional(), ...filters }).strict();
+const kpiConfigSchema = z
+  .object({
+    metric: enumOf(KPI_METRICS).optional(),
+    title: z.string().max(KPI_TITLE_MAX).optional(),
+    ...filters,
+  })
+  .strict();
 
 const trendConfigSchema = z
   .object({
     metrics: enumOf(TREND_METRICS).array().min(1).max(TREND_METRICS.length).optional(),
     granularity: z.enum(TREND_GRANULARITIES).optional(),
+    /** Metrics after the first on a right-hand axis. */
+    secondaryAxis: z.boolean().optional(),
     ...filters,
   })
   .strict();
@@ -149,12 +201,53 @@ const noSettingsConfigSchema = z.object({ ...filters }).strict();
 /** Layout widgets: no data query, so no filters either. */
 const noteConfigSchema = z.object({ text: z.string().max(NOTE_TEXT_MAX).optional() }).strict();
 
+/**
+ * The URL is held to "an AdPulse upload" here so a config that reached the grid
+ * can never point the browser at an arbitrary host. WHICH upload it may be is a
+ * per-request question (the images attached to this conversation, plus the ones
+ * already on the view), so the route answers that one — see `allowedImageUrls`.
+ */
+const imageConfigSchema = z
+  .object({
+    url: z
+      .string()
+      .refine(isAdpulseUploadUrl, {
+        message: "must be the URL of an image uploaded in this conversation",
+      })
+      .optional(),
+    alt: z.string().max(IMAGE_ALT_MAX).optional(),
+    fit: z.enum(IMAGE_FIT_VALUES).optional(),
+  })
+  .strict();
+
 const sectionConfigSchema = z
   .object({
     title: z.string().max(SECTION_TITLE_MAX).optional(),
     subtitle: z.string().max(SECTION_SUBTITLE_MAX).optional(),
     divider: z.boolean().optional(),
   })
+  .strict();
+
+/**
+ * The report cover's WORDING only. The client name and the reporting period are
+ * context — the page supplies them on the editor canvas and the generator
+ * freezes them into the snapshot — so there is nothing here to set them with,
+ * and a model that tries is told so by the strict schema.
+ */
+const coverConfigSchema = z
+  .object({
+    title: z.string().max(COVER_TITLE_MAX).optional(),
+    subtitle: z.string().max(COVER_SUBTITLE_MAX).optional(),
+  })
+  .strict();
+
+/**
+ * The steer for the AI summary. The prose itself is written once, at generation
+ * time (`src/lib/reports/ai-summary.ts`), so this block carries instructions and
+ * never text.
+ */
+const aiSummaryConfigSchema = z
+  .object({ instructions: z.string().max(AI_SUMMARY_INSTRUCTIONS_MAX).optional() })
   .strict();
 
 // --- The table -------------------------------------------------------------
@@ -216,8 +309,9 @@ const BUILDER_WIDGET_KINDS: Record<
     blurb: "one headline metric with its change on the period before",
     example: { metric: "spend" },
     describe: (c) => `KPI tile · ${metricLabel(c.metric)} vs the period before`,
-    // Same label list the widget's own title map uses (METRIC_OPTIONS).
-    title: (c) => metricLabel(c.metric),
+    // The user's own title when set, else the same label list the widget's
+    // title map uses (METRIC_OPTIONS).
+    title: (c) => (typeof c.title === "string" && c.title.trim() ? c.title.trim() : metricLabel(c.metric)),
   }),
   trend: kind({
     schema: trendConfigSchema,
@@ -277,10 +371,46 @@ const BUILDER_WIDGET_KINDS: Record<
   }),
   section: kind({
     schema: sectionConfigSchema,
-    blurb: "a labelled band header that splits a long dashboard into parts",
+    blurb: "a labelled band header that splits a long page into named parts",
     example: { title: "Paid search", divider: true },
     describe: (c) => readSectionConfig(c).subtitle || "Band header",
     title: (c) => readSectionConfig(c).title,
+  }),
+  image: kind({
+    schema: imageConfigSchema,
+    blurb:
+      "an image the user attached to this chat — a logo, a screenshot, a diagram — placed on the grid; \"url\" MUST be copied from the attached image URLs, never invented",
+    example: { url: "<attached image url>", alt: "Client logo", fit: "contain" },
+    describe: (c) => {
+      const alt = typeof c.alt === "string" ? c.alt.trim() : "";
+      const fit = c.fit === "cover" ? "cropped to fill" : "scaled to fit";
+      return alt ? `Image · ${alt} · ${fit}` : `Uploaded image · ${fit}`;
+    },
+    // The registry's own rule for this widget, so the panel card and the grid
+    // agree on the name.
+    title: (c) => (typeof c.alt === "string" && c.alt.trim() ? c.alt.trim().slice(0, IMAGE_ALT_MAX) : "Image"),
+  }),
+  cover: kind({
+    schema: coverConfigSchema,
+    blurb:
+      "the report's title page — a heading and an optional strap line; the client name and the reporting period are added automatically",
+    example: { ...DEFAULT_COVER_CONFIG },
+    describe: (c) => {
+      const { title, subtitle } = readCoverConfig(c);
+      return subtitle ? `Cover · ${title} · ${subtitle}` : `Cover · ${title}`;
+    },
+    title: (c) => readCoverConfig(c).title,
+  }),
+  "ai-summary": kind({
+    schema: aiSummaryConfigSchema,
+    blurb:
+      "a written analysis of the period, composed when the report is generated; \"instructions\" steers what it covers",
+    example: { instructions: "Lead with spend efficiency and call out the biggest mover." },
+    describe: (c) => {
+      const { instructions } = readAiSummaryConfig(c);
+      if (!instructions) return "Written at generation time · no steer";
+      return instructions.length > 70 ? `${instructions.slice(0, 70)}…` : instructions;
+    },
   }),
 };
 
@@ -291,14 +421,21 @@ export type BuilderConfigParse =
   | { ok: false; issues: string[] };
 
 /**
- * Holds a config the assistant produced (or one already on the view) to this
- * type's strict schema. Nothing is repaired: a normalizing pass would silently
+ * Holds a config the assistant produced (or one already on the grid) to this
+ * type's strict schema, refusing a type that does not belong on `surface`. Nothing is repaired: a normalizing pass would silently
  * hand back a different widget than the one that was asked for, so a config
  * that breaks a rule comes back as issues the model can fix and call again.
  */
-export function parseBuilderConfig(type: string, raw: unknown): BuilderConfigParse {
-  if (!isBuilderWidgetType(type)) {
-    return { ok: false, issues: [`the builder cannot configure a "${type}" widget`] };
+export function parseBuilderConfig(
+  type: string,
+  raw: unknown,
+  surface: WidgetSurface = "both"
+): BuilderConfigParse {
+  if (!isBuilderWidgetType(type, surface)) {
+    // Two different refusals read the same way to the model: a type it cannot
+    // configure at all, and one that exists but not on the grid being edited.
+    const where = surfaceAllows(type, surface) ? "" : ` on a ${surface}`;
+    return { ok: false, issues: [`the builder cannot configure a "${type}" widget${where}`] };
   }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return { ok: false, issues: ["config: expected an object"] };
@@ -345,20 +482,26 @@ const sameMetricSet =
   KPI_METRICS.length === QUERY_METRICS.length &&
   KPI_METRICS.every((m) => (QUERY_METRICS as readonly string[]).includes(m));
 
-/** Enum lines, generated from the very lists the schemas above are built on. */
-function fieldRules(): string {
-  return [
-    sameMetricSet
-      ? "kpi.metric / top-movers.metric: any metric id from Metrics above"
-      : `kpi.metric: ${KPI_METRICS.join("|")}; top-movers.metric: any metric id from Metrics above`,
-    `trend.metrics (1+): ${TREND_METRICS.join("|")}; trend.granularity: ${TREND_GRANULARITIES.join("|")}`,
-    `platform-breakdown.metric: ${PLATFORM_BREAKDOWN_METRICS.join("|")}`,
-    `campaign-table.limit: ${CAMPAIGN_TABLE_LIMITS.join("|")}; sortBy: ${CAMPAIGN_TABLE_SORT_BYS.join("|")}`,
-    `top-movers.groupBy: ${TOP_MOVERS_GROUP_BYS.join("|")}; limit: 1-${TOP_MOVERS_MAX_LIMIT}; direction: ${TOP_MOVERS_DIRECTIONS.join("|")}`,
-    `note.text: markdown, max ${NOTE_TEXT_MAX} chars`,
-    `section.title (max ${SECTION_TITLE_MAX}), optional subtitle (max ${SECTION_SUBTITLE_MAX}) and divider (boolean)`,
-  ].join("\n");
-}
+/**
+ * The enum line for one type, generated from the very lists its schema is built
+ * on. Keyed by type so the block can be filtered to the grid being edited — a
+ * report block's rules must not be paid for on a dashboard turn, and a rule the
+ * model cannot use is a rule it can get wrong.
+ */
+const FIELD_RULES: Partial<Record<BuilderWidgetType, string>> = {
+  kpi: sameMetricSet
+    ? "kpi.metric / top-movers.metric: any metric id from Metrics above"
+    : `kpi.metric: ${KPI_METRICS.join("|")}; top-movers.metric: any metric id from Metrics above`,
+  trend: `trend.metrics (1+): ${TREND_METRICS.join("|")}; trend.granularity: ${TREND_GRANULARITIES.join("|")}; trend.secondaryAxis: true puts metrics after the first on a right-hand axis (set it when the metrics differ in magnitude, e.g. spend with conversions)`,
+  "platform-breakdown": `platform-breakdown.metric: ${PLATFORM_BREAKDOWN_METRICS.join("|")}`,
+  "campaign-table": `campaign-table.limit: ${CAMPAIGN_TABLE_LIMITS.join("|")}; sortBy: ${CAMPAIGN_TABLE_SORT_BYS.join("|")}`,
+  "top-movers": `top-movers.groupBy: ${TOP_MOVERS_GROUP_BYS.join("|")}; limit: 1-${TOP_MOVERS_MAX_LIMIT}; direction: ${TOP_MOVERS_DIRECTIONS.join("|")}`,
+  note: `note.text: markdown, max ${NOTE_TEXT_MAX} chars`,
+  section: `section.title (max ${SECTION_TITLE_MAX}), optional subtitle (max ${SECTION_SUBTITLE_MAX}) and divider (boolean)`,
+  image: `image.url: one of the attached image URLs, verbatim; alt: short description (max ${IMAGE_ALT_MAX}); fit: ${IMAGE_FIT_VALUES.join("|")} (contain = whole image, cover = crop to fill)`,
+  cover: `cover.title (max ${COVER_TITLE_MAX}) and optional subtitle (max ${COVER_SUBTITLE_MAX}). The client name and the period are added automatically — never write them into either field.`,
+  "ai-summary": `ai-summary.instructions: optional steer for the writer, max ${AI_SUMMARY_INSTRUCTIONS_MAX} chars. Leave it out for a general summary of the period.`,
+};
 
 /**
  * Which of the fixed types also take the shared `filters` object — established
@@ -377,16 +520,25 @@ const FILTERABLE = BUILDER_WIDGET_TYPES.filter((t) => {
  * BUILDER_WIDGET_KINDS, so a new type or a renamed field reaches the model
  * without a second edit. Kept to compact one-liners: this block is paid for on
  * every request.
+ *
+ * `surface` narrows it to the grid being edited: on a dashboard the two
+ * report-only blocks are not described at all, so they cannot be asked for and
+ * then refused.
  */
-export function builderTypesPromptBlock(): string {
-  const rows = BUILDER_WIDGET_TYPES.filter((t) => t !== "custom").map((t) => {
+export function builderTypesPromptBlock(surface: WidgetSurface): string {
+  const types = builderWidgetTypesFor(surface).filter((t) => t !== "custom");
+  const noun = surface === "report" ? "block" : "widget";
+  const rows = types.map((t) => {
     const k = BUILDER_WIDGET_KINDS[t];
     return `- ${t} — ${k.blurb} — ${JSON.stringify(k.example)}`;
   });
-  return `## Fixed widget types
+  const rules = types.map((t) => FIELD_RULES[t]).filter(Boolean);
+  const filterable = FILTERABLE.filter((t) => surfaceAllows(t, surface));
+  const unfilterable = types.filter((t) => !filterable.includes(t));
+  return `## Fixed ${noun} types
 create_widget's "type" defaults to "custom", the chart builder above — still the right answer for most asks. Use a fixed type only when it is exactly what was asked for; each takes ONLY the keys shown, nothing else.
 ${rows.join("\n")}
-${fieldRules()}
-${FILTERABLE.join(", ")} also accept the same optional "filters" object as a chart; note and section never do (they show no data).
-update_widget changes a widget's settings, not its kind — send a config for the type the widget already has.`;
+${rules.join("\n")}
+${filterable.join(", ")} also accept the same optional "filters" object as a chart; ${unfilterable.join(", ")} never do (they show no queried data).
+update_widget changes a ${noun}'s settings, not its kind — send a config for the type the ${noun} already has.`;
 }

@@ -477,10 +477,14 @@ export const dashboardTemplates = adpulseSchema.table("dashboard_templates", {
   layouts: jsonb("layouts").$type<DashboardLayouts>().notNull(),
   widgets: jsonb("widgets").$type<WidgetInstance[]>().notNull(),
   version: integer("version").notNull().default(1),
+  // The MASTER template: what a client with no saved view renders and what a
+  // new view starts from. At most one row may set it (partial unique index).
+  isMaster: boolean("is_master").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("dashboard_templates_name_idx").on(sql`lower(${table.name})`),
+  uniqueIndex("dashboard_templates_master_idx").on(table.isMaster).where(sql`${table.isMaster}`),
   // Saved-widget usage/detach does `widgets @> '[{"savedWidgetId":"…"}]'`.
   index("dashboard_templates_widgets_gin_idx").using("gin", sql`${table.widgets} jsonb_path_ops`),
 ]);
@@ -515,10 +519,14 @@ export const reportTemplates = adpulseSchema.table("report_templates", {
   layouts: jsonb("layouts").$type<DashboardLayouts>().notNull(),
   widgets: jsonb("widgets").$type<WidgetInstance[]>().notNull(),
   version: integer("version").notNull().default(1),
+  // The MASTER report template: what a new report layout starts from. At most
+  // one row may set it (partial unique index).
+  isMaster: boolean("is_master").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("report_templates_name_idx").on(sql`lower(${table.name})`),
+  uniqueIndex("report_templates_master_idx").on(table.isMaster).where(sql`${table.isMaster}`),
   index("report_templates_widgets_gin_idx").using("gin", sql`${table.widgets} jsonb_path_ops`),
 ]);
 

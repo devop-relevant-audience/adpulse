@@ -354,6 +354,7 @@ export function FunnelChart() {
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
   const platform = useAppStore((s) => s.selectedPlatform);
+  const selectedCampaignIds = useAppStore((s) => s.selectedCampaignIds);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
   const { data: funnelData, isLoading, isError, refetch } = useFunnel({
@@ -361,6 +362,7 @@ export function FunnelChart() {
     startDate: dateRange.start,
     endDate: dateRange.end,
     platform,
+    campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined,
   });
 
   if (!clientId || isLoading) {

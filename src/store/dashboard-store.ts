@@ -18,6 +18,15 @@ interface DashboardEditState extends GridEditState<DashboardConfig> {
    */
   selectedViewByClient: Record<string, string | null>;
   selectView: (clientId: string | null, id: string | null) => void;
+  /**
+   * Whether the master dashboard template is being edited instead of a view.
+   * Lives here rather than in the dashboard component because the editor
+   * REPLACES it: react-grid-layout 2.x measures its container in a mount-only
+   * effect, so the grid has to unmount and remount around the editor to be
+   * measured again (see `dashboard-view.tsx`).
+   */
+  editingMasterTemplate: boolean;
+  setEditingMasterTemplate: (open: boolean) => void;
 }
 
 export const useDashboardStore = create<DashboardEditState>((set) => ({
@@ -36,6 +45,17 @@ export const useDashboardStore = create<DashboardEditState>((set) => ({
       draft: null,
       isDirty: false,
     })),
+
+  editingMasterTemplate: false,
+
+  // Opening the template editor drops any in-progress edit — the draft belongs
+  // to the view, not to the template.
+  setEditingMasterTemplate: (open) =>
+    set(
+      open
+        ? { editingMasterTemplate: true, editMode: false, draft: null, isDirty: false }
+        : { editingMasterTemplate: false }
+    ),
 }));
 
 export function emptyDashboard(name = "My Dashboard"): DashboardConfig {

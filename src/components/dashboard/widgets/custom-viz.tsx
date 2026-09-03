@@ -93,6 +93,37 @@ function sharedFormat(metrics: QueryMetric[]): MetricFormat | null {
   return fmts.size === 1 ? QUERY_METRIC_META[metrics[0]].format : null;
 }
 
+interface AxisSplit {
+  leftFmt: MetricFormat | null;
+  rightFmt: MetricFormat | null;
+  /** Series keys drawn against the right axis. */
+  rightKeys: Set<string>;
+}
+
+/**
+ * The `secondaryAxis` split: the first metric keeps the left axis and every
+ * other metric shares a right one, so conversions stay readable next to spend
+ * instead of flattening into the baseline. Null when the option is off or
+ * there is nothing to split (one series, or a grouped chart whose series are
+ * groups of the same metric). `disabled` lets a stacked area opt out — stacking
+ * across two scales would draw a meaningless sum.
+ */
+function splitAxes(cfg: CustomWidgetConfig, series: LineSeries[], disabled = false): AxisSplit | null {
+  if (disabled || cfg.secondaryAxis !== true || cfg.groupBy !== "none" || series.length < 2) return null;
+  const rest = series.slice(1);
+  return {
+    leftFmt: QUERY_METRIC_META[series[0].metric].format,
+    rightFmt: sharedFormat(rest.map((s) => s.metric)),
+    rightKeys: new Set(rest.map((s) => s.key)),
+  };
+}
+
+/** Legend chips with the right-axis series marked, so two scales are never a surprise. */
+function markRightAxis<T extends { key: string; label: string }>(items: T[], axes: AxisSplit | null): T[] {
+  if (!axes) return items;
+  return items.map((it) => (axes.rightKeys.has(it.key) ? { ...it, label: `${it.label} (right)` } : it));
+}
+
 function formatBucketDate(d: string, bucket: QueryTimeBucket, long = false): string {
   const day = format(parseISO(d), long ? "MMM d, yyyy" : "MMM d");
   return bucket === "week" ? `Wk of ${day}` : day;
@@ -562,14 +593,15 @@ export function LineViz({ cfg, result, currency, compare }: TimeVizProps) {
   );
 
   const axisFmt = sharedFormat(cfg.metrics);
+  const axes = splitAxes(cfg, series);
   const metricByKey = new Map(series.map((s) => [s.key, s.metric]));
 
   return (
     <div className="h-full w-full flex flex-col">
-      <LegendChips items={prev.legend} />
+      <LegendChips items={markRightAxis(prev.legend, axes)} />
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={prev.data} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+          <LineChart data={prev.data} margin={{ top: 4, right: axes ? 0 : 8, left: -8, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
             <XAxis
               dataKey="date"
@@ -577,11 +609,32 @@ export function LineViz({ cfg, result, currency, compare }: TimeVizProps) {
               tickFormatter={(d) => formatBucketDate(String(d), cfg.timeBucket)}
               minTickGap={24}
             />
-            <YAxis
-              tick={AXIS_TICK}
-              width={44}
-              tickFormatter={(v) => axisTick(axisFmt, Number(v), currency)}
-            />
+            {/* Recharts resolves a series' `yAxisId` against a declared axis, so the
+                ids only exist when the chart is actually split. */}
+            {!axes && (
+              <YAxis
+                tick={AXIS_TICK}
+                width={44}
+                tickFormatter={(v) => axisTick(axisFmt, Number(v), currency)}
+              />
+            )}
+            {axes && (
+              <YAxis
+                yAxisId="left"
+                tick={AXIS_TICK}
+                width={44}
+                tickFormatter={(v) => axisTick(axes.leftFmt, Number(v), currency)}
+              />
+            )}
+            {axes && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={AXIS_TICK}
+                width={44}
+                tickFormatter={(v) => axisTick(axes.rightFmt, Number(v), currency)}
+              />
+            )}
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
               labelFormatter={(d) => formatBucketDate(String(d), cfg.timeBucket, true)}
@@ -594,19 +647,20 @@ export function LineViz({ cfg, result, currency, compare }: TimeVizProps) {
                   : text;
               }}
             />
-            {prev.hasCompare && <CompareLine name={prev.name} />}
+            {prev.hasCompare && <CompareLine name={prev.name} yAxisId={axes ? "left" : undefined} />}
             {series.map((s) => (
               <Line
                 key={s.key}
                 type="monotone"
                 dataKey={s.key}
                 name={s.label}
+                {...(axes ? { yAxisId: axes.rightKeys.has(s.key) ? "right" : "left" } : {})}
                 stroke={s.color}
                 strokeWidth={2}
                 dot={false}
               />
             ))}
-            {trend.hasTrend && <TrendLine color={series[0].color} />}
+            {trend.hasTrend && <TrendLine color={series[0].color} yAxisId={axes ? "left" : undefined} />}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -629,14 +683,15 @@ export function AreaViz({ cfg, result, currency, compare }: TimeVizProps) {
   // Stacked areas are read as a composition, so they need solid-ish fills;
   // overlaid ones have to stay see-through to keep the lower series visible.
   const stacked = cfg.areaStacked === true;
+  const axes = splitAxes(cfg, series, stacked);
 
   return (
     <div className="h-full w-full flex flex-col">
-      <LegendChips items={prev.legend} />
+      <LegendChips items={markRightAxis(prev.legend, axes)} />
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           {/* ComposedChart, not AreaChart: it is the one that draws the fit's Line next to Areas. */}
-          <ComposedChart data={prev.data} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+          <ComposedChart data={prev.data} margin={{ top: 4, right: axes ? 0 : 8, left: -8, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
             <XAxis
               dataKey="date"
@@ -644,11 +699,32 @@ export function AreaViz({ cfg, result, currency, compare }: TimeVizProps) {
               tickFormatter={(d) => formatBucketDate(String(d), cfg.timeBucket)}
               minTickGap={24}
             />
-            <YAxis
-              tick={AXIS_TICK}
-              width={44}
-              tickFormatter={(v) => axisTick(axisFmt, Number(v), currency)}
-            />
+            {/* Recharts resolves a series' `yAxisId` against a declared axis, so the
+                ids only exist when the chart is actually split. */}
+            {!axes && (
+              <YAxis
+                tick={AXIS_TICK}
+                width={44}
+                tickFormatter={(v) => axisTick(axisFmt, Number(v), currency)}
+              />
+            )}
+            {axes && (
+              <YAxis
+                yAxisId="left"
+                tick={AXIS_TICK}
+                width={44}
+                tickFormatter={(v) => axisTick(axes.leftFmt, Number(v), currency)}
+              />
+            )}
+            {axes && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={AXIS_TICK}
+                width={44}
+                tickFormatter={(v) => axisTick(axes.rightFmt, Number(v), currency)}
+              />
+            )}
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
               labelFormatter={(d) => formatBucketDate(String(d), cfg.timeBucket, true)}
@@ -661,7 +737,7 @@ export function AreaViz({ cfg, result, currency, compare }: TimeVizProps) {
                   : text;
               }}
             />
-            {prev.hasCompare && <CompareLine name={prev.name} />}
+            {prev.hasCompare && <CompareLine name={prev.name} yAxisId={axes ? "left" : undefined} />}
             {series.map((s) => (
               <Area
                 key={s.key}
@@ -669,13 +745,14 @@ export function AreaViz({ cfg, result, currency, compare }: TimeVizProps) {
                 dataKey={s.key}
                 name={s.label}
                 {...(stacked ? { stackId: "a" } : {})}
+                {...(axes ? { yAxisId: axes.rightKeys.has(s.key) ? "right" : "left" } : {})}
                 stroke={s.color}
                 strokeWidth={2}
                 fill={s.color}
                 fillOpacity={stacked ? 0.65 : 0.18}
               />
             ))}
-            {trend.hasTrend && <TrendLine color={series[0].color} />}
+            {trend.hasTrend && <TrendLine color={series[0].color} yAxisId={axes ? "left" : undefined} />}
           </ComposedChart>
         </ResponsiveContainer>
       </div>

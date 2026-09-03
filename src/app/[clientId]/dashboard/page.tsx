@@ -1,5 +1,5 @@
-import { CustomizableDashboard } from "@/components/dashboard/customizable-dashboard";
+import { DashboardView } from "@/components/dashboard/dashboard-view";
 
 export default function Page() {
-  return <CustomizableDashboard />;
+  return <DashboardView />;
 }

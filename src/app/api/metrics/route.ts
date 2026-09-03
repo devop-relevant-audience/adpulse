@@ -126,7 +126,14 @@ export const GET = withRoute("metrics.GET", async (request: NextRequest) => {
 
     case "pacing": {
       const month = searchParams.get("month") || params.startDate.substring(0, 7);
-      const pacing = await getCampaignPacing({ clientId: params.clientId, month });
+      const pacing = await getCampaignPacing({
+        clientId: params.clientId,
+        month,
+        // getCampaignPacing takes only the list form; fold the single-platform
+        // page selector into it so both spellings filter the same way.
+        platforms: params.platform ? [params.platform] : params.platforms,
+        campaignIds: params.campaignIds,
+      });
       return NextResponse.json(pacing);
     }
 

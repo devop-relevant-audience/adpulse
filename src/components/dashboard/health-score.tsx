@@ -113,11 +113,15 @@ export function HealthScore() {
   const { formatCurrency } = useCurrencyFormat();
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
+  const selectedPlatform = useAppStore((s) => s.selectedPlatform);
+  const selectedCampaignIds = useAppStore((s) => s.selectedCampaignIds);
 
   const { data: healthData, isLoading, isError, refetch } = useHealthScore({
     clientId,
     startDate: dateRange.start,
     endDate: dateRange.end,
+    platform: selectedPlatform,
+    campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined,
   });
 
   if (!clientId || isLoading) {

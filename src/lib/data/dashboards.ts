@@ -9,7 +9,7 @@ import type {
   WidgetInstance,
 } from "@/lib/dashboard/types";
 import { DASHBOARD_CONFIG_VERSION } from "@/lib/dashboard/types";
-import { buildDefaultDashboard } from "@/lib/dashboard/default-preset";
+import { getMasterTemplate } from "@/lib/data/templates";
 import { hydrateWidgets, stripLinkedConfigs } from "@/lib/data/saved-widgets";
 
 // A client owns many named dashboard views. Each is either `internal` (agency
@@ -114,7 +114,9 @@ export async function getDashboardById(id: string): Promise<SavedDashboard | nul
 
 /**
  * The view a client opens on: its default, else its oldest view, else the
- * built-in preset (a pseudo-view with no id — saving it creates the row).
+ * MASTER template's content (a pseudo-view with no id — saving it creates the
+ * row). The master is the agency's house layout, so editing it changes what
+ * every client that has never saved a view sees.
  */
 export async function getDefaultDashboard(
   clientId: string,
@@ -131,7 +133,20 @@ export async function getDefaultDashboard(
     .orderBy(desc(dashboards.isDefault), asc(dashboards.createdAt))
     .limit(1);
 
-  return row ? toConfig(row) : buildDefaultDashboard();
+  if (row) return toConfig(row);
+
+  const master = await getMasterTemplate();
+  return {
+    // No id: the master's content is not this client's saved view until someone
+    // saves it, at which point the PUT inserts the row.
+    id: null,
+    name: "Default",
+    visibility: "internal",
+    isDefault: true,
+    version: master.version,
+    layouts: master.layouts,
+    widgets: master.widgets,
+  };
 }
 
 /**

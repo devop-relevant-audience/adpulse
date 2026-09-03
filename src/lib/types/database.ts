@@ -570,6 +570,8 @@ export interface DashboardTemplateRow {
   layouts: unknown;
   widgets: unknown;
   version: number;
+  /** The single master template — what a client with no saved view renders. */
+  is_master: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -581,6 +583,7 @@ export interface DashboardTemplateInsert {
   layouts: unknown;
   widgets: unknown;
   version?: number;
+  is_master?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -622,6 +625,8 @@ export interface ReportTemplateRow {
   layouts: unknown;
   widgets: unknown;
   version: number;
+  /** The single master report template — what a new report layout starts from. */
+  is_master: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -633,6 +638,7 @@ export interface ReportTemplateInsert {
   layouts: unknown;
   widgets: unknown;
   version?: number;
+  is_master?: boolean;
   created_at?: string;
   updated_at?: string;
 }

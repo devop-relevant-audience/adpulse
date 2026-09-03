@@ -22,7 +22,8 @@ import { QueryError } from "@/components/ui/query-error";
 import { METRIC_OPTIONS, getMetricOption, formatMetric, type MetricOption } from "@/lib/dashboard/metrics";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { ConfigSection, ChipRow, ChipToggle } from "@/components/dashboard/config-ui";
+import { ConfigSection, ConfigField, ChipRow, ChipToggle } from "@/components/dashboard/config-ui";
+import { Switch } from "@/components/ui/switch";
 import type { WidgetRenderProps, WidgetConfigFormProps } from "@/lib/dashboard/types";
 
 // Trend uses the daily-trend row keys, so only metrics with a real per-day
@@ -51,6 +52,16 @@ function readMetrics(config: Record<string, unknown>): string[] {
 function readGranularity(config: Record<string, unknown>): Granularity {
   const g = config.granularity;
   return GRANULARITIES.some((o) => o.value === g) ? (g as Granularity) : "day";
+}
+
+/**
+ * Second axis: metrics after the first are plotted against a right-hand scale,
+ * so conversions stay readable next to spend instead of flattening into the
+ * baseline. Off by default — configs saved before the option existed keep
+ * drawing on one scale.
+ */
+function readSecondaryAxis(config: Record<string, unknown>): boolean {
+  return config.secondaryAxis === true;
 }
 
 /** ISO week (Monday) / calendar month start, as the bucket's `yyyy-MM-dd` key. */
@@ -131,6 +142,10 @@ export function TrendWidget({ config, instanceId }: WidgetRenderProps) {
     () => readMetrics(config).map(getMetricOption).filter((m) => m.trendKey),
     [config]
   );
+  // One metric has nothing to split against, so the right axis only appears
+  // once there is a second series to put on it.
+  const dual = readSecondaryAxis(config) && metrics.length >= 2;
+  const axisOf = (index: number) => (dual ? (index === 0 ? "left" : "right") : undefined);
 
   // Compare always follows the widget's effective range, which may be pinned.
   const compareRange = useMemo(
@@ -213,10 +228,10 @@ export function TrendWidget({ config, instanceId }: WidgetRenderProps) {
   return (
     <div className="h-full w-full flex flex-col">
       <div className="flex items-center gap-3 mb-1 flex-wrap">
-        {metrics.map((m) => (
+        {metrics.map((m, i) => (
           <span key={m.value} className="inline-flex items-center gap-1.5 text-[11px] text-ink-muted">
             <span className="w-2.5 h-2.5 rounded-sm" style={{ background: m.color }} />
-            {m.label}
+            {axisOf(i) === "right" ? `${m.label} (right)` : m.label}
           </span>
         ))}
         {compareLabel && (
@@ -250,7 +265,7 @@ export function TrendWidget({ config, instanceId }: WidgetRenderProps) {
       </div>
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+          <LineChart data={chartData} margin={{ top: 4, right: dual ? 0 : 8, left: -8, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
             <XAxis
               dataKey="date"
@@ -258,11 +273,32 @@ export function TrendWidget({ config, instanceId }: WidgetRenderProps) {
               tickFormatter={(d) => formatBucket(String(d), granularity)}
               minTickGap={24}
             />
-            <YAxis
-              tick={{ fontSize: 10, fill: "#a39e98" }}
-              width={40}
-              tickFormatter={(v) => formatNumber(Number(v))}
-            />
+            {/* Recharts resolves a series' `yAxisId` against a declared axis, so
+                the ids only exist when the chart is actually split. */}
+            {!dual && (
+              <YAxis
+                tick={{ fontSize: 10, fill: "#a39e98" }}
+                width={40}
+                tickFormatter={(v) => formatNumber(Number(v))}
+              />
+            )}
+            {dual && (
+              <YAxis
+                yAxisId="left"
+                tick={{ fontSize: 10, fill: "#a39e98" }}
+                width={40}
+                tickFormatter={(v) => formatNumber(Number(v))}
+              />
+            )}
+            {dual && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 10, fill: "#a39e98" }}
+                width={40}
+                tickFormatter={(v) => formatNumber(Number(v))}
+              />
+            )}
             <Tooltip
               contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #ececec" }}
               labelFormatter={(d, payload) => {
@@ -284,24 +320,26 @@ export function TrendWidget({ config, instanceId }: WidgetRenderProps) {
                 ];
               }}
             />
-            {metrics.map((m) => (
+            {metrics.map((m, i) => (
               <Line
                 key={m.value}
                 type="monotone"
                 dataKey={m.trendKey ?? m.value}
                 name={m.label}
+                {...(dual ? { yAxisId: axisOf(i) } : {})}
                 stroke={m.color}
                 strokeWidth={2}
                 dot={false}
               />
             ))}
             {compareLabel &&
-              metrics.map((m) => (
+              metrics.map((m, i) => (
                 <Line
                   key={`${CMP}${m.value}`}
                   type="monotone"
                   dataKey={`${CMP}${m.trendKey ?? m.value}`}
                   name={`${m.label} · ${compareLabel}`}
+                  {...(dual ? { yAxisId: axisOf(i) } : {})}
                   stroke={m.color}
                   strokeOpacity={0.45}
                   strokeWidth={1.5}
@@ -320,6 +358,7 @@ export function TrendWidget({ config, instanceId }: WidgetRenderProps) {
 export function TrendConfigForm({ config, onChange }: WidgetConfigFormProps) {
   const selected = readMetrics(config);
   const granularity = readGranularity(config);
+  const secondaryAxis = readSecondaryAxis(config);
   function toggle(value: string) {
     const next = selected.includes(value)
       ? selected.filter((v) => v !== value)
@@ -352,6 +391,19 @@ export function TrendConfigForm({ config, onChange }: WidgetConfigFormProps) {
             </ChipToggle>
           ))}
         </ChipRow>
+      </ConfigSection>
+      <ConfigSection title="Display">
+        <ConfigField
+          label="Second axis"
+          hint={selected.length < 2 ? "Needs a second metric" : "Metrics after the first get a right-hand scale"}
+        >
+          <Switch
+            checked={secondaryAxis}
+            disabled={selected.length < 2}
+            onCheckedChange={(checked) => onChange({ ...config, secondaryAxis: checked })}
+            aria-label="Second axis"
+          />
+        </ConfigField>
       </ConfigSection>
     </>
   );

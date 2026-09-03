@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  MasterTemplateError,
   TemplateNameConflictError,
   createTemplate,
   deleteTemplate,
+  getMasterTemplate,
   getTemplate,
   listTemplates,
   updateTemplate,
+  updateTemplateContent,
 } from "@/lib/data/templates";
 import { getDashboardById } from "@/lib/data/dashboards";
+import { resolveWidgets, updateSavedWidget } from "@/lib/data/saved-widgets";
+import { DASHBOARD_CONFIG_VERSION } from "@/lib/dashboard/types";
+import {
+  MAX_WIDGETS,
+  gridLayoutsSchema,
+  widgetInstanceSchema,
+} from "@/lib/dashboard/widget-schemas";
+import { db } from "@/lib/db";
 import { requireAgencyRole, requireClientAccess, requireUser } from "@/lib/auth/guard";
 import { withRoute } from "@/lib/http/with-route";
 
@@ -34,6 +45,15 @@ const patchSchema = z.object({
   description: descriptionSchema.optional(),
 });
 
+// Content save. Same payload the dashboards PUT takes, minus the per-client
+// fields a template has none of.
+const putSchema = z.object({
+  id: uuidSchema,
+  version: z.number().optional(),
+  widgets: z.array(widgetInstanceSchema).max(MAX_WIDGETS),
+  layouts: gridLayoutsSchema,
+});
+
 function badRequest(message: string, details?: unknown) {
   return NextResponse.json({ error: message, ...(details ? { details } : {}) }, { status: 400 });
 }
@@ -52,10 +72,16 @@ async function gateAgency() {
   return requireAgencyRole(gate.ctx);
 }
 
-// GET -> every template, name-sorted, without the layouts/widgets payload.
-export const GET = withRoute("templates.GET", async () => {
+// GET ?action=master -> the master template's full content (created from the
+//                       built-in preset the first time it is asked for)
+// GET                 -> every template, master first, without the payload.
+export const GET = withRoute("templates.GET", async (request: NextRequest) => {
   const gate = await gateAgency();
   if (!gate.ok) return gate.response;
+
+  if (request.nextUrl.searchParams.get("action") === "master") {
+    return NextResponse.json(await getMasterTemplate());
+  }
 
   return NextResponse.json(await listTemplates());
 });
@@ -91,8 +117,7 @@ export const POST = withRoute("templates.POST", async (request: NextRequest) => 
   }
 });
 
-// PATCH -> rename / re-describe. Template CONTENT is immutable in this phase:
-// re-snapshot a view into a new template instead.
+// PATCH -> rename / re-describe. Content is saved by the PUT below.
 export const PATCH = withRoute("templates.PATCH", async (request: NextRequest) => {
   const gate = await gateAgency();
   if (!gate.ok) return gate.response;
@@ -113,8 +138,52 @@ export const PATCH = withRoute("templates.PATCH", async (request: NextRequest) =
   }
 });
 
+// PUT -> rewrite a template's blocks. The UI only offers this for the master,
+// but the endpoint is by id: a template is a grid like any other, so it goes
+// through the same widget resolution and the same one-transaction library sync
+// as the dashboards PUT.
+export const PUT = withRoute("templates.PUT", async (request: NextRequest) => {
+  const gate = await gateAgency();
+  if (!gate.ok) return gate.response;
+
+  const body = await request.json().catch(() => null);
+  const parsed = putSchema.safeParse(body);
+  if (!parsed.success) return badRequest("Invalid template payload", parsed.error.flatten());
+
+  const existing = await getTemplate(parsed.data.id);
+  if (!existing) return notFound();
+
+  const resolved = await resolveWidgets(parsed.data.widgets, "dashboard");
+  if (!resolved.ok) {
+    return NextResponse.json(
+      { error: "Invalid widget config", details: resolved.issues },
+      { status: 400 }
+    );
+  }
+
+  // One transaction: an "update everywhere" library write and the template save
+  // stand or fall together.
+  const saved = await db.transaction(async (tx) => {
+    for (const sync of resolved.syncs) {
+      await updateSavedWidget(sync.id, { config: sync.config }, tx);
+    }
+    return updateTemplateContent(
+      parsed.data.id,
+      {
+        layouts: parsed.data.layouts,
+        // Cast is safe: zod validated the structural shape above.
+        widgets: resolved.widgets as Parameters<typeof updateTemplateContent>[1]["widgets"],
+        version: parsed.data.version ?? DASHBOARD_CONFIG_VERSION,
+      },
+      tx
+    );
+  });
+
+  return saved ? NextResponse.json(saved) : notFound();
+});
+
 // DELETE ?id= -> drop a template. Views already stamped from it are untouched;
-// a template is a copy, not a live link.
+// a template is a copy, not a live link. The master cannot be deleted.
 export const DELETE = withRoute("templates.DELETE", async (request: NextRequest) => {
   const gate = await gateAgency();
   if (!gate.ok) return gate.response;
@@ -125,6 +194,13 @@ export const DELETE = withRoute("templates.DELETE", async (request: NextRequest)
   const existing = await getTemplate(parsedId.data);
   if (!existing) return notFound();
 
-  await deleteTemplate(parsedId.data);
+  try {
+    await deleteTemplate(parsedId.data);
+  } catch (error) {
+    if (error instanceof MasterTemplateError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    throw error;
+  }
   return NextResponse.json({ success: true });
 });

@@ -18,22 +18,24 @@ export interface WidgetScope {
   platforms: Platform[] | undefined;
   /** Single-platform convenience for callers that need one value (undefined when 0 or 2+ platforms). */
   platform: Platform | undefined;
+  /** Effective campaign filter: widget override, else the page selection, else undefined. */
   campaignIds: string[] | undefined;
   filters: WidgetFilters;
   hasWidgetFilters: boolean;
 }
 
 /**
- * Combines the page-level selection (client, date range, platform) with the
- * widget's own `config.filters`. A non-empty widget platform list replaces the
- * global platform selector, a pinned `dateRange` replaces the page range
- * (presets resolve on every render, so they stay rolling); campaign ids only
- * ever come from the widget.
+ * Combines the page-level selection (client, date range, platform, campaigns)
+ * with the widget's own `config.filters`. A non-empty widget platform or
+ * campaign list replaces the matching page selection, and a pinned `dateRange`
+ * replaces the page range (presets resolve on every render, so they stay
+ * rolling).
  */
 export function useWidgetScope(config: Record<string, unknown>): WidgetScope {
   const clientId = useAppStore((s) => s.selectedClientId);
   const pageDateRange = useAppStore((s) => s.dateRange);
   const selectedPlatform = useAppStore((s) => s.selectedPlatform);
+  const selectedCampaignIds = useAppStore((s) => s.selectedCampaignIds);
 
   return useMemo<WidgetScope>(() => {
     const filters = readWidgetFilters(config);
@@ -42,15 +44,20 @@ export function useWidgetScope(config: Record<string, unknown>): WidgetScope {
       : selectedPlatform
         ? [selectedPlatform]
         : undefined;
+    const campaignIds = filters.campaignIds?.length
+      ? filters.campaignIds
+      : selectedCampaignIds.length > 0
+        ? selectedCampaignIds
+        : undefined;
     const platform = platforms && platforms.length === 1 ? platforms[0] : undefined;
     return {
       clientId,
       dateRange: resolveWidgetDateRange(filters.dateRange) ?? pageDateRange,
       platforms,
       platform,
-      campaignIds: filters.campaignIds,
+      campaignIds,
       filters,
       hasWidgetFilters: hasWidgetFilters(filters),
     };
-  }, [config, clientId, pageDateRange, selectedPlatform]);
+  }, [config, clientId, pageDateRange, selectedPlatform, selectedCampaignIds]);
 }

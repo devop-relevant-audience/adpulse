@@ -48,7 +48,7 @@ import type { DashboardConfig, DashboardSummary } from "@/lib/dashboard/types";
 import { cn } from "@/lib/utils";
 
 /** Where a new view's widgets/layout come from. */
-type NewViewSource = "blank" | "duplicate" | "template";
+type NewViewSource = "master" | "blank" | "duplicate" | "template";
 
 interface DashboardViewSwitcherProps {
   clientId: string | null;
@@ -57,6 +57,8 @@ interface DashboardViewSwitcherProps {
   current: DashboardConfig;
   /** Agency staff manage views; client users only switch between published ones. */
   canManage: boolean;
+  /** Opens the master template editor. Required whenever `canManage` is set. */
+  onEditMaster?: () => void;
 }
 
 function errorMessage(error: unknown, fallback: string) {
@@ -68,6 +70,7 @@ export function DashboardViewSwitcher({
   views,
   current,
   canManage,
+  onEditMaster,
 }: DashboardViewSwitcherProps) {
   const selectView = useDashboardStore((s) => s.selectView);
   const isDirty = useDashboardStore((s) => s.isDirty);
@@ -111,7 +114,7 @@ export function DashboardViewSwitcher({
   function openNameDialog(mode: "new" | "duplicate" | "rename") {
     setActionError(null);
     setName(mode === "rename" ? current.name : mode === "duplicate" ? `${current.name} copy` : "");
-    setSource(mode === "duplicate" ? "duplicate" : "blank");
+    setSource(mode === "duplicate" ? "duplicate" : "master");
     setTemplateId(null);
     setNameDialog(mode);
   }
@@ -136,6 +139,7 @@ export function DashboardViewSwitcher({
           name: trimmed,
           duplicateFromId: source === "duplicate" && currentId ? currentId : undefined,
           fromTemplateId: source === "template" ? (templateId ?? undefined) : undefined,
+          fromMaster: source === "master" ? true : undefined,
         });
         if (created.id) selectView(clientId, created.id);
       }
@@ -297,6 +301,12 @@ export function DashboardViewSwitcher({
               >
                 <BiWindows className="w-4 h-4 mr-2" /> Save as template…
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onEditMaster && withDirtyGuard(onEditMaster)}
+                disabled={busy}
+              >
+                <BiGridAlt className="w-4 h-4 mr-2" /> Edit master template…
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
@@ -368,6 +378,9 @@ export function DashboardViewSwitcher({
               <div className="space-y-2">
                 <span className="block text-[12px] font-medium text-ink">Start from</span>
                 <ChipRow>
+                  <ChipToggle active={source === "master"} onClick={() => setSource("master")}>
+                    Master template
+                  </ChipToggle>
                   <ChipToggle active={source === "blank"} onClick={() => setSource("blank")}>
                     Blank
                   </ChipToggle>

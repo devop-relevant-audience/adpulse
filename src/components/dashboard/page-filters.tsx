@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { BiChevronDown, BiFilterAlt, BiX } from "react-icons/bi";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CampaignPicker, campaignCountLabel } from "@/components/dashboard/campaign-picker";
 import { useAppStore } from "@/store/app-store";
 import { useSetUrlFilters } from "@/hooks/use-url-filters";
 import { PLATFORM_COLORS } from "@/lib/dashboard/chart-theme";
@@ -34,8 +35,8 @@ const SHORT_COMPARE_LABELS: Record<CompareMode, string> = {
   previous_year: "vs prev year",
 };
 
-/** The one control that owns every page-level filter: date range, comparison
- * and platform. They all write the same `?start&end&platform&compare` query
+/** The one control that owns every page-level filter: date range, comparison,
+ * platform and campaigns. They all write the same `?start&end&platform&compare&campaigns` query
  * string, so keeping them in three separate widgets only spread one decision
  * across the header. Everything applies immediately — a custom range the moment
  * both ends are picked — so the menu needs no Apply step. */
@@ -43,9 +44,12 @@ export function PageFilters() {
   const dateRange = useAppStore((s) => s.dateRange);
   const compareMode = useAppStore((s) => s.compareMode);
   const selectedPlatform = useAppStore((s) => s.selectedPlatform);
+  const selectedCampaignIds = useAppStore((s) => s.selectedCampaignIds);
+  const clientId = useAppStore((s) => s.selectedClientId);
   // Writes to the URL; the [clientId] layout mirrors it back into the store,
   // so everything below keeps reading from the store.
-  const { setDateRange, setCompareMode, setPlatform } = useSetUrlFilters();
+  const { setDateRange, setCompareMode, setPlatform, setCampaignIds, resetFilters } =
+    useSetUrlFilters();
 
   const [open, setOpen] = useState(false);
   // Only holds a half-finished calendar selection (a start with no end yet).
@@ -64,9 +68,19 @@ export function PageFilters() {
   const platformLabel = PLATFORM_OPTIONS.find((o) => o.value === platform)?.label ?? "All platforms";
   const compareRange = getCompareRange(dateRange, compareMode);
   // "Reset" only means something when at least one filter is off its default
-  // (last-30 days, all platforms, no comparison).
+  // (last-30 days, all platforms, all campaigns, no comparison).
   const isDefault =
-    activePreset?.id === "last-30" && !selectedPlatform && compareMode === "none";
+    activePreset?.id === "last-30" &&
+    !selectedPlatform &&
+    compareMode === "none" &&
+    selectedCampaignIds.length === 0;
+
+  // Narrow the campaign list to the chosen platform. A selection made under a
+  // different platform is kept as-is — the data queries intersect anyway.
+  const pickerPlatforms = useMemo(
+    () => (selectedPlatform ? [selectedPlatform] : undefined),
+    [selectedPlatform]
+  );
 
   const calendarSelection: DateRange | undefined =
     pendingRange ?? { from: parseISO(dateRange.start), to: parseISO(dateRange.end) };
@@ -88,9 +102,7 @@ export function PageFilters() {
 
   function resetAll() {
     const fallback = DATE_RANGE_PRESETS.find((p) => p.id === "last-30");
-    if (fallback) setDateRange(fallback.getRange(today));
-    setCompareMode("none");
-    setPlatform(undefined);
+    resetFilters(fallback ? fallback.getRange(today) : dateRange);
     setPendingRange(undefined);
   }
 
@@ -115,6 +127,11 @@ export function PageFilters() {
               )}
               {platformLabel}
             </span>
+            {selectedCampaignIds.length > 0 && (
+              <span className="shrink-0 rounded-full bg-primary/8 px-1.5 py-px text-[11px] font-medium text-primary">
+                {campaignCountLabel(selectedCampaignIds.length)}
+              </span>
+            )}
             {compareMode !== "none" && (
               <span className="shrink-0 rounded-full bg-primary/8 px-1.5 py-px text-[11px] font-medium text-primary">
                 {SHORT_COMPARE_LABELS[compareMode]}
@@ -215,6 +232,17 @@ export function PageFilters() {
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="border-t border-hairline p-3">
+          <FieldLabel className="pb-1.5">Campaigns</FieldLabel>
+          <CampaignPicker
+            clientId={clientId}
+            selectedIds={selectedCampaignIds}
+            onChange={setCampaignIds}
+            platforms={pickerPlatforms}
+            maxHeightClassName="max-h-44"
+          />
         </div>
 
         <div className="flex items-center justify-between border-t border-hairline px-3 py-2">

@@ -70,8 +70,8 @@ interface WidgetFrameProps {
   onDuplicate?: (i: string) => void;
   /**
    * Pins this widget as the Builder Assistant's edit target. Absent = the
-   * assistant cannot rewrite this widget (not a chart, library-linked, or the
-   * viewer may not edit the dashboard at all).
+   * assistant cannot rewrite this widget (a type it has no schema for on this
+   * surface, library-linked, or the viewer may not edit the grid at all).
    */
   onEditWithAi?: (i: string) => void;
 }
@@ -85,12 +85,30 @@ function EditActions({
   onRemove,
   onSaveToLibrary,
   onDuplicate,
-}: Pick<WidgetFrameProps, "instance" | "onConfigure" | "onRemove" | "onSaveToLibrary" | "onDuplicate"> & {
+  onEditWithAi,
+}: Pick<
+  WidgetFrameProps,
+  "instance" | "onConfigure" | "onRemove" | "onSaveToLibrary" | "onDuplicate" | "onEditWithAi"
+> & {
   linked: boolean;
   canConfigure: boolean;
 }) {
   return (
     <div className="flex items-center gap-0.5 shrink-0">
+      {/* Also offered while editing, not only in view mode: the report builder
+          and the master template editors are ALWAYS in edit mode, so this is the
+          only place an AI edit can be reached there. */}
+      {onEditWithAi && (
+        <button
+          type="button"
+          aria-label="Edit with AI"
+          title="Edit with AI"
+          onClick={() => onEditWithAi(instance.i)}
+          className="p-1 rounded hover:bg-primary/8 text-ink-muted hover:text-primary transition-colors"
+        >
+          <LuSparkles className="w-3.5 h-3.5" />
+        </button>
+      )}
       {onSaveToLibrary && !linked && (
         <button
           type="button"
@@ -176,6 +194,7 @@ export function WidgetFrame({
       onRemove={onRemove}
       onSaveToLibrary={onSaveToLibrary}
       onDuplicate={onDuplicate}
+      onEditWithAi={onEditWithAi}
     />
   );
 

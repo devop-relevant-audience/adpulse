@@ -6,6 +6,7 @@ import type {
 } from "@/lib/dashboard/types";
 import type { Breakpoint } from "@/lib/dashboard/types";
 import { BREAKPOINTS, GRID_COLS } from "@/lib/dashboard/types";
+import { arrangeIntoRow } from "@/lib/dashboard/arrange";
 
 // The generic "editing a widget grid" slice, shared by the dashboard store and
 // the report-layout store. Both edit the same vocabulary (widget instances +
@@ -124,6 +125,22 @@ export interface GridEditState<TConfig extends GridEditableConfig> {
    * old height belongs to the old chart type.
    */
   setWidgetSize: (i: string, size: { w: number; h: number; minW: number; minH: number }) => void;
+  /**
+   * Sets a widget's width, its height, or both, leaving whatever is not given
+   * alone — and never going below the widget's own declared minimums, which
+   * `resizeWidget` predates and does not check. This is the Builder Assistant's
+   * resize path: "make the table taller" must not also reset a width the user
+   * dragged, and cannot be allowed to squeeze a chart under the size it renders
+   * at.
+   */
+  setWidgetGeometry: (i: string, size: { w?: number; h?: number }) => void;
+  /**
+   * Puts the named widgets side by side on one row, in the order given, and
+   * reports whether anything moved (false = fewer than two of them are on the
+   * grid). See `arrangeIntoRow` for why the assistant arranges rows instead of
+   * naming coordinates.
+   */
+  arrangeRow: (ids: string[]) => boolean;
 }
 
 /**
@@ -340,5 +357,44 @@ export function createGridEditSlice<TConfig extends GridEditableConfig>(
         }
         return { draft: { ...s.draft, layouts }, isDirty: true };
       }),
+
+    setWidgetGeometry: (i, size) =>
+      set((s) => {
+        if (!s.draft) return s;
+        const layouts = { ...s.draft.layouts };
+        for (const bp of BREAKPOINTS) {
+          layouts[bp] = (s.draft.layouts[bp] ?? []).map((it) => {
+            if (it.i !== i) return it;
+            const next = { ...it };
+            if (size.w !== undefined) {
+              const floor = Math.min(it.minW ?? 1, GRID_COLS[bp]);
+              next.w = Math.max(floor, clampWidth(size.w, bp));
+            }
+            if (size.h !== undefined) next.h = Math.max(it.minH ?? 1, size.h);
+            return next;
+          });
+        }
+        return { draft: { ...s.draft, layouts }, isDirty: true };
+      }),
+
+    arrangeRow: (ids) => {
+      let moved = false;
+      set((s) => {
+        if (!s.draft) return s;
+        const layouts = { ...s.draft.layouts };
+        // Every breakpoint is arranged on its own column count, so the same
+        // request produces one row on the 12-column desktop grid and a stack on
+        // the 4-column phone grid, which is what "side by side" has to mean
+        // there. A breakpoint that cannot honour it keeps what it had.
+        for (const bp of BREAKPOINTS) {
+          const next = arrangeIntoRow(s.draft.layouts[bp] ?? [], ids, GRID_COLS[bp]);
+          if (!next) continue;
+          layouts[bp] = next;
+          moved = true;
+        }
+        return moved ? { draft: { ...s.draft, layouts }, isDirty: true } : s;
+      });
+      return moved;
+    },
   };
 }

@@ -11,7 +11,7 @@ import {
   type Layout,
   type ResponsiveLayouts,
 } from "react-grid-layout";
-import { BiArrowBack, BiCheck, BiPlus, BiShow, BiX } from "react-icons/bi";
+import { BiArrowBack, BiCheck, BiGridAlt, BiPlus, BiShow, BiX } from "react-icons/bi";
 import { LuSparkles } from "react-icons/lu";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,64 +29,70 @@ import { BuilderAssistant } from "@/components/dashboard/builder-assistant";
 import { WidgetCatalogDialog } from "@/components/dashboard/widget-catalog-dialog";
 import { WidgetConfigDialog } from "@/components/dashboard/widget-config-dialog";
 import { SaveWidgetDialog } from "@/components/dashboard/save-widget-dialog";
+import { ReportPreviewDialog } from "@/components/reports/report-preview-dialog";
 import { WidgetDataProvider } from "@/lib/dashboard/widget-data";
 import { getWidget } from "@/lib/dashboard/widget-registry";
-import { useReportLayout, useSaveReportLayout } from "@/hooks/use-report-layouts";
-import { ReportPreviewDialog } from "@/components/reports/report-preview-dialog";
-import { useReportLayoutStore } from "@/store/report-layout-store";
+import { useSelectedClient } from "@/hooks/use-selected-client";
+import { useMasterTemplate, useSaveTemplateContent } from "@/hooks/use-templates";
+import {
+  useMasterReportTemplate,
+  useSaveReportTemplateContent,
+} from "@/hooks/use-report-templates";
+import { useTemplateEditStore } from "@/store/template-edit-store";
 import { useBuilderGrid } from "@/hooks/use-builder-grid";
 import { useAppStore } from "@/store/app-store";
 import type { NewWidgetSpec } from "@/store/grid-edit-store";
 import {
+  GRID_BREAKPOINTS,
   GRID_COLS,
   GRID_CONTAINER_PADDING,
   GRID_MARGIN,
   GRID_ROW_HEIGHT,
   type DashboardLayouts,
-  type ReportLayoutConfig,
   type SavedWidget,
+  type TemplateContent,
   type WidgetInstance,
 } from "@/lib/dashboard/types";
 
-// The report builder's canvas: one layout, always in edit mode, drawn on a
-// document-width page rather than the full dashboard width so the blocks are
-// arranged at roughly the proportions the generated report will use.
+// The master template's canvas: the house dashboard and the house report, edited
+// with the same grid vocabulary as a client's own view or layout. Always in edit
+// mode, one at a time (see `template-edit-store.ts`).
 //
-// The grid wiring is the dashboard's (see `customizable-dashboard.tsx`): RGL
-// 2.x self-measures through `useContainerWidth`, so the measured div must be
-// mounted on the very first render — loading, empty and populated states all
-// live INSIDE it.
+// Widgets render LIVE against whichever client is selected — the registry's
+// hooks read the app store — so the editor is a preview of the template's shape,
+// not of any one client's numbers. The banner says so.
 
-/** Editing width of the page. Matches the generated report's document width. */
+/** Editing width of the report page. Matches the generated report's document width. */
 const PAGE_MAX_WIDTH = 880;
 
-// The editor grid is PINNED to `lg`/12 columns, whatever the page measures.
-// RGL picks a breakpoint from the measured width (`getBreakpointFromWidth`:
-// the widest entry whose value is strictly below the width), and the page's
-// content box is ~832px — under GRID_BREAKPOINTS.lg (1024), so it would select
-// `md` and write every drag and resize into `layouts.md`. The report renderer
-// (`view-report.tsx`) draws `layouts.lg` at 12 columns only, so those edits
-// would be discarded. A single-entry breakpoint map at 0 makes `lg` the only
-// candidate at any width; 12 columns at 832px simply means narrower cells.
-// `md`/`sm` are still maintained by the store (addWidget/resizeWidget) and
-// carried through the save, because the PUT schema requires all three.
-const EDITOR_BREAKPOINTS = { lg: 0 };
-const EDITOR_COLS = { lg: GRID_COLS.lg };
+// The report grid is PINNED to `lg`/12 columns whatever the page measures — see
+// the long note in `report-layout-editor.tsx`: the page's content box is under
+// GRID_BREAKPOINTS.lg, so RGL would otherwise write every drag into `layouts.md`
+// and the report renderer, which draws `lg` only, would discard them.
+const REPORT_BREAKPOINTS = { lg: 0 };
+const REPORT_COLS = { lg: GRID_COLS.lg };
 
-export function ReportLayoutEditor({
+export function MasterTemplateEditor({
+  kind,
   clientId,
-  layoutId,
-  layoutName,
   onBack,
 }: {
+  kind: "dashboard" | "report";
   clientId: string;
-  layoutId: string;
-  /** Known from the list, so the toolbar has a name before the fetch lands. */
-  layoutName: string;
   onBack: () => void;
 }) {
-  const { data: saved, isLoading, isError, refetch } = useReportLayout(clientId, layoutId);
-  const saveLayout = useSaveReportLayout(clientId);
+  const isReport = kind === "report";
+  // Both hook sets are called unconditionally (rules of hooks); only the one
+  // matching `kind` fetches, and the other mutation is inert until used.
+  const dashboardMaster = useMasterTemplate(!isReport);
+  const reportMaster = useMasterReportTemplate(isReport);
+  const saveDashboardContent = useSaveTemplateContent();
+  const saveReportContent = useSaveReportTemplateContent();
+
+  const { data: saved, isLoading, isError, refetch } = isReport ? reportMaster : dashboardMaster;
+  const saveContent = isReport ? saveReportContent : saveDashboardContent;
+
+  const client = useSelectedClient();
   const { width, containerRef } = useContainerWidth();
   // The assistant shares the fixed right-hand slot (and the <main> push) with
   // the AI chat panel, so its open state lives in the app store, which keeps
@@ -94,17 +100,17 @@ export function ReportLayoutEditor({
   const isBuilderOpen = useAppStore((s) => s.isBuilderOpen);
   const setBuilderOpen = useAppStore((s) => s.setBuilderOpen);
 
-  const draft = useReportLayoutStore((s) => s.draft);
-  const isDirty = useReportLayoutStore((s) => s.isDirty);
-  const beginEdit = useReportLayoutStore((s) => s.beginEdit);
-  const cancelEdit = useReportLayoutStore((s) => s.cancelEdit);
-  const setLayouts = useReportLayoutStore((s) => s.setLayouts);
-  const addWidget = useReportLayoutStore((s) => s.addWidget);
-  const duplicateWidget = useReportLayoutStore((s) => s.duplicateWidget);
-  const removeWidget = useReportLayoutStore((s) => s.removeWidget);
-  const updateWidgetConfig = useReportLayoutStore((s) => s.updateWidgetConfig);
-  const linkWidget = useReportLayoutStore((s) => s.linkWidget);
-  const resizeWidget = useReportLayoutStore((s) => s.resizeWidget);
+  const draft = useTemplateEditStore((s) => s.draft);
+  const isDirty = useTemplateEditStore((s) => s.isDirty);
+  const beginEdit = useTemplateEditStore((s) => s.beginEdit);
+  const cancelEdit = useTemplateEditStore((s) => s.cancelEdit);
+  const setLayouts = useTemplateEditStore((s) => s.setLayouts);
+  const addWidget = useTemplateEditStore((s) => s.addWidget);
+  const duplicateWidget = useTemplateEditStore((s) => s.duplicateWidget);
+  const removeWidget = useTemplateEditStore((s) => s.removeWidget);
+  const updateWidgetConfig = useTemplateEditStore((s) => s.updateWidgetConfig);
+  const linkWidget = useTemplateEditStore((s) => s.linkWidget);
+  const resizeWidget = useTemplateEditStore((s) => s.resizeWidget);
 
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [configuringId, setConfiguringId] = useState<string | null>(null);
@@ -114,17 +120,17 @@ export function ReportLayoutEditor({
   const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  // Seed the draft once per layout. Guarded on the STORE's draft, not a ref:
+  // Seed the draft once per template. Guarded on the STORE's draft, not a ref:
   // StrictMode re-runs effects after their cleanup (which clears the draft), and
   // a ref would still say "done" — leaving the skeleton up forever. A background
-  // refetch changes `saved` but the draft for this layout already exists, so the
-  // user's unsaved edits are never re-seeded away.
+  // refetch changes `saved` but the draft for this template already exists, so
+  // unsaved edits are never re-seeded away.
   useEffect(() => {
     if (!saved) return;
-    const draft = useReportLayoutStore.getState().draft;
-    if (draft && draft.id === layoutId) return;
+    const current = useTemplateEditStore.getState().draft;
+    if (current && current.id === saved.id) return;
     beginEdit(saved);
-  }, [saved, layoutId, beginEdit]);
+  }, [saved, beginEdit]);
 
   // The draft belongs to this editor session, so leaving drops it.
   useEffect(() => () => cancelEdit(), [cancelEdit]);
@@ -133,7 +139,7 @@ export function ReportLayoutEditor({
   // — otherwise <main> keeps its margin with nothing in the slot.
   useEffect(() => () => setBuilderOpen(false), [setBuilderOpen]);
 
-  // Scroll a freshly added block into view. RGL renders a new item one commit
+  // Scroll a freshly added widget into view. RGL renders a new item one commit
   // after the draft updates, so the element may not exist yet — retry briefly.
   // The flash itself is declarative (`highlight` on WidgetFrame).
   useEffect(() => {
@@ -165,17 +171,19 @@ export function ReportLayoutEditor({
     ? draft?.layouts.lg.find((l) => l.i === configuring.i)?.w
     : undefined;
 
-  // The Builder Assistant, on the report surface — the same apparatus the
-  // dashboard uses (see `use-builder-grid.ts`), so a block it builds here is the
-  // same widget it would build there, plus the report-only ones. No `save`: this
-  // editor is ALWAYS inside an edit session, so an assistant change joins the
-  // draft and lands with the Save button like every other edit.
-  const builder = useBuilderGrid<ReportLayoutConfig>({
-    store: useReportLayoutStore,
-    surface: "report",
+  // The Builder Assistant, pointed at the master template rather than at one
+  // client's grid — the prompt says so, so it builds for every client instead of
+  // pinning the template to this one's campaigns. No `save`: this editor is
+  // ALWAYS inside an edit session, so an assistant change joins the draft and
+  // lands with the Save button like every other edit.
+  const builder = useBuilderGrid<TemplateContent>({
+    store: useTemplateEditStore,
+    surface: isReport ? "report" : "dashboard",
     config: draft,
     saved,
-    scope: `${clientId}:${layoutId}`,
+    // One master per kind, so the kind is the whole identity; the client rides
+    // along because it is the data the tools read.
+    scope: `${clientId}:master-${kind}`,
     onHighlight: setJustAddedId,
     onOpenPanel: () => setBuilderOpen(true),
   });
@@ -204,15 +212,15 @@ export function ReportLayoutEditor({
     );
   }
 
-  // The grid only ever edits `lg` (see EDITOR_BREAKPOINTS), so `md`/`sm` are
-  // taken straight from the draft — the store keeps them in step on add and
-  // resize, and the PUT schema requires all three arrays.
+  // The report grid only ever edits `lg` (see REPORT_BREAKPOINTS), so its
+  // `md`/`sm` are taken straight from the draft — the store keeps them in step
+  // on add and resize, and the PUT schema requires all three arrays.
   function handleLayoutChange(_current: Layout, all: ResponsiveLayouts) {
-    const cur = useReportLayoutStore.getState().draft?.layouts;
+    const cur = useTemplateEditStore.getState().draft?.layouts;
     setLayouts({
       lg: [...(all.lg ?? cur?.lg ?? [])] as DashboardLayouts["lg"],
-      md: [...(cur?.md ?? [])] as DashboardLayouts["md"],
-      sm: [...(cur?.sm ?? [])] as DashboardLayouts["sm"],
+      md: [...((isReport ? cur?.md : all.md ?? cur?.md) ?? [])] as DashboardLayouts["md"],
+      sm: [...((isReport ? cur?.sm : all.sm ?? cur?.sm) ?? [])] as DashboardLayouts["sm"],
     });
   }
 
@@ -222,7 +230,12 @@ export function ReportLayoutEditor({
     try {
       // Re-seed the draft from what the SERVER stored: linked widgets come back
       // hydrated, and the save is then no longer dirty.
-      const stored = await saveLayout.mutateAsync(draft);
+      const stored = await saveContent.mutateAsync({
+        id: draft.id,
+        layouts: draft.layouts,
+        widgets: draft.widgets,
+        version: draft.version,
+      });
       beginEdit(stored);
       return true;
     } catch {
@@ -232,8 +245,8 @@ export function ReportLayoutEditor({
     }
   }
 
-  // The preview renders the SAVED row, so unsaved blocks have to land first —
-  // a failed save keeps the dialog shut and leaves the error line to explain.
+  // The preview renders the SAVED template, so unsaved blocks have to land first
+  // — a failed save keeps the dialog shut and leaves the error line to explain.
   async function handlePreview() {
     if (isDirty && !(await handleSave())) return;
     setPreviewOpen(true);
@@ -249,7 +262,65 @@ export function ReportLayoutEditor({
     if (saved) beginEdit(saved);
   }
 
-  const name = draft?.name ?? saved?.name ?? layoutName;
+  const name = draft?.name ?? saved?.name ?? (isReport ? "Master report" : "Master dashboard");
+  const clientLabel = client?.name ? `${client.name}’s` : "the selected client’s";
+
+  const grid = !draft ? (
+    <Skeleton className="h-[400px] w-full rounded-xl" />
+  ) : draft.widgets.length === 0 ? (
+    <div className="border border-dashed border-hairline rounded-xl py-16 grid place-items-center text-center">
+      {isReport ? (
+        <BiPlus className="w-8 h-8 text-ink-faint mb-3" />
+      ) : (
+        <BiGridAlt className="w-8 h-8 text-ink-faint mb-3" />
+      )}
+      <p className="text-sm font-medium text-ink">
+        This master {isReport ? "report" : "dashboard"} is empty
+      </p>
+      <p className="text-xs text-ink-muted mt-1 mb-4">
+        {isReport
+          ? "Start with a cover block, then add the metrics every report should carry."
+          : "Add the widgets every client should see out of the box."}
+      </p>
+      <div className="flex items-center justify-center gap-2">
+        <Button size="sm" onClick={() => setCatalogOpen(true)}>
+          <BiPlus className="w-4 h-4" /> {isReport ? "Add block" : "Add widget"}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setBuilderOpen(true)}>
+          <LuSparkles className="w-4 h-4" /> Builder Assistant
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <ResponsiveGridLayout
+      className="layout"
+      width={width}
+      layouts={draft.layouts as unknown as ResponsiveLayouts}
+      breakpoints={isReport ? REPORT_BREAKPOINTS : GRID_BREAKPOINTS}
+      cols={isReport ? REPORT_COLS : GRID_COLS}
+      rowHeight={GRID_ROW_HEIGHT}
+      margin={GRID_MARGIN}
+      containerPadding={GRID_CONTAINER_PADDING}
+      dragConfig={{ enabled: true, handle: ".widget-drag-handle" }}
+      resizeConfig={{ enabled: true }}
+      onLayoutChange={handleLayoutChange}
+    >
+      {draft.widgets.map((w) => (
+        <div key={w.i} data-widget-id={w.i}>
+          <WidgetFrame
+            instance={w}
+            editMode
+            highlight={w.i === justAddedId}
+            onConfigure={setConfiguringId}
+            onRemove={removeWidget}
+            onSaveToLibrary={setSavingToLibraryId}
+            onDuplicate={handleDuplicateWidget}
+            onEditWithAi={builder.canEditWithAi(w) ? builder.editWithAi : undefined}
+          />
+        </div>
+      ))}
+    </ResponsiveGridLayout>
+  );
 
   return (
     <WidgetDataProvider>
@@ -266,7 +337,9 @@ export function ReportLayoutEditor({
             </Button>
             <div className="min-w-0">
               <h1 className="text-lg font-semibold text-ink truncate">{name}</h1>
-              <p className="text-[12px] text-ink-muted">Report layout</p>
+              <p className="text-[12px] text-ink-muted">
+                Master {isReport ? "report" : "dashboard"} template
+              </p>
             </div>
           </div>
 
@@ -277,7 +350,7 @@ export function ReportLayoutEditor({
               onClick={() => setCatalogOpen(true)}
               disabled={!draft}
             >
-              <BiPlus className="w-4 h-4" /> Add block
+              <BiPlus className="w-4 h-4" /> {isReport ? "Add block" : "Add widget"}
             </Button>
             <Button
               variant="outline"
@@ -287,115 +360,81 @@ export function ReportLayoutEditor({
             >
               <LuSparkles className="w-4 h-4" /> Builder Assistant
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handlePreview()}
-              disabled={!draft || saveLayout.isPending}
-            >
-              <BiShow className="w-4 h-4" /> {isDirty ? "Save & preview" : "Preview"}
-            </Button>
+            {isReport && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handlePreview()}
+                disabled={!draft || saveContent.isPending}
+              >
+                <BiShow className="w-4 h-4" /> {isDirty ? "Save & preview" : "Preview"}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
               onClick={() => withDirtyGuard(revertToSaved)}
-              disabled={!draft || !isDirty || saveLayout.isPending}
+              disabled={!draft || !isDirty || saveContent.isPending}
             >
               <BiX className="w-4 h-4" /> Cancel
             </Button>
             <Button
               size="sm"
               onClick={() => void handleSave()}
-              disabled={!draft || !isDirty || saveLayout.isPending}
+              disabled={!draft || !isDirty || saveContent.isPending}
             >
-              <BiCheck className="w-4 h-4" /> {saveLayout.isPending ? "Saving…" : "Save"}
+              <BiCheck className="w-4 h-4" /> {saveContent.isPending ? "Saving…" : "Save"}
             </Button>
           </div>
         </div>
 
-        {saveLayout.isError && (
+        {saveContent.isError && (
           <p role="alert" className="text-[12px] text-destructive">
-            {saveLayout.error instanceof Error
-              ? saveLayout.error.message
-              : "Failed to save the layout"}
+            {saveContent.error instanceof Error
+              ? saveContent.error.message
+              : "Failed to save the template"}
           </p>
         )}
 
         {isError && !isLoading && (
-          <QueryError onRetry={() => refetch()} message="Couldn't load this report layout" />
+          <QueryError
+            onRetry={() => refetch()}
+            message={`Couldn't load the master ${isReport ? "report" : "dashboard"} template`}
+          />
         )}
 
-        {/* The page. The measured div sits INSIDE the padding so the grid width
-            is the page's content width, and it is mounted on the first render
-            (useContainerWidth attaches its observer in a mount effect only). */}
-        <div
-          className="mx-auto w-full rounded-xl border border-hairline bg-white p-6 shadow-sm"
-          style={{ maxWidth: PAGE_MAX_WIDTH }}
-        >
-          <div ref={containerRef}>
-            {!draft ? (
-              <Skeleton className="h-[400px] w-full rounded-xl" />
-            ) : draft.widgets.length === 0 ? (
-              <div className="border border-dashed border-hairline rounded-xl py-16 grid place-items-center text-center">
-                <BiPlus className="w-8 h-8 text-ink-faint mb-3" />
-                <p className="text-sm font-medium text-ink">This report layout is empty</p>
-                <p className="text-xs text-ink-muted mt-1 mb-4">
-                  Start with a cover block, then add the metrics this report should carry — or
-                  let the assistant build the page for you.
-                </p>
-                <div className="flex items-center justify-center gap-2">
-                  <Button size="sm" onClick={() => setCatalogOpen(true)}>
-                    <BiPlus className="w-4 h-4" /> Add block
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setBuilderOpen(true)}>
-                    <LuSparkles className="w-4 h-4" /> Builder Assistant
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <ResponsiveGridLayout
-                className="layout"
-                width={width}
-                layouts={draft.layouts as unknown as ResponsiveLayouts}
-                breakpoints={EDITOR_BREAKPOINTS}
-                cols={EDITOR_COLS}
-                rowHeight={GRID_ROW_HEIGHT}
-                margin={GRID_MARGIN}
-                containerPadding={GRID_CONTAINER_PADDING}
-                dragConfig={{ enabled: true, handle: ".widget-drag-handle" }}
-                resizeConfig={{ enabled: true }}
-                onLayoutChange={handleLayoutChange}
-              >
-                {draft.widgets.map((w) => (
-                  <div key={w.i} data-widget-id={w.i}>
-                    <WidgetFrame
-                      instance={w}
-                      editMode
-                      highlight={w.i === justAddedId}
-                      onConfigure={setConfiguringId}
-                      onRemove={removeWidget}
-                      onSaveToLibrary={setSavingToLibraryId}
-                      onDuplicate={handleDuplicateWidget}
-                      onEditWithAi={builder.canEditWithAi(w) ? builder.editWithAi : undefined}
-                    />
-                  </div>
-                ))}
-              </ResponsiveGridLayout>
-            )}
+        <p className="text-[12px] text-ink-muted rounded-lg border border-hairline bg-canvas-soft px-3 py-2">
+          You’re editing the master {isReport ? "report" : "dashboard"} template. Every new client
+          and every new {isReport ? "report layout" : "view"} starts from it. Existing{" "}
+          {isReport ? "layouts" : "views"} are not changed. Data shown is {clientLabel}, for
+          preview only.
+        </p>
+
+        {/* The measured div must be mounted on the very first render: RGL 2.x's
+            `useContainerWidth` attaches its observer in a mount effect only, so
+            loading, empty and populated states all live INSIDE it. */}
+        {isReport ? (
+          <div
+            className="mx-auto w-full rounded-xl border border-hairline bg-white p-6 shadow-sm"
+            style={{ maxWidth: PAGE_MAX_WIDTH }}
+          >
+            <div ref={containerRef}>{grid}</div>
           </div>
-        </div>
+        ) : (
+          <div ref={containerRef}>{grid}</div>
+        )}
 
         <WidgetCatalogDialog
           open={catalogOpen}
           onOpenChange={setCatalogOpen}
           onAdd={handleAddWidget}
           onAddSaved={handleAddSavedWidget}
-          surface="report"
+          surface={isReport ? "report" : "dashboard"}
         />
         <WidgetConfigDialog
           instance={configuring}
           currentWidth={configuringWidth}
-          currentViewId={layoutId}
+          currentViewId={draft?.id ?? null}
           open={!!configuringId}
           onOpenChange={(o) => !o && setConfiguringId(null)}
           onSave={(cfg, link) => configuring && updateWidgetConfig(configuring.i, cfg, link)}
@@ -410,15 +449,15 @@ export function ReportLayoutEditor({
           }
         />
 
-        {/* Stays mounted so the thread survives closing the panel. The editor
-            itself is agency-only (the report-layouts API is agency-gated on
-            every verb), so there is no role check to repeat here. */}
+        {/* Stays mounted so the thread survives closing the panel. Reaching this
+            editor at all is agency-only (both template APIs are), so there is no
+            role check to repeat here. */}
         <BuilderAssistant
           open={isBuilderOpen}
           onOpenChange={setBuilderOpen}
-          gridKind="report-layout"
+          gridKind={isReport ? "report-template" : "dashboard-template"}
           clientId={clientId}
-          viewId={layoutId}
+          viewId={`master-${kind}`}
           viewName={name}
           widgets={builder.widgets}
           targetWidgetId={builder.targetWidgetId}
@@ -430,10 +469,10 @@ export function ReportLayoutEditor({
           onArrangeWidgets={builder.onArrangeWidgets}
         />
 
-        {previewOpen && (
+        {previewOpen && draft && (
           <ReportPreviewDialog
             clientId={clientId}
-            source={{ kind: "layout", id: layoutId }}
+            source={{ kind: "template", id: draft.id }}
             name={name}
             onClose={() => setPreviewOpen(false)}
           />
@@ -444,7 +483,7 @@ export function ReportLayoutEditor({
             <DialogHeader>
               <DialogTitle>Discard unsaved changes?</DialogTitle>
               <DialogDescription className="text-[13px]">
-                “{name}” has blocks that have not been saved. Continuing drops them.
+                “{name}” has changes that have not been saved. Continuing drops them.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

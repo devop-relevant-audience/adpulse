@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BiHash,
   BiLineChart,
@@ -39,7 +39,6 @@ import {
   ChipRow,
   ChipToggle,
 } from "@/components/dashboard/config-ui";
-import { cn } from "@/lib/utils";
 import {
   NumberViz,
   LineViz,
@@ -397,6 +396,7 @@ const DISPLAY_OPTION_META: Record<DisplayOption, { label: string; hint: string }
   trendLine: { label: "Trend line", hint: "Straight-line fit over the first series" },
   heatCells: { label: "Heat cells", hint: "Shade each number within its column" },
   compareSeries: { label: "Compare period", hint: "Draw the earlier window behind this one" },
+  secondaryAxis: { label: "Second axis", hint: "Metrics after the first get a right-hand scale" },
 };
 
 /** "Clicks, CTR and CPA" — an Oxford-comma-free list for the warning prose. */
@@ -475,11 +475,7 @@ function ThresholdField({
 }) {
   const threshold = cfg.threshold;
   return (
-    <ConfigField
-      label="Only groups where"
-      hint="Applied before the top-N cut"
-      className="pt-3 border-t border-hairline/60"
-    >
+    <ConfigField label="Only groups where" hint="Applied before the top-N cut">
       <div className="flex items-center gap-2 flex-wrap">
         <Switch
           checked={!!threshold}
@@ -579,6 +575,10 @@ export function CustomWidgetConfigForm({ config, onChange }: WidgetConfigFormPro
   // next change of any kind — it explains one click, it is not a standing badge.
   const [snapNote, setSnapNote] = useState<string | null>(null);
 
+  // The chart type is chosen once and then rarely touched, so the picker stays
+  // folded behind a one-line summary of the current type and opens on demand.
+  const [pickingType, setPickingType] = useState(false);
+
   /** Apply a patch, re-normalize so the preview never sees an invalid combo, keep unrelated keys. */
   function update(patch: Partial<CustomWidgetConfig>, note: string | null = null) {
     const next = normalizeCustomConfig({ ...cfg, ...patch });
@@ -596,6 +596,9 @@ export function CustomWidgetConfigForm({ config, onChange }: WidgetConfigFormPro
   /** Every type is always clickable; the normalizer snaps whatever won't fit. */
   function chooseVisualization(v: CustomVisualization) {
     update({ visualization: v }, snapPreview[v]);
+    // Picking is a one-shot task: fold the list so the summary (and any snap
+    // note under it) is what the eye lands on next.
+    setPickingType(false);
   }
 
   function toggleMetric(m: QueryMetric) {
@@ -620,54 +623,65 @@ export function CustomWidgetConfigForm({ config, onChange }: WidgetConfigFormPro
   return (
     <>
       <ConfigSection title="Chart type">
+        {(() => {
+          const ActiveIcon = VIZ_ICONS[cfg.visualization];
+          return (
+            <div className="flex items-center gap-3">
+              <span className="w-9 h-9 shrink-0 rounded-md bg-primary text-white grid place-items-center">
+                <ActiveIcon className="w-4.5 h-4.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-ink leading-tight">
+                  {VISUALIZATION_LABELS[cfg.visualization]}
+                </p>
+                <p className="text-[11px] text-ink-muted leading-snug">{VIZ_BLURBS[cfg.visualization]}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPickingType((open) => !open)}
+                aria-expanded={pickingType}
+                className="shrink-0 h-7 px-2.5 rounded-md border border-hairline text-xs text-ink-muted hover:text-ink hover:border-ink-faint transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                {pickingType ? "Done" : "Change"}
+              </button>
+            </div>
+          );
+        })()}
+
         {/* All nine types, always, in the same order — a widget's chart type is
             never hidden behind an overflow or filtered by how it was created.
-            One grid rather than a grid per family so every tile is the same
-            width; the family label is a full-width row inside it.
-            `@[…]` variants size against the dialog's settings rail (its
-            `@container`), not the viewport: the rail runs 19.5–31.5rem wide, so
-            three tiles per row is the most that still fits a readable label. */}
-        <div className="grid grid-cols-2 @[19rem]:grid-cols-3 gap-2">
-          {VISUALIZATION_FAMILIES.map((family) => (
-            <Fragment key={family.label}>
-              <p className="col-span-full mt-1 first:mt-0 text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-faint">
-                {family.label}
-              </p>
-              {family.types.map((v) => {
-                const Icon = VIZ_ICONS[v];
-                const active = cfg.visualization === v;
-                return (
-                  <button
-                    key={v}
-                    type="button"
-                    aria-pressed={active}
-                    // Never disabled: the normalizer snaps whatever the type
-                    // can't take, and the tooltip says what that costs.
-                    title={snapPreview[v] ?? undefined}
-                    onClick={() => chooseVisualization(v)}
-                    className={cn(
-                      "flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-center transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                      active ? "border-primary bg-primary/8" : "border-hairline bg-white hover:border-ink-faint"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "w-7 h-7 rounded-md grid place-items-center",
-                        active ? "bg-primary text-white" : "bg-canvas-soft text-ink-muted"
-                      )}
-                    >
-                      <Icon className="w-4 h-4" />
-                    </span>
-                    <span className={cn("text-xs font-medium", active ? "text-primary" : "text-ink")}>
-                      {VISUALIZATION_LABELS[v]}
-                    </span>
-                    <span className="text-[11px] text-ink-muted leading-tight">{VIZ_BLURBS[v]}</span>
-                  </button>
-                );
-              })}
-            </Fragment>
-          ))}
-        </div>
+            One row per family keeps the list short and reads as a menu rather
+            than a wall of tiles: the family label sits in a fixed left column
+            and its types line up as chips beside it. */}
+        {pickingType && (
+          <div className="space-y-2 pt-3 border-t border-hairline/60">
+            {VISUALIZATION_FAMILIES.map((family) => (
+              <div key={family.label} className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-faint">
+                  {family.label}
+                </span>
+                <ChipRow>
+                  {family.types.map((v) => {
+                    const Icon = VIZ_ICONS[v];
+                    return (
+                      <ChipToggle
+                        key={v}
+                        active={cfg.visualization === v}
+                        // Never disabled: the normalizer snaps whatever the type
+                        // can't take, and the tooltip says what that costs.
+                        title={snapPreview[v] ?? VIZ_BLURBS[v]}
+                        onClick={() => chooseVisualization(v)}
+                      >
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        {VISUALIZATION_LABELS[v]}
+                      </ChipToggle>
+                    );
+                  })}
+                </ChipRow>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* The trap this warns about: line/area/combo/pivot force a time bucket
             and number/bar/pie/donut force it off, so switching between those
@@ -722,54 +736,64 @@ export function CustomWidgetConfigForm({ config, onChange }: WidgetConfigFormPro
           )}
         </ConfigField>
 
-        <div className="grid grid-cols-1 @[26rem]:grid-cols-2 gap-x-4 gap-y-4">
-          <ConfigField label="Break down by">
-            <ChipRow>
-              {QUERY_GROUP_BYS.map((g) => {
-                const allowed = rule.groupBy.includes(g);
-                return (
-                  <ChipToggle
-                    key={g}
-                    active={cfg.groupBy === g}
-                    disabled={!allowed}
-                    title={allowed ? undefined : GROUP_BY_NOTE[cfg.visualization]}
-                    onClick={() => update({ groupBy: g })}
-                  >
-                    {GROUP_BY_LABELS[g]}
-                  </ChipToggle>
-                );
-              })}
-            </ChipRow>
-            {GROUP_BY_NOTE[cfg.visualization] && (
-              <p className="text-[11px] text-ink-faint">{GROUP_BY_NOTE[cfg.visualization]}</p>
-            )}
-          </ConfigField>
+        {/* Full-width rows rather than two columns: the five breakdown chips
+            wrap under a half-width column and the two fields read as one
+            scattered block. Each on its own line, the eye scans down. */}
+        <ConfigField label="Break down by">
+          <ChipRow>
+            {QUERY_GROUP_BYS.map((g) => {
+              const allowed = rule.groupBy.includes(g);
+              return (
+                <ChipToggle
+                  key={g}
+                  active={cfg.groupBy === g}
+                  disabled={!allowed}
+                  title={allowed ? undefined : GROUP_BY_NOTE[cfg.visualization]}
+                  onClick={() => update({ groupBy: g })}
+                >
+                  {GROUP_BY_LABELS[g]}
+                </ChipToggle>
+              );
+            })}
+          </ChipRow>
+          {GROUP_BY_NOTE[cfg.visualization] && (
+            <p className="text-[11px] text-ink-faint">{GROUP_BY_NOTE[cfg.visualization]}</p>
+          )}
+        </ConfigField>
 
-          <ConfigField label="Over time">
-            <ChipRow>
-              {QUERY_TIME_BUCKETS.map((t) => {
-                const allowed = rule.timeBucket.includes(t);
-                return (
-                  <ChipToggle
-                    key={t}
-                    active={cfg.timeBucket === t}
-                    disabled={!allowed}
-                    title={allowed ? undefined : TIME_BUCKET_NOTE[cfg.visualization]}
-                    onClick={() => update({ timeBucket: t })}
-                  >
-                    {TIME_BUCKET_LABELS[t]}
-                  </ChipToggle>
-                );
-              })}
-            </ChipRow>
-            {TIME_BUCKET_NOTE[cfg.visualization] && (
-              <p className="text-[11px] text-ink-faint">{TIME_BUCKET_NOTE[cfg.visualization]}</p>
-            )}
-          </ConfigField>
-        </div>
+        <ConfigField label="Over time">
+          <ChipRow>
+            {QUERY_TIME_BUCKETS.map((t) => {
+              const allowed = rule.timeBucket.includes(t);
+              return (
+                <ChipToggle
+                  key={t}
+                  active={cfg.timeBucket === t}
+                  disabled={!allowed}
+                  title={allowed ? undefined : TIME_BUCKET_NOTE[cfg.visualization]}
+                  onClick={() => update({ timeBucket: t })}
+                >
+                  {TIME_BUCKET_LABELS[t]}
+                </ChipToggle>
+              );
+            })}
+          </ChipRow>
+          {TIME_BUCKET_NOTE[cfg.visualization] && (
+            <p className="text-[11px] text-ink-faint">{TIME_BUCKET_NOTE[cfg.visualization]}</p>
+          )}
+        </ConfigField>
 
+        {/* Everything below only exists once there are groups to rank, so it
+            sits under its own sub-heading behind a rule: one block, one job. */}
         {grouped && (
-          <div className="grid grid-cols-3 gap-3 pt-1 border-t border-hairline/60 [&>*]:pt-3">
+          <div className="space-y-4 pt-4 border-t border-hairline/60">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-faint">
+                Ranking
+              </p>
+              <span className="text-[11px] text-ink-muted">Which groups make the cut</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
             <ConfigField label="Show">
               <Select value={String(cfg.limit)} onValueChange={(v) => update({ limit: Number(v) })}>
                 <SelectTrigger size="sm" className="w-full text-xs" aria-label="Number of groups">
@@ -812,10 +836,10 @@ export function CustomWidgetConfigForm({ config, onChange }: WidgetConfigFormPro
                 </SelectContent>
               </Select>
             </ConfigField>
+            </div>
+            <ThresholdField cfg={cfg} update={update} />
           </div>
         )}
-
-        {grouped && <ThresholdField cfg={cfg} update={update} />}
       </ConfigSection>
 
       {/* Driven entirely by VISUALIZATION_OPTIONS, so a type that gains or loses
@@ -851,8 +875,17 @@ export function CustomWidgetConfigForm({ config, onChange }: WidgetConfigFormPro
 
             // The normalizer drops compareSeries on a grouped chart, so the
             // toggle has to say why rather than silently refuse to stay on.
+            // Same for the second axis, which also has nothing to do until a
+            // second metric exists, and which a stacked area ignores (a stack
+            // across two scales would draw a meaningless sum).
             const blocked =
-              opt === "compareSeries" && grouped ? "Needs a chart with no breakdown" : null;
+              (opt === "compareSeries" || opt === "secondaryAxis") && grouped
+                ? "Needs a chart with no breakdown"
+                : opt === "secondaryAxis" && cfg.metrics.length < 2
+                  ? "Needs a second metric"
+                  : opt === "secondaryAxis" && cfg.areaStacked === true
+                    ? "Stacked areas share one scale"
+                    : null;
 
             return (
               <ConfigField key={opt} label={meta.label} hint={blocked ?? meta.hint}>

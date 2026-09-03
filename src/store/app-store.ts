@@ -51,6 +51,8 @@ interface AppState {
   dateRange: { start: string; end: string };
   compareMode: CompareMode;
   selectedPlatform: Platform | undefined;
+  /** Empty = no campaign filter (all campaigns). */
+  selectedCampaignIds: string[];
   referenceContext: ReferenceContext | null;
   /**
    * The two right-hand panels share one fixed slot (and the <main> margin that
@@ -64,6 +66,7 @@ interface AppState {
   setDateRange: (range: { start: string; end: string }) => void;
   setCompareMode: (mode: CompareMode) => void;
   setSelectedPlatform: (platform: Platform | undefined) => void;
+  setSelectedCampaignIds: (ids: string[]) => void;
   setReferenceContext: (ctx: ReferenceContext | null) => void;
   toggleChat: () => void;
   setChatOpen: (open: boolean) => void;
@@ -79,11 +82,16 @@ function getDefaultDateRange() {
   };
 }
 
+/** Shared reference for the "no campaign filter" state, so clearing the filter
+ * never hands subscribers a fresh `[]` and re-runs their effects. */
+const NO_CAMPAIGN_IDS: string[] = [];
+
 export const useAppStore = create<AppState>((set) => ({
   selectedClientId: null,
   dateRange: getDefaultDateRange(),
   compareMode: "none",
   selectedPlatform: undefined,
+  selectedCampaignIds: NO_CAMPAIGN_IDS,
   referenceContext: null,
   isChatOpen: false,
   isBuilderOpen: false,
@@ -92,6 +100,8 @@ export const useAppStore = create<AppState>((set) => ({
   setDateRange: (range) => set({ dateRange: range }),
   setCompareMode: (mode) => set({ compareMode: mode }),
   setSelectedPlatform: (platform) => set({ selectedPlatform: platform }),
+  setSelectedCampaignIds: (ids) =>
+    set({ selectedCampaignIds: ids.length === 0 ? NO_CAMPAIGN_IDS : ids }),
   setReferenceContext: (ctx) =>
     set({ referenceContext: ctx, isChatOpen: true, isBuilderOpen: false }),
   toggleChat: () =>

@@ -9,6 +9,12 @@ import { cn } from "@/lib/utils";
  * Contract: every widget `ConfigForm` renders one or more `<ConfigSection>`
  * cards — the dialog stacks them and appends the shared Filters/Size cards,
  * so a form must NOT add its own outer spacing or headings.
+ *
+ * Density is the DIALOG's call, not the form's: the card padding and the gap
+ * between fields read the `--config-pad` / `--config-gap` custom properties,
+ * so a dialog tier loosens every card it holds by setting them on the pane
+ * (see `TIER` in widget-config-dialog.tsx). Unset, they fall back to the
+ * compact values every form was designed against.
  */
 
 interface ConfigSectionProps {
@@ -24,13 +30,20 @@ interface ConfigSectionProps {
 export function ConfigSection({ title, hint, children, className, bodyClassName }: ConfigSectionProps) {
   return (
     <section className={cn("rounded-lg border border-hairline bg-white overflow-hidden", className)}>
-      <div className="flex items-baseline justify-between gap-3 px-3.5 py-2 bg-canvas-soft/60 border-b border-hairline/80">
+      <div className="flex items-baseline justify-between gap-3 px-[var(--config-pad,0.875rem)] py-2 bg-canvas-soft/60 border-b border-hairline/80">
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">
           {title}
         </h3>
         {hint && <span className="text-[11px] text-ink-muted text-right">{hint}</span>}
       </div>
-      <div className={cn("px-3.5 py-3.5 space-y-4", bodyClassName)}>{children}</div>
+      <div
+        className={cn(
+          "p-[var(--config-pad,0.875rem)] space-y-[var(--config-gap,1rem)]",
+          bodyClassName
+        )}
+      >
+        {children}
+      </div>
     </section>
   );
 }

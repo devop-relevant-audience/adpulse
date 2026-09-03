@@ -284,6 +284,12 @@ export interface CustomWidgetConfig {
   heatCells?: boolean;
   /** line/area/combo: draw the comparison period as a second, dashed series. */
   compareSeries?: boolean;
+  /**
+   * line/area: plot every metric after the first against a right-hand axis, so
+   * a small series (conversions) is readable next to a large one (spend)
+   * instead of flattening into the baseline. Ungrouped charts only.
+   */
+  secondaryAxis?: boolean;
 }
 
 export const DISPLAY_OPTIONS = [
@@ -294,6 +300,7 @@ export const DISPLAY_OPTIONS = [
   "trendLine",
   "heatCells",
   "compareSeries",
+  "secondaryAxis",
 ] as const;
 export type DisplayOption = (typeof DISPLAY_OPTIONS)[number];
 
@@ -302,8 +309,8 @@ export const VISUALIZATION_OPTIONS: Record<CustomVisualization, readonly Display
   number: ["sparkline", "showComparison"],
   // The comparison series needs a time axis to lay the earlier window onto, so
   // only the three time-bucketed chart types offer it.
-  line: ["trendLine", "compareSeries"],
-  area: ["areaStacked", "trendLine", "compareSeries"],
+  line: ["trendLine", "compareSeries", "secondaryAxis"],
+  area: ["areaStacked", "trendLine", "compareSeries", "secondaryAxis"],
   bar: ["barMode"],
   combo: ["trendLine", "compareSeries"],
   pie: [],
@@ -323,6 +330,7 @@ export const DISPLAY_OPTION_DEFAULTS = {
   trendLine: false,
   heatCells: false,
   compareSeries: false,
+  secondaryAxis: false,
 } as const satisfies { [K in DisplayOption]: NonNullable<CustomWidgetConfig[K]> };
 
 export interface VisualizationRule {
@@ -383,6 +391,7 @@ export const customWidgetConfigSchema = z
     trendLine: z.boolean().optional(),
     heatCells: z.boolean().optional(),
     compareSeries: z.boolean().optional(),
+    secondaryAxis: z.boolean().optional(),
     threshold: metricThresholdSchema.optional(),
   })
   .strict()
@@ -411,6 +420,13 @@ export const customWidgetConfigSchema = z
         code: "custom",
         path: ["compareSeries"],
         message: "compareSeries only applies to an ungrouped chart",
+      });
+    }
+    if (cfg.secondaryAxis !== undefined && cfg.groupBy !== "none") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["secondaryAxis"],
+        message: "secondaryAxis only applies to an ungrouped chart",
       });
     }
     const max = cfg.groupBy === "none" ? rule.maxMetrics : rule.maxMetricsWhenGrouped;
@@ -494,6 +510,11 @@ export function normalizeCustomConfig(input: Partial<CustomWidgetConfig> | Recor
     // series is unreadable, so the comparison is an ungrouped-chart option.
     ...(allowed.includes("compareSeries") && groupBy === "none"
       ? { compareSeries: bool("compareSeries") }
+      : {}),
+    // A grouped chart plots one metric across N groups, so there is no second
+    // metric to move onto a right axis.
+    ...(allowed.includes("secondaryAxis") && groupBy === "none"
+      ? { secondaryAxis: bool("secondaryAxis") }
       : {}),
   };
 

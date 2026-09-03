@@ -1,5 +1,5 @@
-import { asc, eq, sql } from "drizzle-orm";
-import { db } from "@/lib/db";
+import { asc, desc, eq, sql } from "drizzle-orm";
+import { db, type DbOrTx } from "@/lib/db";
 import { reportTemplates } from "@/lib/db/schema";
 import type {
   DashboardLayouts,
@@ -7,16 +7,29 @@ import type {
   WidgetInstance,
 } from "@/lib/dashboard/types";
 import { DASHBOARD_CONFIG_VERSION } from "@/lib/dashboard/types";
-import { stripLinkedConfigs } from "@/lib/data/saved-widgets";
+import { buildDefaultReportLayout } from "@/lib/dashboard/default-report-preset";
+import { hydrateWidgets, stripLinkedConfigs } from "@/lib/data/saved-widgets";
 
 // Agency-wide report templates: a named snapshot of one report layout's blocks,
 // not tied to any client. Mirrors `src/lib/data/templates.ts` exactly.
 //
 // A template is a snapshot, not a live mirror: editing the source layout later
-// does not change the template, and this phase has no content editing (only
-// name/description). Deleting a saved widget detaches report templates the same
-// way it detaches dashboard views (see `deleteSavedWidget`), so a template never
-// points at a missing library row.
+// does not change the template. Deleting a saved widget detaches report
+// templates the same way it detaches dashboard views (see `deleteSavedWidget`),
+// so a template never points at a missing library row.
+//
+// Exactly one row may carry `isMaster` (partial unique index): the master is
+// what every new report layout starts from. It is created lazily, from the
+// built-in report preset, the first time it is asked for, and it cannot be
+// deleted — only edited.
+
+/** Thrown when an operation is refused because the row is the master template. */
+export class MasterReportTemplateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MasterReportTemplateError";
+  }
+}
 
 /** Thrown when a template name collides (case-insensitive unique index). */
 export class ReportTemplateNameConflictError extends Error {
@@ -28,15 +41,17 @@ export class ReportTemplateNameConflictError extends Error {
 
 const PG_UNIQUE_VIOLATION = "23505";
 
-function isNameConflict(error: unknown): boolean {
+function isUniqueViolation(error: unknown, index: string): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
     (error as { code?: string }).code === PG_UNIQUE_VIOLATION &&
-    String((error as { constraint_name?: string }).constraint_name ?? "").includes(
-      "report_templates_name_idx"
-    )
+    String((error as { constraint_name?: string }).constraint_name ?? "").includes(index)
   );
+}
+
+function isNameConflict(error: unknown): boolean {
+  return isUniqueViolation(error, "report_templates_name_idx");
 }
 
 /** The snapshot itself — what `createReportLayout` needs to stamp a new layout. */
@@ -47,6 +62,7 @@ export interface ReportTemplate {
   layouts: DashboardLayouts;
   widgets: WidgetInstance[];
   version: number;
+  isMaster: boolean;
 }
 
 const templateColumns = {
@@ -56,7 +72,20 @@ const templateColumns = {
   layouts: reportTemplates.layouts,
   widgets: reportTemplates.widgets,
   version: reportTemplates.version,
+  isMaster: reportTemplates.isMaster,
 };
+
+/** Name + description the master row is created with on first read. */
+const MASTER_NAME = "Master report";
+const MASTER_DESCRIPTION = "The layout every new report layout starts from.";
+
+/** Widgets hydrated from the library — what an editor or a renderer needs. */
+async function withHydratedWidgets(
+  template: ReportTemplate,
+  conn: DbOrTx = db
+): Promise<ReportTemplate> {
+  return { ...template, widgets: await hydrateWidgets(template.widgets ?? [], conn) };
+}
 
 /**
  * The template list. `widgetCount` comes from jsonb_array_length so the
@@ -69,10 +98,13 @@ export async function listReportTemplates(): Promise<ReportTemplateSummary[]> {
       name: reportTemplates.name,
       description: reportTemplates.description,
       widgetCount: sql<number>`jsonb_array_length(${reportTemplates.widgets})`.mapWith(Number),
+      isMaster: reportTemplates.isMaster,
       updated_at: reportTemplates.updatedAt,
     })
     .from(reportTemplates)
-    .orderBy(asc(sql`lower(${reportTemplates.name})`));
+    // The master is the one every other template is a variation of, so it heads
+    // the list regardless of name.
+    .orderBy(desc(reportTemplates.isMaster), asc(sql`lower(${reportTemplates.name})`));
 }
 
 export async function getReportTemplate(id: string): Promise<ReportTemplate | null> {
@@ -80,6 +112,82 @@ export async function getReportTemplate(id: string): Promise<ReportTemplate | nu
     .select(templateColumns)
     .from(reportTemplates)
     .where(eq(reportTemplates.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * One template's content with its widgets HYDRATED from the library — what a
+ * renderer needs. `getReportTemplate` deliberately stays in stored form: a
+ * stamp copies pointers verbatim, so only the paths that draw a template (the
+ * preview) pay for the hydration.
+ */
+export async function getReportTemplateContent(
+  id: string,
+  conn: DbOrTx = db
+): Promise<ReportTemplate | null> {
+  const [row] = await conn
+    .select(templateColumns)
+    .from(reportTemplates)
+    .where(eq(reportTemplates.id, id))
+    .limit(1);
+  return row ? withHydratedWidgets(row, conn) : null;
+}
+
+/**
+ * The master report template, created from the built-in report preset the first
+ * time it is asked for. Widgets come back HYDRATED, so this feeds the master
+ * editor and the preview directly.
+ */
+export async function getMasterReportTemplate(conn: DbOrTx = db): Promise<ReportTemplate> {
+  const existing = await readMaster(conn);
+  if (existing) return withHydratedWidgets(existing, conn);
+
+  const preset = buildDefaultReportLayout();
+  // A pre-existing template may already hold the master's name (the name index
+  // is case-insensitive), so fall back to a suffixed one rather than 500ing.
+  const name = (await nameTaken(conn, MASTER_NAME)) ? `${MASTER_NAME} (house)` : MASTER_NAME;
+  try {
+    const [row] = await conn
+      .insert(reportTemplates)
+      .values({
+        name,
+        description: MASTER_DESCRIPTION,
+        layouts: preset.layouts,
+        widgets: stripLinkedConfigs(preset.widgets),
+        version: preset.version,
+        isMaster: true,
+      })
+      .returning(templateColumns);
+    return withHydratedWidgets(row, conn);
+  } catch (error) {
+    // Two first requests raced: whichever insert lost reads the winner's row.
+    // A name collision counts too — a template already holds the master's name.
+    if (
+      isUniqueViolation(error, "report_templates_master_idx") ||
+      isUniqueViolation(error, "report_templates_name_idx")
+    ) {
+      const raced = await readMaster(conn);
+      if (raced) return withHydratedWidgets(raced, conn);
+    }
+    throw error;
+  }
+}
+
+async function nameTaken(conn: DbOrTx, name: string): Promise<boolean> {
+  const [row] = await conn
+    .select({ id: reportTemplates.id })
+    .from(reportTemplates)
+    .where(eq(sql`lower(${reportTemplates.name})`, name.toLowerCase()))
+    .limit(1);
+  return !!row;
+}
+
+async function readMaster(conn: DbOrTx): Promise<ReportTemplate | null> {
+  const [row] = await conn
+    .select(templateColumns)
+    .from(reportTemplates)
+    .where(eq(reportTemplates.isMaster, true))
     .limit(1);
   return row ?? null;
 }
@@ -140,7 +248,38 @@ export async function updateReportTemplate(
   }
 }
 
-/** Deleting a template never touches the layouts stamped from it — it is a copy. */
+/**
+ * Rewrite a template's blocks. This is the "edit the house report" path: the UI
+ * only offers it for the master, but the API is by id. Widgets are stored in the
+ * same pointer form as everywhere else and come back hydrated.
+ */
+export async function updateReportTemplateContent(
+  id: string,
+  input: { layouts: DashboardLayouts; widgets: WidgetInstance[]; version?: number },
+  conn: DbOrTx = db
+): Promise<ReportTemplate | null> {
+  const [row] = await conn
+    .update(reportTemplates)
+    .set({
+      layouts: input.layouts,
+      widgets: stripLinkedConfigs(input.widgets),
+      version: input.version ?? DASHBOARD_CONFIG_VERSION,
+      updatedAt: sql`now()`,
+    })
+    .where(eq(reportTemplates.id, id))
+    .returning(templateColumns);
+  return row ? withHydratedWidgets(row, conn) : null;
+}
+
+/**
+ * Deleting a template never touches the layouts stamped from it — it is a copy.
+ * The master is the exception: it is what a new layout starts from, so it is
+ * edited, never removed.
+ */
 export async function deleteReportTemplate(id: string): Promise<void> {
+  const existing = await getReportTemplate(id);
+  if (existing?.isMaster) {
+    throw new MasterReportTemplateError("The master template cannot be deleted");
+  }
   await db.delete(reportTemplates).where(eq(reportTemplates.id, id));
 }

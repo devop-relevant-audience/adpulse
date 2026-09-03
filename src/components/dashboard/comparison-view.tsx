@@ -616,6 +616,8 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
   const [platformFilter, setPlatformFilter] = useState<Platform | "all">("all");
 
   const platform = platformFilter === "all" ? undefined : platformFilter;
+  const selectedCampaignIds = useAppStore((s) => s.selectedCampaignIds);
+  const campaignIds = selectedCampaignIds.length ? selectedCampaignIds : undefined;
 
   const { data: comparison, isLoading: compLoading, isError: compError, refetch: refetchComparison } = useComparison({
     clientId,
@@ -624,10 +626,11 @@ function PeriodComparisonTab({ clientId }: { clientId: string }) {
     previousStart: periodB.start,
     previousEnd: periodB.end,
     platform,
+    campaignIds,
   });
 
-  const { data: trendA, isLoading: trendALoading } = useDailyTrend({ clientId, startDate: periodA.start, endDate: periodA.end, platform });
-  const { data: trendB, isLoading: trendBLoading } = useDailyTrend({ clientId, startDate: periodB.start, endDate: periodB.end, platform });
+  const { data: trendA, isLoading: trendALoading } = useDailyTrend({ clientId, startDate: periodA.start, endDate: periodA.end, platform, campaignIds });
+  const { data: trendB, isLoading: trendBLoading } = useDailyTrend({ clientId, startDate: periodB.start, endDate: periodB.end, platform, campaignIds });
   const [chartMetric, setChartMetric] = useState<"spend" | "conversions">("spend");
 
   const chartData = useMemo(() => {

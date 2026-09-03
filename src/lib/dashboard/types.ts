@@ -147,7 +147,26 @@ export interface DashboardTemplateSummary {
   name: string;
   description: string;
   widgetCount: number;
+  /** The one master template of its kind (partial unique index in the DB). */
+  isMaster: boolean;
   updated_at: string;
+}
+
+/**
+ * A template's full content, as both template APIs serve it. Dashboard and
+ * report templates hold the identical shape — the same grid vocabulary, the
+ * same widget form — so the editor and its hooks are typed against one type
+ * rather than two identical ones. Widgets arrive HYDRATED (linked instances
+ * carry the library row's config), like every other grid read.
+ */
+export interface TemplateContent {
+  id: string;
+  name: string;
+  description: string;
+  layouts: DashboardLayouts;
+  widgets: WidgetInstance[];
+  version: number;
+  isMaster: boolean;
 }
 
 export interface GridItem {
@@ -223,6 +242,8 @@ export interface ReportTemplateSummary {
   name: string;
   description: string;
   widgetCount: number;
+  /** The one master report template (partial unique index in the DB). */
+  isMaster: boolean;
   updated_at: string;
 }
 
@@ -271,3 +292,92 @@ export const SIZE_PRESETS = [
 export const WIDGET_SIZE_WIDTH = Object.fromEntries(
   SIZE_PRESETS.map((p) => [p.key, p.w])
 ) as Record<WidgetSizeKey, number>;
+
+/**
+ * The HEIGHT vocabulary — the row-count counterpart to SIZE_PRESETS, and the
+ * same idea: one small set of words the assistant picks from, so "make it
+ * taller" lands on a height the widget actually renders well at instead of an
+ * arbitrary row count.
+ *
+ * The five steps are read off what the widget registry already uses: a stat
+ * tile and a section header live at 2-3 rows, the fixed charts cluster at 7-8,
+ * a trend chart is 9, and 12 is a full-screen-ish block for a table someone
+ * wants to see all of. Nothing between the steps is reachable by word, which is
+ * the point — a hand-drag still sets any height it likes.
+ */
+export const WIDGET_HEIGHT_KEYS = [
+  "compact",
+  "short",
+  "medium",
+  "tall",
+  "extra-tall",
+] as const;
+export type WidgetHeightKey = (typeof WIDGET_HEIGHT_KEYS)[number];
+
+export const HEIGHT_PRESETS = [
+  { key: "compact", label: "Compact", h: 3 },
+  { key: "short", label: "Short", h: 5 },
+  { key: "medium", label: "Medium", h: 7 },
+  { key: "tall", label: "Tall", h: 9 },
+  { key: "extra-tall", label: "Extra tall", h: 12 },
+] as const satisfies readonly { key: WidgetHeightKey; label: string; h: number }[];
+
+/** Grid rows for each height word. */
+export const WIDGET_HEIGHT_ROWS = Object.fromEntries(
+  HEIGHT_PRESETS.map((p) => [p.key, p.h])
+) as Record<WidgetHeightKey, number>;
+
+/**
+ * Rendered pixel height of `h` grid rows. Each row is GRID_ROW_HEIGHT tall and
+ * the gutter falls BETWEEN rows, so it is counted one time fewer.
+ */
+export function gridRowsToPx(h: number): number {
+  return h * GRID_ROW_HEIGHT + Math.max(0, h - 1) * GRID_MARGIN[1];
+}
+
+/**
+ * The size word for a column span, or undefined when the span is not one of the
+ * four. Deliberately EXACT rather than nearest: a widget hand-dragged to 4 of 12
+ * columns is a third, and calling it "quarter" because 3 is the closest preset
+ * would describe the page wrongly to anything reading the description back. A
+ * span with no word is reported as its raw column count instead.
+ */
+export function widgetSizeKeyFor(w: number): WidgetSizeKey | undefined {
+  return SIZE_PRESETS.find((p) => p.w === w)?.key;
+}
+
+/** The height word for a row count, or undefined when it is not one of the five. */
+export function widgetHeightKeyFor(h: number): WidgetHeightKey | undefined {
+  return HEIGHT_PRESETS.find((p) => p.h === h)?.key;
+}
+
+/**
+ * Widgets one `arrange_row` call may put side by side. Twelve columns cannot
+ * usefully hold more, and it caps what the assistant can move in one go.
+ *
+ * Lives here rather than beside `arrangeIntoRow` so the builder route and its
+ * prompt (both server-side) can read it without pulling react-grid-layout into
+ * a serverless function.
+ */
+export const MAX_ARRANGE_WIDGETS = 6;
+
+/**
+ * A grid's items as the visual rows a reader sees, top to bottom, each ordered
+ * left to right. Items that share a `y` share a row — which is what the grid's
+ * own placement and its upward compaction produce, so this matches the page for
+ * every layout the app builds. A tall widget standing beside two stacked ones
+ * is the one case it splits more finely than the eye does, which is why callers
+ * print the raw column and row numbers next to the grouping rather than instead
+ * of it.
+ */
+export function groupIntoRows(items: readonly GridItem[]): GridItem[][] {
+  const byRow = new Map<number, GridItem[]>();
+  for (const item of items) {
+    const row = byRow.get(item.y);
+    if (row) row.push(item);
+    else byRow.set(item.y, [item]);
+  }
+  return [...byRow.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, row]) => [...row].sort((a, b) => a.x - b.x));
+}

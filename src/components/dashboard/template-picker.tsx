@@ -162,6 +162,11 @@ export function TemplatePicker({
                     <span className="flex-1 min-w-0">
                       <span className="flex items-baseline gap-2">
                         <span className="text-[13px] text-ink truncate">{template.name}</span>
+                        {template.isMaster && (
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-primary bg-primary/10 px-1.5 py-0.5 rounded shrink-0">
+                            Master
+                          </span>
+                        )}
                         <span className="text-[11px] text-ink-faint shrink-0 tabular-nums">
                           {template.widgetCount} widget{template.widgetCount === 1 ? "" : "s"}
                         </span>
@@ -206,19 +211,23 @@ export function TemplatePicker({
                       >
                         <BiPencil className="w-3.5 h-3.5" />
                       </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        aria-label={`Delete ${template.name}`}
-                        disabled={busy}
-                        onClick={() => {
-                          setRenaming(null);
-                          setConfirmDelete(template.id);
-                        }}
-                      >
-                        <BiTrash className="w-3.5 h-3.5" />
-                      </Button>
+                      {/* The master is the house template every new view and
+                          layout starts from — the API refuses to delete it. */}
+                      {!template.isMaster && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`Delete ${template.name}`}
+                          disabled={busy}
+                          onClick={() => {
+                            setRenaming(null);
+                            setConfirmDelete(template.id);
+                          }}
+                        >
+                          <BiTrash className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </span>
                   )}
                 </div>

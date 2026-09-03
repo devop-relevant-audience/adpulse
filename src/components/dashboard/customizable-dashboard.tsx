@@ -4,7 +4,7 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import "./dashboard-grid.css";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { NewWidgetSpec } from "@/store/dashboard-store";
 import {
   ResponsiveGridLayout,
@@ -20,38 +20,24 @@ import { isAgencyRole } from "@/lib/auth/roles";
 import { useDashboard, useDashboards, useSaveDashboard } from "@/hooks/use-dashboard";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { buildDefaultDashboard } from "@/lib/dashboard/default-preset";
+import { useMasterTemplate } from "@/hooks/use-templates";
 import {
-  BREAKPOINTS,
   GRID_COLS,
   GRID_BREAKPOINTS,
   GRID_ROW_HEIGHT,
   GRID_MARGIN,
   GRID_CONTAINER_PADDING,
-  WIDGET_SIZE_WIDTH,
-  type Breakpoint,
-  type GridItem,
-  type WidgetSizeKey,
   type DashboardConfig,
   type DashboardLayouts,
   type SavedWidget,
   type WidgetInstance,
 } from "@/lib/dashboard/types";
-import { chartDefaultSize, getWidget } from "@/lib/dashboard/widget-registry";
+import { getWidget } from "@/lib/dashboard/widget-registry";
 import { WidgetFrame } from "@/components/dashboard/widget-frame";
 import { WidgetDataProvider } from "@/lib/dashboard/widget-data";
 import { WidgetCatalogDialog } from "@/components/dashboard/widget-catalog-dialog";
-import {
-  BuilderAssistant,
-  type BuilderApplyResult,
-  type BuilderInsertResult,
-} from "@/components/dashboard/builder-assistant";
-import { normalizeCustomConfig } from "@/lib/dashboard/custom-widget";
-import {
-  isBuilderWidgetType,
-  type BuilderWidgetType,
-} from "@/lib/builder/widget-kinds";
-import { WIDGET_META } from "@/lib/dashboard/widget-meta";
-import type { BuilderWidgetRef } from "@/lib/builder/protocol";
+import { BuilderAssistant } from "@/components/dashboard/builder-assistant";
+import { useBuilderGrid } from "@/hooks/use-builder-grid";
 import { SaveWidgetDialog } from "@/components/dashboard/save-widget-dialog";
 import { DashboardViewSwitcher } from "@/components/dashboard/dashboard-view-switcher";
 import { WidgetConfigDialog } from "@/components/dashboard/widget-config-dialog";
@@ -59,34 +45,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-/** Mirrors MAX_INVENTORY_WIDGETS in the builder route's request schema. */
-const MAX_BUILDER_INVENTORY = 40;
-
-/** What one Builder change did to the view: how it persisted, and to which widget. */
-interface AppliedChange {
-  state: BuilderInsertResult;
-  /** The instance the change touched; null when it could not be applied. */
-  id: string | null;
-}
-
-const NOT_APPLIED: AppliedChange = { state: "failed", id: null };
-
-/**
- * A widget's layout item on every breakpoint. Captured before a Builder change
- * removes or resizes the widget, so an undo can put back the exact footprint —
- * position included, which re-placing the widget would lose.
- */
-function layoutSnapshot(
-  layouts: DashboardLayouts,
-  i: string
-): Partial<Record<Breakpoint, GridItem>> {
-  const snapshot: Partial<Record<Breakpoint, GridItem>> = {};
-  for (const bp of BREAKPOINTS) {
-    const item = layouts[bp]?.find((it) => it.i === i);
-    if (item) snapshot[bp] = { ...item };
-  }
-  return snapshot;
-}
 
 export function CustomizableDashboard() {
   const clientId = useAppStore((s) => s.selectedClientId);
@@ -127,18 +85,18 @@ export function CustomizableDashboard() {
   const resizeWidget = useDashboardStore((s) => s.resizeWidget);
 
   const [catalogOpen, setCatalogOpen] = useState(false);
-  // The view as the Builder Assistant last saved it. A second widget in the same
-  // assistant turn is built on this rather than on `saved`, whose query-cache
-  // update may not have re-rendered yet — otherwise widget 1 would be dropped.
-  const builderSavedRef = useRef<DashboardConfig | null>(null);
-  // The widget "Edit with AI" pinned in the Builder panel. Null = the assistant
-  // builds new widgets unless the user names one.
-  const [builderTargetId, setBuilderTargetId] = useState<string | null>(null);
   const [configuringId, setConfiguringId] = useState<string | null>(null);
   const [savingToLibraryId, setSavingToLibraryId] = useState<string | null>(null);
   // New widgets land at the bottom of the grid, usually below the fold — track
   // the last-added id so we can scroll it into view and flash it once rendered.
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  // Opening the master template editor unmounts this component (the swap lives
+  // in `dashboard-view.tsx`, so each grid gets its own mount), hence a store
+  // flag rather than local state. The master's content also backs Reset: it is
+  // what a client with no saved view renders, so "the default layout" means the
+  // master, with the built-in preset only the fallback until the fetch lands.
+  const setEditingMasterTemplate = useDashboardStore((s) => s.setEditingMasterTemplate);
+  const { data: master } = useMasterTemplate(canEdit);
 
   // The panel only exists on this view, so leaving it must drop the flag too —
   // otherwise <main> keeps its margin with nothing in the slot. Cleanup only,
@@ -213,301 +171,24 @@ export function CustomizableDashboard() {
 
   const config: DashboardConfig | null | undefined = editMode && draft ? draft : saved;
 
-  // Anything else that writes the cache (a manual save, a view switch) makes the
-  // builder's copy stale, so it stops being used as a base.
-  useEffect(() => {
-    if (builderSavedRef.current && builderSavedRef.current !== saved) {
-      builderSavedRef.current = null;
-    }
-  }, [saved]);
-
-  /**
-   * Footprint for a widget the assistant produced: the type's natural size —
-   * per chart shape for the `custom` builder, the registry default for every
-   * other type — with the width overridden when the assistant asked for one of
-   * the four size words the config dialog also offers.
-   */
-  const builderSize = useCallback(
-    (type: BuilderWidgetType, widgetConfig: Record<string, unknown>, size?: WidgetSizeKey) => {
-      const natural =
-        type === "custom"
-          ? chartDefaultSize(normalizeCustomConfig(widgetConfig).visualization)
-          : WIDGET_META[type].defaultSize;
-      return size ? { ...natural, w: WIDGET_SIZE_WIDTH[size] } : natural;
-    },
-    []
-  );
-
-  /**
-   * The view the next Builder change lands on — the open edit draft, else the
-   * copy the Builder last saved, else the server's. Resolved exactly the way
-   * `applyBuilderChange` resolves it, so a "before" snapshot taken here is of
-   * what the change is about to mutate.
-   */
-  const builderBase = useCallback(
-    (): DashboardConfig | null => {
-      const store = useDashboardStore.getState();
-      if (store.editMode && store.draft) return store.draft;
-      return builderSavedRef.current ?? saved ?? null;
-    },
-    [saved]
-  );
-
-  /**
-   * Runs one Builder Assistant change against the view and reports how it
-   * persisted. Inside an open edit session the change joins the draft (the user
-   * saves as usual); otherwise a throwaway begin/mutate/end batch runs
-   * synchronously — the grid never flips into edit mode on screen — and the
-   * result is saved immediately, so "created" means created and saved.
-   *
-   * `mutate` returns the instance id it touched, or null when it could not be
-   * applied (a target that vanished between the request and the response).
-   * `highlight` is off for a removal — there is nothing left to scroll to.
-   */
-  const applyBuilderChange = useCallback(
-    async (mutate: () => string | null, highlight = true): Promise<AppliedChange> => {
-      const store = useDashboardStore.getState();
-
-      if (store.editMode && store.draft) {
-        const id = mutate();
-        if (!id) return NOT_APPLIED;
-        if (highlight) setJustAddedId(id);
-        return { state: "draft", id };
-      }
-
-      const base = builderSavedRef.current ?? saved;
-      if (!base) return NOT_APPLIED;
-      store.beginEdit(base);
-      const id = mutate();
-      const pending = useDashboardStore.getState().draft;
-      store.endEdit();
-      if (!id || !pending) return NOT_APPLIED;
-
-      try {
-        builderSavedRef.current = await saveDashboard.mutateAsync(pending);
-        if (highlight) setJustAddedId(id);
-        return { state: "saved", id };
-      } catch {
-        // Clear the mutation's error so the edit toolbar doesn't later show a
-        // stale "Failed to save layout" for a failure the panel already owns.
-        saveDashboard.reset();
-        return NOT_APPLIED;
-      }
-    },
-    [saved, saveDashboard]
-  );
-
-  // An undo is pressed long after the change that produced it, so it must not
-  // close over the `applyBuilderChange` of that render: that one still holds the
-  // view (and the save mutation) that was open back then.
-  const applyRef = useRef(applyBuilderChange);
-  useEffect(() => {
-    applyRef.current = applyBuilderChange;
-  }, [applyBuilderChange]);
-
-  // What the Builder is pointed at right now. A change (or an undo) captured
-  // under another client or view refuses instead of landing on the wrong one.
-  // Keyed on the SELECTION, not on `config.id`: saving a view that had never
-  // been saved gives it an id, and that must not invalidate the undo of the
-  // very change that saved it.
-  const builderScope = `${clientId ?? ""}:${selectedViewId ?? "default"}`;
-  const builderScopeRef = useRef(builderScope);
-  useEffect(() => {
-    builderScopeRef.current = builderScope;
-  }, [builderScope]);
-
-  const runUndo = useCallback(
-    async (
-      scope: string,
-      mutate: () => string | null,
-      highlight = true
-    ): Promise<BuilderInsertResult> => {
-      if (builderScopeRef.current !== scope) return "failed";
-      const { state } = await applyRef.current(mutate, highlight);
-      return state;
-    },
-    []
-  );
-
-  /** New widget: the catalog's exact add path, sized for its type. */
-  const handleBuilderWidget = useCallback(
-    async (
-      type: BuilderWidgetType,
-      widgetConfig: Record<string, unknown>,
-      size?: WidgetSizeKey
-    ): Promise<BuilderApplyResult> => {
-      // The panel's in-flight turn closed over this handler, so it can be the
-      // one from before a client or view switch. Applying it now would insert
-      // into the view the user has left (or, in an open edit, into the draft of
-      // the one they moved to), so a stale scope reports failure instead.
-      if (builderScopeRef.current !== builderScope) return { state: "failed" };
-      const { state, id } = await applyBuilderChange(() => {
-        const spec: NewWidgetSpec = {
-          type,
-          defaultSize: builderSize(type, widgetConfig, size),
-          defaultConfig: { ...widgetConfig },
-        };
-        return useDashboardStore.getState().addWidget(spec);
-      });
-      if (!id) return { state };
-
-      return {
-        state,
-        undo: () =>
-          runUndo(
-            builderScope,
-            () => {
-              const store = useDashboardStore.getState();
-              if (!store.draft?.widgets.some((w) => w.i === id)) return null;
-              store.removeWidget(id);
-              return id;
-            },
-            false
-          ),
-      };
-    },
-    [applyBuilderChange, builderScope, builderSize, runUndo]
-  );
-
-  /**
-   * Existing widget: replace its config in place. The footprint only moves when
-   * the assistant asked for a size or a chart changed shape — otherwise a
-   * widget the user has hand-resized would snap back on every small edit, and
-   * the undo would have a footprint to put back that never moved.
-   */
-  const handleBuilderUpdate = useCallback(
-    async (
-      widgetId: string,
-      type: BuilderWidgetType,
-      widgetConfig: Record<string, unknown>,
-      size?: WidgetSizeKey
-    ): Promise<BuilderApplyResult> => {
-      if (builderScopeRef.current !== builderScope) return { state: "failed" };
-      const base = builderBase();
-      const before = base?.widgets.find((w) => w.i === widgetId);
-      const reshaped =
-        type === "custom" &&
-        !!before &&
-        normalizeCustomConfig(before.config).visualization !==
-          normalizeCustomConfig(widgetConfig).visualization;
-      const resized = !!before && (!!size || reshaped);
-      const beforeItems = resized && base ? layoutSnapshot(base.layouts, widgetId) : {};
-
-      const { state, id } = await applyBuilderChange(() => {
-        const store = useDashboardStore.getState();
-        const current = store.draft?.widgets.find((w) => w.i === widgetId);
-        // The panel only offers ids the server took from this view, but the view
-        // can change under an in-flight request, so the target is re-checked —
-        // including that it is still the same type the config was written for.
-        if (!current || current.type !== type || current.savedWidgetId) return null;
-
-        store.updateWidgetConfig(widgetId, { ...widgetConfig });
-        // A new chart shape owns its whole footprint, so the height goes with
-        // it. A plain "make it full width" is a WIDTH change only — the same
-        // thing the config dialog's size picker does — because the height may
-        // have been dragged to what the user wanted and is not ours to reset.
-        if (reshaped) store.setWidgetSize(widgetId, builderSize(type, widgetConfig, size));
-        else if (size) store.resizeWidget(widgetId, WIDGET_SIZE_WIDTH[size]);
-        return widgetId;
-      });
-      if (!id || !before) return { state };
-
-      return {
-        state,
-        undo: () =>
-          runUndo(builderScope, () => {
-            const store = useDashboardStore.getState();
-            if (!store.draft?.widgets.some((w) => w.i === widgetId)) return null;
-            store.restoreWidget(before, beforeItems);
-            return widgetId;
-          }),
-      };
-    },
-    [applyBuilderChange, builderBase, builderScope, builderSize, runUndo]
-  );
-
-  /**
-   * Existing widget, deleted. The instance and its layout item on every
-   * breakpoint are captured first: an undo restores those, because re-adding
-   * the widget would drop it wherever the grid has room now.
-   */
-  const handleBuilderRemove = useCallback(
-    async (widgetId: string): Promise<BuilderApplyResult> => {
-      if (builderScopeRef.current !== builderScope) return { state: "failed" };
-      const base = builderBase();
-      const before = base?.widgets.find((w) => w.i === widgetId);
-      if (!base || !before) return { state: "failed" };
-      const beforeItems = layoutSnapshot(base.layouts, widgetId);
-
-      const { state, id } = await applyBuilderChange(() => {
-        const store = useDashboardStore.getState();
-        if (!store.draft?.widgets.some((w) => w.i === widgetId)) return null;
-        store.removeWidget(widgetId);
-        return widgetId;
-      }, false);
-      if (!id) return { state };
-
-      return {
-        state,
-        undo: () =>
-          runUndo(builderScope, () => {
-            useDashboardStore.getState().restoreWidget(before, beforeItems);
-            return widgetId;
-          }),
-      };
-    },
-    [applyBuilderChange, builderBase, builderScope, runUndo]
-  );
-
-  /**
-   * What the assistant is allowed to change. A widget is editable only if the
-   * builder has a schema for its type (BUILDER_WIDGET_TYPES) AND it is not
-   * linked to the saved-widget library — a linked instance stores no inline
-   * config (the library row owns it), so an inline rewrite would be stripped on
-   * save and silently lost. The route re-checks the config against that
-   * schema and may still demote it.
-   */
-  const builderWidgets: BuilderWidgetRef[] = useMemo(() => {
-    if (!config) return [];
-    // Capped to the route's inventory limit — a view longer than this loses its
-    // tail as an edit target rather than 400ing the whole request.
-    return config.widgets.slice(0, MAX_BUILDER_INVENTORY).map((w) => {
-      const def = getWidget(w.type);
-      // The title the grid prints, so the user can name a widget by what they see.
-      const title = def?.getTitle ? def.getTitle(w.config) : def?.title ?? w.type;
-      if (!isBuilderWidgetType(w.type)) {
-        return {
-          i: w.i,
-          title,
-          type: w.type,
-          locked: `it is a "${def?.title ?? w.type}" widget, which the builder cannot configure`,
-        };
-      }
-      if (w.savedWidgetId) {
-        return { i: w.i, title, type: w.type, locked: "it is linked to the saved widget library" };
-      }
-      // A chart is normalized first so the model always sees a complete config;
-      // the fixed types are sent as stored and validated server-side.
-      const current: Record<string, unknown> =
-        w.type === "custom" ? { ...normalizeCustomConfig(w.config) } : w.config;
-      return { i: w.i, title, type: w.type, config: current };
-    });
-  }, [config]);
-
-  /** Pins a widget as the assistant's edit target and opens the panel. */
-  const handleEditWithAi = useCallback(
-    (i: string) => {
-      setBuilderTargetId(i);
-      setBuilderOpen(true);
-    },
-    [setBuilderOpen]
-  );
-
-  // Derived rather than cleared in an effect (the repo's lint rejects setState
-  // in an effect body): a pinned widget that is gone — removed, or the view or
-  // client switched — simply stops being the target.
-  const builderTarget =
-    builderTargetId && builderWidgets.some((w) => w.i === builderTargetId) ? builderTargetId : null;
+  // The Builder Assistant's whole change/undo/inventory apparatus, shared with
+  // the report builder and the master template editors (see `use-builder-grid.ts`).
+  // A dashboard view is usually NOT in edit mode, so a change made from the
+  // panel is saved on the spot — hence `save`.
+  const builder = useBuilderGrid<DashboardConfig>({
+    store: useDashboardStore,
+    surface: "dashboard",
+    config,
+    saved,
+    save: (next) => saveDashboard.mutateAsync(next),
+    resetSave: () => saveDashboard.reset(),
+    // Keyed on the SELECTION, not on `config.id`: saving a view that had never
+    // been saved gives it an id, and that must not invalidate the undo of the
+    // very change that saved it.
+    scope: `${clientId ?? ""}:${selectedViewId ?? "default"}`,
+    onHighlight: setJustAddedId,
+    onOpenPanel: () => setBuilderOpen(true),
+  });
 
   const widgetsById = useMemo(() => {
     const m = new Map<string, WidgetInstance>();
@@ -549,6 +230,13 @@ export function CustomizableDashboard() {
                 views={views ?? []}
                 current={config}
                 canManage={canEdit}
+                onEditMaster={() => {
+                  // The draft and the Builder panel belong to this view, not to
+                  // the template, so both are dropped on the way in.
+                  cancelEdit();
+                  setBuilderOpen(false);
+                  setEditingMasterTemplate(true);
+                }}
               />
               {editMode && (
                 <span className="text-[11px] font-medium text-primary bg-primary/8 px-2 py-0.5 rounded-full shrink-0">
@@ -577,16 +265,25 @@ export function CustomizableDashboard() {
                   onClick={() =>
                     // Reset the widgets, not the view's identity — Save must still
                     // update THIS view rather than create a new row.
-                    beginEdit({
-                      ...buildDefaultDashboard(config.name),
-                      id: config.id,
-                      visibility: config.visibility,
-                      isDefault: config.isDefault,
-                    })
+                    beginEdit(
+                      master
+                        ? {
+                            ...config,
+                            widgets: master.widgets,
+                            layouts: master.layouts,
+                            version: master.version,
+                          }
+                        : {
+                            ...buildDefaultDashboard(config.name),
+                            id: config.id,
+                            visibility: config.visibility,
+                            isDefault: config.isDefault,
+                          }
+                    )
                   }
-                  title="Reset to the default layout"
+                  title="Reset to the master dashboard template"
                 >
-                  <BiReset className="w-4 h-4" /> Reset
+                  <BiReset className="w-4 h-4" /> Reset to master
                 </Button>
                 <Button variant="ghost" size="sm" onClick={cancelEdit}>
                   <BiX className="w-4 h-4" /> Cancel
@@ -678,9 +375,7 @@ export function CustomizableDashboard() {
                     onSaveToLibrary={setSavingToLibraryId}
                     onDuplicate={handleDuplicateWidget}
                     onEditWithAi={
-                      canEdit && isBuilderWidgetType(w.type) && !w.savedWidgetId
-                        ? handleEditWithAi
-                        : undefined
+                      canEdit && builder.canEditWithAi(w) ? builder.editWithAi : undefined
                     }
                   />
                 </div>
@@ -720,12 +415,14 @@ export function CustomizableDashboard() {
             dashboardId={config?.id ?? null}
             viewId={selectedViewId}
             viewName={config?.name}
-            widgets={builderWidgets}
-            targetWidgetId={builderTarget}
-            onTargetChange={setBuilderTargetId}
-            onCreateWidget={handleBuilderWidget}
-            onUpdateWidget={handleBuilderUpdate}
-            onRemoveWidget={handleBuilderRemove}
+            widgets={builder.widgets}
+            targetWidgetId={builder.targetWidgetId}
+            onTargetChange={builder.setTargetWidgetId}
+            onCreateWidget={builder.onCreateWidget}
+            onUpdateWidget={builder.onUpdateWidget}
+            onRemoveWidget={builder.onRemoveWidget}
+            onResizeWidget={builder.onResizeWidget}
+            onArrangeWidgets={builder.onArrangeWidgets}
           />
         )}
       </div>

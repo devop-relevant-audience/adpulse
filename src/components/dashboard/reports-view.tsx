@@ -42,6 +42,7 @@ import { NewViewReportDialog } from "@/components/reports/new-view-report-dialog
 import { GenerateReportDialog } from "@/components/reports/generate-report-dialog";
 import { ReportLayoutEditor } from "@/components/reports/report-layout-editor";
 import { ReportLayoutsPanel } from "@/components/reports/report-layouts-panel";
+import { MasterTemplateEditor } from "@/components/templates/master-template-editor";
 import { ViewReport, ViewReportHeader } from "@/components/reports/view-report";
 import { ShareDialog } from "@/components/report/share-dialog";
 import { isViewSnapshot } from "@/lib/reports/view-snapshot";
@@ -313,6 +314,8 @@ export function ReportsView() {
   const [showShareDialog, setShowShareDialog] = useState(false);
   // The layout whose blocks are being edited — the editor replaces this view.
   const [editingLayout, setEditingLayout] = useState<ReportLayoutSummary | null>(null);
+  // The master report template, edited in the same place as a layout.
+  const [editingMaster, setEditingMaster] = useState(false);
   const [generatingLayout, setGeneratingLayout] = useState<ReportLayoutSummary | null>(null);
 
   const { data: reports, isLoading: reportsLoading, isError: reportsError, refetch: refetchReports } = useGeneratedReports(clientId);
@@ -323,6 +326,16 @@ export function ReportsView() {
 
   if (!clientId) {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-[300px] w-full" /></div>;
+  }
+
+  if (canManageLayouts && editingMaster) {
+    return (
+      <MasterTemplateEditor
+        kind="report"
+        clientId={clientId}
+        onBack={() => setEditingMaster(false)}
+      />
+    );
   }
 
   // Editing a layout takes over the whole view (no route of its own).
@@ -415,6 +428,7 @@ export function ReportsView() {
           clientId={clientId}
           onEdit={setEditingLayout}
           onGenerate={setGeneratingLayout}
+          onEditMaster={() => setEditingMaster(true)}
         />
       )}
 

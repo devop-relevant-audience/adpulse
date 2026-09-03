@@ -7,7 +7,9 @@ import {
   IMAGE_UPLOAD_TYPES_LABEL,
   MAX_IMAGE_UPLOAD_BYTES,
   MAX_IMAGE_UPLOAD_LABEL,
+  UPLOAD_BLOB_PATH_PREFIX,
   findUnsafeSvgContent,
+  isAdpulseUploadUrl,
   sniffImage,
 } from "@/lib/uploads/image-constraints";
 
@@ -22,9 +24,6 @@ import {
 // The Blob token is read lazily inside the handler, never at module scope, so a
 // missing token is a 503 on this one route rather than an import-time crash
 // that takes the whole app down.
-
-const BLOB_PATH_PREFIX = "adpulse/uploads";
-const BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 
 // Generous enough to never bother a real editor, tight enough that a stolen
 // session cannot fill the store. Fails open when Upstash is unconfigured.
@@ -92,7 +91,7 @@ export const POST = withRoute("assets.POST", async (request: NextRequest) => {
   // Random path, so one client's uploads cannot be found by guessing names.
   // `addRandomSuffix` adds a second random segment and removes any chance of a
   // collision rejecting the write.
-  const pathname = `${BLOB_PATH_PREFIX}/${crypto.randomUUID()}.${sniffed.extension}`;
+  const pathname = `${UPLOAD_BLOB_PATH_PREFIX}/${crypto.randomUUID()}.${sniffed.extension}`;
 
   // Uploads the exact bytes that were validated, not the original File handle.
   const blob = await put(pathname, new Blob([bytes], { type: sniffed.contentType }), {
@@ -144,21 +143,9 @@ export const DELETE = withRoute("assets.DELETE", async (request: NextRequest) =>
   const raw = request.nextUrl.searchParams.get("url");
   if (!raw) return badRequest("A `url` query parameter is required.");
 
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    return badRequest("`url` is not a valid URL.");
-  }
-
-  const ownedByThisApp =
-    parsed.protocol === "https:" &&
-    parsed.hostname.endsWith(BLOB_HOST_SUFFIX) &&
-    parsed.pathname.startsWith(`/${BLOB_PATH_PREFIX}/`);
-
-  if (!ownedByThisApp) return badRequest("`url` is not an AdPulse upload.");
+  if (!isAdpulseUploadUrl(raw)) return badRequest("`url` is not an AdPulse upload.");
 
   // Deleting an already-deleted blob is a no-op, so this stays idempotent.
-  await del(parsed.toString(), { token });
+  await del(raw, { token });
   return NextResponse.json({ success: true });
 });

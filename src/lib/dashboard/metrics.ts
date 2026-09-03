@@ -49,3 +49,6 @@ export function formatMetric(value: number, format: MetricFormat, currency?: str
       return Number.isFinite(value) ? `${value.toFixed(2)}x` : "—";
   }
 }
+
+/** Longest custom title a KPI tile accepts (see `kpiTitle` in kpi-widget.tsx). */
+export const KPI_TITLE_MAX = 80;

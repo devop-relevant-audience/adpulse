@@ -252,6 +252,7 @@ export function metricWidgetPlan(
           metrics: metrics.length > 0 ? metrics : ["spend", "conversions"],
           groupBy: "none",
           timeBucket: "day",
+          secondaryAxis: config.secondaryAxis === true,
         })
       );
     }

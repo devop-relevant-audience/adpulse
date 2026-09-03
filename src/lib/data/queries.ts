@@ -534,19 +534,24 @@ export interface PacingData {
 export async function getCampaignPacing(params: {
   clientId: string;
   month: string;
+  platforms?: Platform[];
+  campaignIds?: string[];
 }): Promise<PacingData> {
+  const budgetConditions = [
+    eq(campaignBudgets.clientId, params.clientId),
+    eq(campaignBudgets.month, params.month),
+  ];
+  if (params.campaignIds?.length) {
+    budgetConditions.push(inArray(campaignBudgets.campaignId, params.campaignIds));
+  }
+
   const budgets = await db
     .select({
       campaign_id: campaignBudgets.campaignId,
       monthly_budget: campaignBudgets.monthlyBudget,
     })
     .from(campaignBudgets)
-    .where(
-      and(
-        eq(campaignBudgets.clientId, params.clientId),
-        eq(campaignBudgets.month, params.month)
-      )
-    );
+    .where(and(...budgetConditions));
 
   const monthStart = `${params.month}-01`;
   const monthDate = new Date(monthStart);
@@ -560,6 +565,18 @@ export async function getCampaignPacing(params: {
 
   const endDateStr = endOfRange.toISOString().split("T")[0];
 
+  const perfConditions = [
+    eq(campaignPerformance.clientId, params.clientId),
+    gte(campaignPerformance.date, monthStart),
+    lte(campaignPerformance.date, endDateStr),
+  ];
+  if (params.platforms?.length) {
+    perfConditions.push(inArray(campaignPerformance.platform, params.platforms));
+  }
+  if (params.campaignIds?.length) {
+    perfConditions.push(inArray(campaignPerformance.campaignId, params.campaignIds));
+  }
+
   const performanceData = await db
     .select({
       campaign_id: campaignPerformance.campaignId,
@@ -568,13 +585,7 @@ export async function getCampaignPacing(params: {
       spend: campaignPerformance.spend,
     })
     .from(campaignPerformance)
-    .where(
-      and(
-        eq(campaignPerformance.clientId, params.clientId),
-        gte(campaignPerformance.date, monthStart),
-        lte(campaignPerformance.date, endDateStr)
-      )
-    );
+    .where(and(...perfConditions));
 
   const spendByCampaign = new Map<string, { total: number; name: string; platform: Platform }>();
   for (const row of performanceData || []) {
@@ -590,7 +601,14 @@ export async function getCampaignPacing(params: {
     }
   }
 
-  const campaigns: CampaignPacingItem[] = (budgets || []).map((budget) => {
+  // campaign_budgets has no platform column, so a platform filter can only be
+  // applied via the performance side: a budget whose campaign has no row in the
+  // platform-filtered performance query is not on a selected platform.
+  const budgetRows = params.platforms?.length
+    ? (budgets || []).filter((budget) => spendByCampaign.has(budget.campaign_id))
+    : budgets || [];
+
+  const campaigns: CampaignPacingItem[] = budgetRows.map((budget) => {
     const spendInfo = spendByCampaign.get(budget.campaign_id);
     const spentToDate = spendInfo?.total || 0;
     const dailyRunRate = daysElapsed > 0 ? spentToDate / daysElapsed : 0;

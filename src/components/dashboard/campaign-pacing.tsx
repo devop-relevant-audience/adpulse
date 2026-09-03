@@ -108,12 +108,16 @@ function PacingBar({ item }: { item: CampaignPacingItem }) {
 export function CampaignPacing() {
   const clientId = useAppStore((s) => s.selectedClientId);
   const dateRange = useAppStore((s) => s.dateRange);
+  const selectedPlatform = useAppStore((s) => s.selectedPlatform);
+  const selectedCampaignIds = useAppStore((s) => s.selectedCampaignIds);
 
   const currentMonth = dateRange.start.substring(0, 7);
 
   const { data: pacingData, isLoading, isError, refetch } = usePacing({
     clientId,
     month: currentMonth,
+    platform: selectedPlatform,
+    campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined,
   });
 
   if (!clientId || isLoading) {

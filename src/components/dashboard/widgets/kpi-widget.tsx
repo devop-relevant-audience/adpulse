@@ -9,9 +9,11 @@ import { useWidgetScope } from "@/hooks/use-widget-scope";
 import { getCompareRange, COMPARE_MODE_LABELS } from "@/lib/dashboard/date-presets";
 import { useRegisterWidgetData, type WidgetData } from "@/lib/dashboard/widget-data";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { QueryError } from "@/components/ui/query-error";
 import { cn } from "@/lib/utils";
 import {
+  KPI_TITLE_MAX,
   METRIC_OPTIONS,
   getMetricOption,
   formatMetric,
@@ -30,6 +32,16 @@ import type { WidgetRenderProps, WidgetConfigFormProps } from "@/lib/dashboard/t
 function readMetric(config: Record<string, unknown>): string {
   const m = config.metric;
   return typeof m === "string" && METRIC_OPTIONS.some((o) => o.value === m) ? m : "spend";
+}
+
+/**
+ * The tile's title: the user's own when set, otherwise the metric's label. The
+ * body keeps printing the metric label, so a renamed tile still says which
+ * metric it shows.
+ */
+export function kpiTitle(config: Record<string, unknown>): string {
+  const t = typeof config.title === "string" ? config.title.trim() : "";
+  return t ? t.slice(0, KPI_TITLE_MAX) : getMetricOption(readMetric(config)).label;
 }
 
 export function KpiWidget({ config, instanceId }: WidgetRenderProps) {
@@ -139,6 +151,30 @@ export function KpiWidget({ config, instanceId }: WidgetRenderProps) {
         </span>
       </div>
     </button>
+  );
+}
+
+/** Right-column card in the config dialog: an optional custom title. */
+export function KpiTitleForm({ config, onChange }: WidgetConfigFormProps) {
+  // Raw value while typing so a trailing space is not eaten before the next key.
+  const rawTitle = typeof config.title === "string" ? config.title : "";
+  function setTitle(value: string) {
+    const merged: Record<string, unknown> = { ...config };
+    if (value.length > 0) merged.title = value;
+    else delete merged.title;
+    onChange(merged);
+  }
+  return (
+    <ConfigSection title="Title" hint="Metric name if left empty">
+      <Input
+        value={rawTitle}
+        maxLength={KPI_TITLE_MAX}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder={getMetricOption(readMetric(config)).label}
+        aria-label="Widget title"
+        className="h-8 text-xs bg-white"
+      />
+    </ConfigSection>
   );
 }
 

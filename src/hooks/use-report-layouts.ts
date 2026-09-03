@@ -108,6 +108,8 @@ export function useCreateReportLayout(clientId: string | null) {
       name: string;
       duplicateFromId?: string;
       fromTemplateId?: string;
+      /** Start from the master template. Mutually exclusive with the two above. */
+      fromMaster?: true;
     }) => {
       if (!clientId) throw new Error("No client selected");
       const res = await fetch("/api/report-layouts", {
