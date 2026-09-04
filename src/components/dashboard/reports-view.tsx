@@ -44,6 +44,7 @@ import { ReportLayoutEditor } from "@/components/reports/report-layout-editor";
 import { ReportLayoutsPanel } from "@/components/reports/report-layouts-panel";
 import { MasterTemplateEditor } from "@/components/templates/master-template-editor";
 import { ViewReport, ViewReportHeader } from "@/components/reports/view-report";
+import { DownloadPdfButton } from "@/components/reports/download-pdf-button";
 import { ShareDialog } from "@/components/report/share-dialog";
 import { isViewSnapshot } from "@/lib/reports/view-snapshot";
 import type { ReportLayoutSummary } from "@/lib/dashboard/types";
@@ -367,16 +368,19 @@ export function ReportsView() {
             </Button>
             <ViewReportHeader title={openReport.title} snapshot={openSnapshot} />
           </div>
-          {canShare && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 shrink-0"
-              onClick={() => setShowShareDialog(true)}
-            >
-              <BiLink className="w-3.5 h-3.5" /> Share link
-            </Button>
-          )}
+          <div className="flex items-start gap-2 shrink-0">
+            {canShare && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0"
+                onClick={() => setShowShareDialog(true)}
+              >
+                <BiLink className="w-3.5 h-3.5" /> Share link
+              </Button>
+            )}
+            <DownloadPdfButton reportId={openReport.id} title={openReport.title} />
+          </div>
         </div>
 
         <ViewReport snapshot={openSnapshot} />

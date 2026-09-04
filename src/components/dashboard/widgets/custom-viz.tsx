@@ -38,6 +38,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useChartAnimation, usePrintMode } from "@/components/dashboard/print-mode";
 import { formatMetric } from "@/lib/dashboard/metrics";
 import { formatCurrencyCompact, formatNumber } from "@/lib/format";
 import {
@@ -582,6 +583,7 @@ function trendFor(
 }
 
 export function LineViz({ cfg, result, currency, compare }: TimeVizProps) {
+  const animated = useChartAnimation();
   const { data, series } = useMemo(() => pivotLineData(cfg, result), [cfg, result]);
   const trend = useMemo(() => trendFor(cfg, data, series), [cfg, data, series]);
   // Like the trend fit, the comparison tracks the FIRST series only: one ghost
@@ -658,6 +660,7 @@ export function LineViz({ cfg, result, currency, compare }: TimeVizProps) {
                 stroke={s.color}
                 strokeWidth={2}
                 dot={false}
+                isAnimationActive={animated}
               />
             ))}
             {trend.hasTrend && <TrendLine color={series[0].color} yAxisId={axes ? "left" : undefined} />}
@@ -671,6 +674,7 @@ export function LineViz({ cfg, result, currency, compare }: TimeVizProps) {
 // --- Area ------------------------------------------------------------------
 
 export function AreaViz({ cfg, result, currency, compare }: TimeVizProps) {
+  const animated = useChartAnimation();
   const { data, series } = useMemo(() => pivotLineData(cfg, result), [cfg, result]);
   const trend = useMemo(() => trendFor(cfg, data, series), [cfg, data, series]);
   const prev = useMemo(
@@ -750,6 +754,7 @@ export function AreaViz({ cfg, result, currency, compare }: TimeVizProps) {
                 strokeWidth={2}
                 fill={s.color}
                 fillOpacity={stacked ? 0.65 : 0.18}
+                isAnimationActive={animated}
               />
             ))}
             {trend.hasTrend && <TrendLine color={series[0].color} yAxisId={axes ? "left" : undefined} />}
@@ -763,6 +768,7 @@ export function AreaViz({ cfg, result, currency, compare }: TimeVizProps) {
 // --- Combo (bars + line) ----------------------------------------------------
 
 export function ComboViz({ cfg, result, currency, compare }: TimeVizProps) {
+  const animated = useChartAnimation();
   const metrics = cfg.metrics.slice(0, 2);
   const dual = metrics.length === 2;
   const [barMetric, lineMetric] = metrics;
@@ -835,6 +841,7 @@ export function ComboViz({ cfg, result, currency, compare }: TimeVizProps) {
               fill={QUERY_METRIC_META[barMetric].color}
               radius={[3, 3, 0, 0]}
               maxBarSize={32}
+              isAnimationActive={animated}
             />
             {/* One metric selected: the combo degrades to the bars alone. */}
             {dual && (
@@ -846,6 +853,7 @@ export function ComboViz({ cfg, result, currency, compare }: TimeVizProps) {
                 stroke={QUERY_METRIC_META[lineMetric].color}
                 strokeWidth={2}
                 dot={false}
+                isAnimationActive={animated}
               />
             )}
             {trend.hasTrend && <TrendLine color={QUERY_METRIC_META[barMetric].color} yAxisId="left" />}
@@ -926,6 +934,7 @@ function sliceLabel(props: PieLabelRenderProps) {
 }
 
 export function PieViz({ cfg, result, currency }: VizProps) {
+  const animated = useChartAnimation();
   const metric = cfg.metrics[0];
   const slices = useMemo(() => buildSlices(cfg, result), [cfg, result]);
   const donut = cfg.visualization === "donut";
@@ -952,6 +961,7 @@ export function PieViz({ cfg, result, currency }: VizProps) {
               strokeWidth={0}
               labelLine={false}
               label={sliceLabel}
+              isAnimationActive={animated}
             >
               {slices.map((s) => (
                 <Cell key={s.key} fill={s.color} />
@@ -980,6 +990,7 @@ export function PieViz({ cfg, result, currency }: VizProps) {
 const ABS_PREFIX = "__abs_";
 
 export function BarViz({ cfg, result, currency }: VizProps) {
+  const animated = useChartAnimation();
   const metrics = cfg.metrics.slice(0, 2);
   const mode = cfg.barMode ?? "grouped";
   // A single metric has nothing to stack against, so it always draws grouped.
@@ -1059,6 +1070,7 @@ export function BarViz({ cfg, result, currency }: VizProps) {
                 // Only the top segment of a stack gets the rounded cap.
                 radius={stacked && i < metrics.length - 1 ? [0, 0, 0, 0] : [4, 4, 0, 0]}
                 maxBarSize={48}
+                isAnimationActive={animated}
               >
                 {colorByPlatform &&
                   result.rows.map((r) => (
@@ -1074,6 +1086,21 @@ export function BarViz({ cfg, result, currency }: VizProps) {
       </div>
     </div>
   );
+}
+
+// --- Table shell -----------------------------------------------------------
+
+/**
+ * The table's own box. On screen it fills its tile and scrolls inside it; on
+ * paper it grows to its natural height and lets the page break between rows,
+ * because a scroll container in a PDF simply cuts every row past the fold.
+ * `overflow-visible` beats the Table container's baked-in `overflow-x-auto` on
+ * specificity, so the two cannot fight over cascade order.
+ */
+function useTableShellClass(): string {
+  return usePrintMode()
+    ? "w-full [&>[data-slot=table-container]]:overflow-visible"
+    : "h-full w-full min-h-0 [&>[data-slot=table-container]]:h-full [&>[data-slot=table-container]]:overflow-auto";
 }
 
 // --- Table sorting (shared with the campaign-table widget) -----------------
@@ -1230,6 +1257,7 @@ export function TableViz({
   const headClass = "h-7 px-2 text-[11px] font-medium text-ink-muted bg-white";
   const cellClass = "py-1 px-2 text-xs";
 
+  const shellClass = useTableShellClass();
   const sort = useTableSort();
   const rows = useMemo(
     () =>
@@ -1252,7 +1280,7 @@ export function TableViz({
   }, [cfg.heatCells, cfg.metrics, result.rows]);
 
   return (
-    <div className="h-full w-full min-h-0 [&>[data-slot=table-container]]:h-full [&>[data-slot=table-container]]:overflow-auto">
+    <div className={shellClass}>
       <Table className="text-xs">
         <TableHeader className="sticky top-0 z-10 bg-white">
           <TableRow className="hover:bg-transparent">
@@ -1380,6 +1408,7 @@ function MetricCell({
 
 /** Rows = groups, columns = time buckets, one metric in the cells. */
 export function PivotViz({ cfg, result, currency }: VizProps) {
+  const shellClass = useTableShellClass();
   const metric = cfg.metrics[0];
 
   const { dates, rows } = useMemo(() => {
@@ -1417,7 +1446,7 @@ export function PivotViz({ cfg, result, currency }: VizProps) {
   const invert = QUERY_METRIC_META[metric].invert;
 
   return (
-    <div className="h-full w-full min-h-0 [&>[data-slot=table-container]]:h-full [&>[data-slot=table-container]]:overflow-auto">
+    <div className={shellClass}>
       <Table className="text-xs">
         <TableHeader className="sticky top-0 z-20 bg-white">
           <TableRow className="hover:bg-transparent">

@@ -13,6 +13,7 @@
 import { format, parseISO } from "date-fns";
 import { BiFilterAlt, BiLockAlt } from "react-icons/bi";
 import { Panel } from "@/components/ui/panel";
+import { cn } from "@/lib/utils";
 import { WidgetErrorBoundary } from "@/components/dashboard/widget-frame";
 import { getWidget } from "@/lib/dashboard/widget-registry";
 import { describeWidgetFilters, readWidgetFilters } from "@/lib/dashboard/filters";
@@ -55,9 +56,17 @@ const COLUMNS = GRID_COLS.lg;
 const GUTTER = GRID_MARGIN[1];
 
 /** RGL's own item height: h rows plus the gutters between them. */
-function itemHeight(h: number): number {
+export function itemHeight(h: number): number {
   return h * GRID_ROW_HEIGHT + (h - 1) * GUTTER;
 }
+
+/**
+ * How a widget's frame is sized. `"fill"` is the grid's own rule — the panel
+ * fills its tile and clips what does not fit, which is what a fixed-row layout
+ * needs. `"auto"` lets the panel grow to its content, for the print renderer,
+ * where a clipped note or a half-shown table is simply lost.
+ */
+export type WidgetFit = "fill" | "auto";
 
 function Placeholder({ children }: { children: React.ReactNode }) {
   return (
@@ -234,19 +243,23 @@ function SnapshotWidgetBody({
 }
 
 /** Same chrome as the dashboard's WidgetFrame, without the edit affordances. */
-function SnapshotWidgetFrame({
+export function SnapshotWidgetFrame({
   widget,
   currency,
   compareLabel,
   dateRange,
   comparison,
+  fit = "fill",
 }: {
   widget: SnapshotWidget;
   currency: string;
   compareLabel: string;
   dateRange: DateRange;
   comparison: DateRange;
+  /** Defaults to the grid's fill-the-tile behaviour; the print page opts into "auto". */
+  fit?: WidgetFit;
 }) {
+  const auto = fit === "auto";
   const def = getWidget(widget.type);
   if (!def) {
     return (
@@ -263,7 +276,7 @@ function SnapshotWidgetFrame({
   // an image) is not a card, so it gets no Panel and no title row.
   if (def.chromeless) {
     return (
-      <div className="h-full w-full px-1">
+      <div className={cn("w-full px-1", !auto && "h-full")}>
         <WidgetErrorBoundary>
           <SnapshotWidgetBody
             widget={widget}
@@ -278,7 +291,7 @@ function SnapshotWidgetFrame({
   }
 
   return (
-    <Panel className="h-full w-full flex flex-col overflow-hidden">
+    <Panel className={cn("w-full flex flex-col", !auto && "h-full overflow-hidden")}>
       <div className="flex items-center gap-1.5 px-3 h-8 shrink-0 border-b border-hairline/60">
         <span className="text-[12px] font-medium text-ink-secondary truncate flex-1">{title}</span>
         {filterLabel && (
@@ -291,7 +304,7 @@ function SnapshotWidgetFrame({
           </span>
         )}
       </div>
-      <div className="flex-1 min-h-0 p-3">
+      <div className={cn("p-3", !auto && "flex-1 min-h-0")}>
         <WidgetErrorBoundary>
           <SnapshotWidgetBody
             widget={widget}
@@ -308,7 +321,7 @@ function SnapshotWidgetFrame({
 
 // --- Grid ------------------------------------------------------------------
 
-interface PlacedWidget {
+export interface PlacedWidget {
   widget: SnapshotWidget;
   item: GridItem;
 }
@@ -317,7 +330,7 @@ interface PlacedWidget {
  * Pairs each widget with its `lg` layout item. A widget the layout forgot is
  * appended full width below everything else rather than dropped.
  */
-function placeWidgets(snapshot: ViewSnapshot): PlacedWidget[] {
+export function placeWidgets(snapshot: ViewSnapshot): PlacedWidget[] {
   const byKey = new Map(snapshot.layouts.lg?.map((item) => [item.i, item]) ?? []);
   let nextY = Math.max(0, ...(snapshot.layouts.lg ?? []).map((i) => i.y + i.h));
 

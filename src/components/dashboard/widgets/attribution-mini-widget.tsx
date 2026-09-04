@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from "recharts";
 import { useAttributionComparison } from "@/hooks/use-metrics";
+import { useChartAnimation } from "@/components/dashboard/print-mode";
 import { useAppStore } from "@/store/app-store";
 import { useSelectedClient } from "@/hooks/use-selected-client";
 import { DemoOnlyWidgetPlaceholder } from "@/components/dashboard/demo-only";
@@ -43,6 +44,7 @@ export function AttributionMiniChart({
   modelA: AttributionModel;
   modelB: AttributionModel;
 }) {
+  const animated = useChartAnimation();
   const a = comparison.models.find((m) => m.model === modelA);
   const b = comparison.models.find((m) => m.model === modelB);
   const labelA = a?.label ?? "First Touch";
@@ -79,12 +81,12 @@ export function AttributionMiniChart({
             <XAxis dataKey="platform" tick={{ fontSize: 10, fill: "#6b6b6b" }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 9, fill: "#6b6b6b" }} axisLine={false} tickLine={false} width={28} tickFormatter={(v) => `${v}%`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => [`${Number(v).toFixed(1)}%`, ""]} />
-            <Bar dataKey={labelA} radius={[3, 3, 0, 0]}>
+            <Bar dataKey={labelA} radius={[3, 3, 0, 0]} isAnimationActive={animated}>
               {chartData.map((entry, i) => (
                 <Cell key={`a-${i}`} fill={entry.color} fillOpacity={0.4} />
               ))}
             </Bar>
-            <Bar dataKey={labelB} radius={[3, 3, 0, 0]}>
+            <Bar dataKey={labelB} radius={[3, 3, 0, 0]} isAnimationActive={animated}>
               {chartData.map((entry, i) => (
                 <Cell key={`b-${i}`} fill={entry.color} />
               ))}

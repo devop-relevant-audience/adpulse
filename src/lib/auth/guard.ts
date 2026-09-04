@@ -45,13 +45,12 @@ export function isAgency(ctx: AuthContext): boolean {
   return ctx.profile?.role === "agency_admin" || ctx.profile?.role === "agency_member";
 }
 
+// The access question on its own, with no NextResponse attached — for callers
+// that are not route handlers (a server component that renders notFound()).
 // Agency roles pass unconditionally; a client_user passes only for a client
 // linked to one of their Atlas projects. Single indexed join — runs per request.
-export async function requireClientAccess(
-  ctx: AuthContext,
-  clientId: string
-): Promise<GuardResult> {
-  if (isAgency(ctx)) return { ok: true, ctx };
+export async function canAccessClient(ctx: AuthContext, clientId: string): Promise<boolean> {
+  if (isAgency(ctx)) return true;
 
   const [row] = await db
     .select({ id: clients.id })
@@ -60,7 +59,14 @@ export async function requireClientAccess(
     .where(and(eq(clients.id, clientId), eq(atlasProjectUsers.clerkUserId, ctx.userId)))
     .limit(1);
 
-  return row ? { ok: true, ctx } : forbidden();
+  return !!row;
+}
+
+export async function requireClientAccess(
+  ctx: AuthContext,
+  clientId: string
+): Promise<GuardResult> {
+  return (await canAccessClient(ctx, clientId)) ? { ok: true, ctx } : forbidden();
 }
 
 // Agency-only. Pass `"agency_admin"` to further restrict to admins.

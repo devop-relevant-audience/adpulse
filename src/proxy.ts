@@ -7,16 +7,22 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest } from "next/server";
 
 const isLoginRoute = createRouteMatcher(["/login(.*)"]);
+const isPrintRoute = createRouteMatcher(["/print/reports/(.*)"]);
 
 // Public surfaces that must work without a session: the sign-in page, public
-// shared-report links (`/?share=<token>`), and the share-view API (token +
-// password are checked inside the route, which is also rate-limited).
+// shared-report links (`/?share=<token>`), the share-view API (token +
+// password are checked inside the route, which is also rate-limited), and a
+// print page carrying a `t` token — that is the PDF exporter's own headless
+// browser, which has no session. The signature is verified inside the page,
+// which 404s without a valid one; a print request WITHOUT `t` is a human and
+// keeps going through the normal gate.
 function isPublic(req: NextRequest): boolean {
   const { pathname, searchParams } = req.nextUrl;
   return (
     isLoginRoute(req) ||
     (pathname === "/" && searchParams.has("share")) ||
-    (pathname === "/api/reports/share" && req.method === "GET")
+    (pathname === "/api/reports/share" && req.method === "GET") ||
+    (isPrintRoute(req) && searchParams.has("t"))
   );
 }
 

@@ -119,6 +119,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Chromium is launched, not bundled: the PDF export (src/lib/reports/pdf.ts)
+  // loads these through native require at runtime, and bundling them would
+  // break the binary lookup (and balloon the function).
+  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium", "puppeteer"],
   async headers() {
     return [
       {
